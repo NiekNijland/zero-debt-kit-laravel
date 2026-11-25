@@ -1,18 +1,50 @@
 # zero-debt-kit-laravel
 
-A portable program that brings a codebase to this state: every task is done one way, the way is written down with a file to copy, a guard in CI stops the old way coming back, every debt counter is at zero, and nothing lets a counter grow again.
+Green CI does not mean a codebase has a shape. You can have high coverage and PHPStan at level 8 and still end up with three ways to authorize a route, four ways to write a test helper and a new pattern with every pull request. A linter checks lines, not structure. With AI agents writing a growing share of the code, the drift gets faster.
 
-The kit prescribes: every project converges to the same patterns and structure; only techniques differ (`01-principles.md`, "Who decides what"). It gets better with every project that uses it: the last step of a run writes its lessons back here.
+This kit makes CI the quality gate for structure. It does that with two mechanisms:
 
-The kit is generic: it holds no organisation-specific rule, name, address or token. What an organisation manages for itself (a shared formatter config, shared pipeline images, an autofix commit) is asked in step 1 and stays the organisation's.
+- **Architecture tests** decide, per task, the one allowed way: where a class lives, what it may depend on, how a controller or a test is shaped. Code that does it another way fails the build, with a message that says what to do instead.
+- **Ratchets** are counters for everything that is still wrong: old violations, suppressions, skips, oversized files, baselines. A counter may only go down. Nothing can be added to make a build green, and at zero the list is deleted and CI fails if it comes back.
 
-## Scope
+Together they are the guards. The result: anyone, including an agent working unattended, can contribute, and when CI is green the code fits your design patterns. The old way cannot come back, and the rules do not depend on a reviewer remembering them.
 
-The method and the shell tools (`tools/`, `ci/`) work for any stack. The catalogs, the reference project and the tool configs are written for Laravel (PHP) with a React frontend, on Pest, PHPStan, Rector and Pint. `catalog/other-stacks.md` maps the rows to other stacks, but nothing outside Laravel and React has been run.
+## What it is
 
-## About this kit
+A program you hand to an AI agent in your repository. It measures the codebase, writes down the one way per task (with a file to copy), puts a guard in CI for every rule, and burns the old way down to zero in ten steps. You sign off at three gates; the agent does the rest. It brings a codebase to this state: every task is done one way, the way is written down, a guard stops the old way coming back, every debt counter is at zero, and nothing lets a counter grow again.
 
-The kit came out of one real cleanup of a Laravel and React application. `reference-project/` is an anonymized extract of that application's guards, configs and guides, rewritten onto an example domain (a small web shop): the names in it are illustrative, the lists and guides are shortened, and the code is not a runnable application. Read it for the shape of a guard, not for a product.
+It is one standard: there is no lighter version of done. If you only want a single guard, take it from `reference-project/` and `04-guards.md`; you do not need the whole program for that.
+
+## Who it is for
+
+Teams on Laravel and React (Pest, PHPStan, Rector, Pint) that already have decent coverage and static analysis and still see patterns drift, especially when agents write code. The method and the shell tools work for any stack; the catalogs, the reference project and the tool configs are written for Laravel and React. `catalog/other-stacks.md` maps the rows to other stacks, but nothing outside Laravel and React has been run.
+
+It came out of one real cleanup of a Laravel and React application and is being applied to a second one. The lessons of each run are written back into the kit. It prescribes: every project converges to the same patterns and structure; only techniques differ (`01-principles.md`, "Who decides what").
+
+It is generic: it holds no organisation-specific rule, name, address or token. What an organisation manages for itself (a shared formatter config, shared pipeline images, an autofix commit) is asked in step 1 and stays the organisation's.
+
+## What the gate looks like
+
+A class in a place the layout table does not allow. The architecture test names the rule, the place and the fix:
+
+```text
+FAIL  keeps every new class in the layout of the guide
+place app/Helpers/QuickFix.php: no folder of the layout tables in app/AGENTS.md holds a class here.
+Move it to the folder its table row names (domain code to a module folder), as the tables say.
+```
+
+A suppression added to make a static-analysis error go away. The ratchet row is at zero, and a row at zero never takes an override:
+
+```text
+ratchet            may    base    head  change  result
+analyser-baseline  down   9977       0   -9977  ok
+analyser-ignore    down      0       1      +1  FAILS
+comments           down   3630    3631      +1  FAILS
+
+A ratchet moved the wrong way. A row that is at 0 never takes an override: fix the entries.
+```
+
+The first output is the message of a guard in the reference project; the second shows the shape of the ratchet script's table, with numbers from a real run (`tools/ci-ratchets.sh`).
 
 ## How to use it
 
@@ -20,11 +52,15 @@ The kit came out of one real cleanup of a Laravel and React application. `refere
 2. The agent asks the questions of step 1 that it cannot answer from the repository, then measures, maps the catalog onto the project and audits. No code changes. You sign the definition of clean and answer every question that is yours, all in step 1.
 3. The agent works through steps 2 to 10 of `05-program.md` and stops for your go after steps 1, 3 and 10, or when a decision is yours. A step that changes source code ends with a runtime check on a production-like environment.
 
-**One standard.** The kit has no lighter variants: the program ends at step 10 with the definition of clean met, every counter at zero and nothing that lets debt grow. A project that has not met it is not done; it is not a smaller version of done.
+Step 1 changes nothing in the repository. It produces four files: a project profile, a measured plan with a dashboard of every counter, a backlog and a hand-off note.
 
 ## The ten steps
 
 1 Discover and define · 2 Make the checks tell the truth · 3 Freeze the patterns · 4 Test foundation · 5 Layout · 6 Types · 7 Module hygiene · 8 Patterns · 9 Fill and trim · 10 Lock and audit
+
+## About the reference project
+
+`reference-project/` is an anonymized extract of an application's guards, configs and guides, rewritten onto an example domain (a small web shop): the names in it are illustrative, the lists and guides are shortened, and the code is not a runnable application. Read it for the shape of a guard, not for a product. Its `README.md` lists where it falls short of the kit.
 
 ## Files
 
