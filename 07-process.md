@@ -115,7 +115,7 @@ Work in a chain. When PR B depends on PR A, or follows it in the same step, B st
 
 1. Each branch starts from its parent's tip and its PR **targets the parent's branch**. The diff shows only its own commits.
 2. The reviewers approve in chain order. Each PR is reviewed against its parent.
-3. Merge from the bottom: the first PR to the main line, then the next. When the parent merges, the host retargets the child to the main line; check it did. If the host does not, retarget it with the API (no push, so no approval is voided). A child never needs a push after its parent merges while the chain was built on the parent's final tip.
+3. Merge from the bottom: the first PR to the main line, then the next. **Merge the parent with its source branch closed** (`close_source_branch: true` on Bitbucket; the same option on other hosts): the host then retargets the child to the main line itself and the child keeps its approvals. Merging with the branch kept leaves the child pointing at the parent's branch, and retargeting it by hand voids its approvals (observed on Bitbucket). Check afterwards that the child's destination is the main line. A child never needs a push after its parent merges while the chain was built on the parent's final tip.
 4. A fix on a lower PR is a push to that branch: merge it into each child in the same round and push each child once, and say before you push which approvals it voids. Do the fix before the first approval where you can.
 
 Rules that stay: where two PRs must change one register or one guide file, put them in one PR or in one chain, never side by side; codemod branches follow section 6; one move branch at a time (D5).
