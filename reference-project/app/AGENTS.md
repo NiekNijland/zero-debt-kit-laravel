@@ -62,6 +62,15 @@ no alias, an alias that points at a class outside those folders, and a name list
 or notification adds its line. One who moves or renames one writes the data migration or the alias first, then replaces the
 line by the new name; the old name of a job, mail or notification may stay listed while its alias exists.
 
+A queued class, a closure given to a queue and a moved class are also listed in `database/stored-names`, one sorted file per
+kind (`queued-classes.txt`, `closure-classes.txt`, `aliases.tsv`). Every queued job carries its class name in the queue
+payload, so each is a line of `queued-classes.txt`. A closure given to `Bus::chain()->catch()`, `dispatch()` or `Queue::push()`
+is serialized into the job payload with its defining class as scope and every class its body names, so each of those is a line
+of `closure-classes.txt`. `aliases.tsv` holds one line per moved class (old name, new name, one tab, sorted by old name); both
+names stay on the registers until the alias leaves. `tests/Unit/StoredNameRegisterArchitectureTest.php` with
+`tests/Support/Architecture/StoredNameRegisterGuard.php` compares the registers with the code, both directions, and fails a
+guide that lost these sentences.
+
 `Contracts`, `Enums`, `Exceptions` and `ValueObjects` are pure, and so is `app/Support`: they never reference a model or the database
 layer. A `Data` class may name a model only inside its static `from*` factories (`fromModel()`, `fromPaginator()`): that is where a model
 becomes Data, as `XData::from($model)` or `XData::fromModel($model)`. Its properties, constructor and every other method stay model-free;
@@ -71,6 +80,12 @@ model gets its factory in a `<Name>Exceptions` class in the `Support` of the mod
 
 ## ONE WAY PER TASK
 
+- **Size**: a PHP file has at most 400 lines; a method at most 80 lines, a controller action at most 40. A big class splits by
+  responsibility, never by line count. `tests/Unit/MethodSizeArchitectureTest.php` takes both numbers from this sentence, so
+  the guide and the guard cannot disagree.
+- **Final by default**: every concrete class in `app` is `final`. A parent class is `abstract`; a concrete class is never
+  extended (it becomes abstract, or its children are folded into it). `tests/Unit/ClosedClassArchitectureTest.php` fails an open
+  class, an extended concrete class and a stale line of the counted list of open classes, which is empty.
 - **Business logic** is an Action. A job, command, listener or controller calls it. A controller holds no `DB::` call, lock, transaction or write method (save, update, create, delete, attach, sync, ...) except on an Action or service it gets through its constructor, and its `__invoke` is at most 40 lines; `tests/Unit/ThinControllersArchitectureTest.php` enforces it without a list. A page controller hands its props to an `XPageService`; side effects of a visit go in an Action.
 - **Dependencies** come through the constructor, or through `handle()` in jobs and commands; a private method that
   needs one takes it as a parameter. A FormRequest cannot take constructor arguments: `rules()`, `authorize()` and
