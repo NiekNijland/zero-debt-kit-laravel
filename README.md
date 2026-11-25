@@ -9,9 +9,33 @@ This kit makes CI the quality gate for structure. It does that with two mechanis
 
 Together they are the guards. The result: anyone, including an agent working unattended, can contribute, and when CI is green the code fits your design patterns. The old way cannot come back, and the rules do not depend on a reviewer remembering them.
 
+## What the gate looks like
+
+A class in a place the layout table does not allow. The architecture test names the rule, the place and the fix:
+
+```text
+FAIL  keeps every class of a module in the folders of the module table of app/AGENTS.md
+place app/Modules/Orders/Loose.php: no folder of the module table in app/AGENTS.md holds a class here.
+A class sits in <Domain>/<Folder>/[<Subdomain>/]<Class>.php, never in the module root or a folder the
+table does not name, as the table says.
+```
+
+A suppression added to make a static-analysis error go away. The ratchet row is at zero, so the build fails, and a row at zero never takes an override:
+
+```text
+ratchet                                 may    base    head  change  result
+analyser-baseline                      down       0       0      +0  ok
+analyser-ignore                        down       0       1      +1  FAILS
+
+A ratchet moved the wrong way, or a row was redefined or removed. A row that is at 0 never takes an override: fix the entries. Other rows can be explained in a commit that touches that row's files, or this script for a redefined or removed row:
+  [ratchet: <name>] <reason>
+```
+
+The first output is the message of a guard in `reference-project/`; the second is what `tools/ci-ratchets.sh` prints when a suppression is added (the numbers are illustrative).
+
 ## What it is
 
-A program you hand to an AI agent in your repository. It measures the codebase, writes down the one way per task (with a file to copy), puts a guard in CI for every rule, and burns the old way down to zero in ten steps. You sign off at three gates; the agent does the rest. It brings a codebase to this state: every task is done one way, the way is written down, a guard stops the old way coming back, every debt counter is at zero, and nothing lets a counter grow again.
+A program you hand to an AI agent in your repository. It measures the codebase, writes down the one way per task (with a file to copy), puts a guard in CI for every rule, and burns the old way down to zero in ten steps. You sign off at three gates and answer the questions that are yours; the agent does the rest. The end state: every task is done one way, the way is written down, a guard stops the old way coming back, every debt counter is at zero, and nothing lets a counter grow again.
 
 It is one standard: there is no lighter version of done. If you only want a single guard, take it from `reference-project/` and `04-guards.md`; you do not need the whole program for that.
 
@@ -19,32 +43,9 @@ It is one standard: there is no lighter version of done. If you only want a sing
 
 Teams on Laravel and React (Pest, PHPStan, Rector, Pint) that already have decent coverage and static analysis and still see patterns drift, especially when agents write code. The method and the shell tools work for any stack; the catalogs, the reference project and the tool configs are written for Laravel and React. `catalog/other-stacks.md` maps the rows to other stacks, but nothing outside Laravel and React has been run.
 
-It came out of one real cleanup of a Laravel and React application and is being applied to a second one. The lessons of each run are written back into the kit. It prescribes: every project converges to the same patterns and structure; only techniques differ (`01-principles.md`, "Who decides what").
+It is proven on one real cleanup of one Laravel and React application; the lessons of each run are written back into the kit. The kit decides the patterns and the structure, and only techniques differ between projects (`01-principles.md`, "Who decides what").
 
 It is generic: it holds no organisation-specific rule, name, address or token. What an organisation manages for itself (a shared formatter config, shared pipeline images, an autofix commit) is asked in step 1 and stays the organisation's.
-
-## What the gate looks like
-
-A class in a place the layout table does not allow. The architecture test names the rule, the place and the fix:
-
-```text
-FAIL  keeps every new class in the layout of the guide
-place app/Helpers/QuickFix.php: no folder of the layout tables in app/AGENTS.md holds a class here.
-Move it to the folder its table row names (domain code to a module folder), as the tables say.
-```
-
-A suppression added to make a static-analysis error go away. The ratchet row is at zero, and a row at zero never takes an override:
-
-```text
-ratchet            may    base    head  change  result
-analyser-baseline  down   9977       0   -9977  ok
-analyser-ignore    down      0       1      +1  FAILS
-comments           down   3630    3631      +1  FAILS
-
-A ratchet moved the wrong way. A row that is at 0 never takes an override: fix the entries.
-```
-
-The first output is the message of a guard in the reference project; the second shows the shape of the ratchet script's table, with numbers from a real run (`tools/ci-ratchets.sh`).
 
 ## How to use it
 
