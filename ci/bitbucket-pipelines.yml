@@ -1,0 +1,175 @@
+# Skeleton for Bitbucket Pipelines. Replace every <placeholder>.
+# A repository without a pipeline copies this file to bitbucket-pipelines.yml. A repository that has one keeps its
+# file and adds these steps to it; every deploy, service and cache definition stays (05-program.md, step 2).
+# The checks are split into the parts of PARTS in scripts/checks.sh, one step each (bash scripts/checks.sh --list-parts): keep
+# one step per part, or a check falls out of the pipeline. None has a condition: they run on every pull request, a docs-only one too.
+# To re-run a pull-request pipeline without a push, POST /pipelines with pipeline_pullrequest_target (single shot: no fallback).
+# A path condition may go on a test step, never on the checks step. No step commits or pushes.
+# The image is pinned by digest and every step has a maximum time.
+# A project without a database leaves the database service out.
+# The scheduled pipeline is the custom pipeline "scheduled"; its schedule (once a day) is made in the repository
+# settings by someone with admin rights.
+# A pull-request pipeline merges the destination branch into the checkout first, so HEAD is that merge and
+# BITBUCKET_COMMIT is not: the checks read HEAD, and CHECK_HEAD is never set here.
+# Step 9 of the program adds one line to the backend tests of a pull request: bash scripts/mutation.sh --changed (the files
+# the pull request changes, with the committed minimum score).
+
+# Speed (04-guards.md C4, "CI speed"): cache the dependency directories and downloaded tools by the hash of the lock file,
+# keep the analyser's result cache between builds (not the type-aware lint cache), run independent jobs side by side, and
+# switch the package manager's process timeout off for the long scripts (Composer: Composer\Config::disableProcessTimeout).
+# A formatter config that the organisation hosts as a URL stays a URL: download it once per run (cached), never commit it.
+# Every branch that deploys gets the "on a deploying branch" runs, not only the main branch, and each suite runs once per
+# trigger before the deploy step (where this pipeline is the deploy pipeline, the smoke job sits in front of the deploy).
+# The audit of a deploying branch covers production dependencies only (--omit=dev); the pull request and the scheduled run
+# audit everything.
+
+image: <image with bash, git and the project's toolchain, pinned by digest>
+
+clone:
+  depth: full
+
+definitions:
+  caches:
+    dependencies:
+      key:
+        files:
+          - <lock file of the package manager>
+      path: <dependency directory of the package manager>
+  services:
+    database:
+      image: <the image of DATABASE_IMAGE in scripts/kit-config.sh>
+
+pipelines:
+  pull-requests:
+    '**':
+      - parallel:
+          - step:
+              name: Checks gate
+              max-time: <maximum minutes>
+              caches:
+                - dependencies
+              script:
+                - export CHECK_BASE="$BITBUCKET_PR_DESTINATION_BRANCH"
+                - <install dependencies from the lock file>
+                - <install gitleaks at a pinned version, checked against its checksum (the repo part runs it)>
+                - bash scripts/checks.sh --part gate
+          - step:
+              name: Checks static
+              max-time: <maximum minutes>
+              caches:
+                - dependencies
+              script:
+                - export CHECK_BASE="$BITBUCKET_PR_DESTINATION_BRANCH"
+                - <install dependencies from the lock file>
+                - <install gitleaks at a pinned version, checked against its checksum (the repo part runs it)>
+                - bash scripts/checks.sh --part static
+          - step:
+              name: Checks guards
+              max-time: <maximum minutes>
+              caches:
+                - dependencies
+              script:
+                - export CHECK_BASE="$BITBUCKET_PR_DESTINATION_BRANCH"
+                - <install dependencies from the lock file>
+                - <install gitleaks at a pinned version, checked against its checksum (the repo part runs it)>
+                - bash scripts/checks.sh --part guards
+          - step:
+              name: Checks repo
+              max-time: <maximum minutes>
+              caches:
+                - dependencies
+              script:
+                - export CHECK_BASE="$BITBUCKET_PR_DESTINATION_BRANCH"
+                - <install dependencies from the lock file>
+                - <install gitleaks at a pinned version, checked against its checksum (the repo part runs it)>
+                - bash scripts/checks.sh --part repo
+          - step:
+              name: Backend tests
+              max-time: <maximum minutes>
+              services:
+                - database
+              script:
+                - <install dependencies from the lock file>
+                - <backend test command, with coverage held at the committed floor (tools/README.md, "Coverage")>
+          - step:
+              name: Frontend tests
+              max-time: <maximum minutes>
+              script:
+                - <install dependencies from the lock file>
+                - <frontend test command, with coverage held at the committed floor (tools/README.md, "Coverage")>
+          - step:
+              name: Smoke
+              max-time: <maximum minutes>
+              services:
+                - database
+              script:
+                - <install dependencies from the lock file>
+                - <boot the stack with seeded data and the production drivers (cache store, queue, database engine)>
+                - <smoke suite command, in a browser where the project has a frontend, after installing that browser at a pinned version>
+  branches:
+    '{<main branch>,<other deploying branch>}':
+      - parallel:
+          - step:
+              name: Checks gate on the main branch
+              max-time: <maximum minutes>
+              caches:
+                - dependencies
+              script:
+                - <install dependencies from the lock file>
+                - bash scripts/checks.sh --main --part gate
+          - step:
+              name: Checks static on the main branch
+              max-time: <maximum minutes>
+              caches:
+                - dependencies
+              script:
+                - <install dependencies from the lock file>
+                - bash scripts/checks.sh --main --part static
+          - step:
+              name: Checks guards on the main branch
+              max-time: <maximum minutes>
+              caches:
+                - dependencies
+              script:
+                - <install dependencies from the lock file>
+                - bash scripts/checks.sh --main --part guards
+          - step:
+              name: Checks repo on the main branch
+              max-time: <maximum minutes>
+              caches:
+                - dependencies
+              script:
+                - <install dependencies from the lock file>
+                - bash scripts/checks.sh --main --part repo
+          - step:
+              name: Backend tests
+              max-time: <maximum minutes>
+              services:
+                - database
+              script:
+                - <install dependencies from the lock file>
+                - <backend test command, with coverage held at the committed floor (tools/README.md, "Coverage")>
+          - step:
+              name: Frontend tests
+              max-time: <maximum minutes>
+              script:
+                - <install dependencies from the lock file>
+                - <frontend test command, with coverage held at the committed floor (tools/README.md, "Coverage")>
+          - step:
+              name: Smoke
+              max-time: <maximum minutes>
+              services:
+                - database
+              script:
+                - <install dependencies from the lock file>
+                - <boot the stack with seeded data and the production drivers (cache store, queue, database engine)>
+                - <smoke suite command, in a browser where the project has a frontend, after installing that browser at a pinned version>
+  custom:
+    scheduled:
+      - step:
+          name: Scheduled
+          max-time: <maximum minutes>
+          script:
+            - <install dependencies from the lock file>
+            - bash scripts/checks.sh --scheduled
+            - bash scripts/mutation.sh

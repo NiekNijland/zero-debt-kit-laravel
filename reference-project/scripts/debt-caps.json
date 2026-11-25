@@ -1,0 +1,5 @@
+{
+    "support-classes-without-own-test": 0,
+    "frontend-logic-without-test": 10,
+    "frontend-components-without-test": 20
+}

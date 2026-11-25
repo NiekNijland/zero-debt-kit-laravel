@@ -1,0 +1,109 @@
+# Skeleton for GitLab CI. Replace every <placeholder>.
+# A repository without a pipeline copies this file to .gitlab-ci.yml. A repository that has one keeps its
+# file and adds these jobs and rules to it; every deploy, service and cache definition stays (05-program.md, step 2).
+# The checks job is a matrix over the parts of PARTS in scripts/checks.sh (bash scripts/checks.sh --list-parts).
+# The checks job runs on every merge request, a docs-only one too: its rule has no changes filter.
+# A changes rule may go on a test job, never on the checks job. No job commits or pushes.
+# The image is pinned by digest and every job has a maximum time.
+# A project without a database leaves the services blocks out.
+# The scheduled pipeline (once a day) is made under the project's pipeline schedules by someone with maintainer rights.
+# Step 9 of the program adds one line to backend-tests, on merge requests only: the mutation tool on the files
+# the merge request changes, with the committed minimum score.
+
+# Speed (04-guards.md C4, "CI speed"): cache the dependency directories and downloaded tools by the hash of the lock file,
+# keep the analyser's result cache between builds (not the type-aware lint cache), run independent jobs side by side, and
+# switch the package manager's process timeout off for the long scripts (Composer: Composer\Config::disableProcessTimeout).
+# A formatter config that the organisation hosts as a URL stays a URL: download it once per run (cached), never commit it.
+# Every branch that deploys gets the "on a deploying branch" runs, not only the main branch, and each suite runs once per
+# trigger before the deploy step (where this pipeline is the deploy pipeline, the smoke job sits in front of the deploy).
+# The audit of a deploying branch covers production dependencies only (--omit=dev); the pull request and the scheduled run
+# audit everything.
+# Dependency cache: a cache block keyed by the lock file (key: files: [<lock file>]), with the dependency directory as path.
+# Step 9 of the program adds, to backend-tests on merge requests: bash scripts/mutation.sh --changed.
+
+image: <image with bash, git and the project's toolchain, pinned by digest>
+
+variables:
+  GIT_DEPTH: 0
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH == "<other deploying branch>"
+
+stages:
+  - verify
+
+checks:
+  stage: verify
+  timeout: <maximum minutes> minutes
+  parallel:
+    matrix:
+      - PART: [gate, static, guards, repo]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  variables:
+    CHECK_BASE: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+    CHECK_HEAD: $CI_COMMIT_SHA
+  script:
+    - <install dependencies from the lock file>
+    - <install gitleaks at a pinned version, checked against its checksum>
+    - bash scripts/checks.sh --part $PART
+
+checks-main:
+  stage: verify
+  timeout: <maximum minutes> minutes
+  parallel:
+    matrix:
+      - PART: [gate, static, guards, repo]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && ($CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_BRANCH == "<other deploying branch>")
+  script:
+    - <install dependencies from the lock file>
+    - bash scripts/checks.sh --main --part $PART
+
+backend-tests:
+  stage: verify
+  timeout: <maximum minutes> minutes
+  services:
+    - name: <the image of DATABASE_IMAGE in scripts/kit-config.sh>
+      alias: database
+  rules:
+    - if: $CI_PIPELINE_SOURCE != "schedule"
+  script:
+    - <install dependencies from the lock file>
+    - <backend test command, with coverage held at the committed floor (tools/README.md, "Coverage")>
+
+frontend-tests:
+  stage: verify
+  timeout: <maximum minutes> minutes
+  rules:
+    - if: $CI_PIPELINE_SOURCE != "schedule"
+  script:
+    - <install dependencies from the lock file>
+    - <frontend test command, with coverage held at the committed floor (tools/README.md, "Coverage")>
+
+smoke:
+  stage: verify
+  timeout: <maximum minutes> minutes
+  services:
+    - name: <the image of DATABASE_IMAGE in scripts/kit-config.sh>
+      alias: database
+  rules:
+    - if: $CI_PIPELINE_SOURCE != "schedule"
+  script:
+    - <install dependencies from the lock file>
+    - <boot the stack with seeded data and the production drivers (cache store, queue, database engine)>
+    - <smoke suite command, in a browser where the project has a frontend, after installing that browser at a pinned version>
+
+scheduled:
+  stage: verify
+  timeout: <maximum minutes> minutes
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  script:
+    - <install dependencies from the lock file>
+    - bash scripts/checks.sh --scheduled
+    - bash scripts/mutation.sh

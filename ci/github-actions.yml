@@ -1,0 +1,116 @@
+# Skeleton for GitHub Actions. Replace every <placeholder>.
+# A repository without a workflow copies this file to .github/workflows/ci.yml. A repository that has one keeps its
+# file and adds these jobs and triggers to it; every deploy, service and cache definition stays (05-program.md, step 2).
+# The checks job is a matrix over the parts of PARTS in scripts/checks.sh (bash scripts/checks.sh --list-parts): one entry per part.
+# The pull_request trigger has no path filter: the checks job runs on every pull request, a docs-only one too.
+# A path filter may go on a test job, never on the checks job. No job commits or pushes.
+# Every runner image is a fixed version, every action a commit sha, every job has a maximum time.
+# Full history (fetch-depth 0) only where a run compares with a base or reads history: checks, backend-tests (for
+# the mutation run of step 9) and scheduled. A project without a database leaves the services blocks out.
+# Step 9 of the program adds one step to backend-tests, on pull requests only: the mutation tool on the files
+# the pull request changes, with the committed minimum score. That job fetches the full history for it.
+
+# Speed (04-guards.md C4, "CI speed"): cache the dependency directories and downloaded tools by the hash of the lock file,
+# keep the analyser's result cache between builds (not the type-aware lint cache), run independent jobs side by side, and
+# switch the package manager's process timeout off for the long scripts (Composer: Composer\Config::disableProcessTimeout).
+# A formatter config that the organisation hosts as a URL stays a URL: download it once per run (cached), never commit it.
+# Every branch that deploys gets the "on a deploying branch" runs, not only the main branch, and each suite runs once per
+# trigger before the deploy step (where this pipeline is the deploy pipeline, the smoke job sits in front of the deploy).
+# The audit of a deploying branch covers production dependencies only (--omit=dev); the pull request and the scheduled run
+# audit everything.
+# Dependency cache: an actions/cache step (pinned by commit sha) keyed by the hash of the lock file, before the install step.
+# Step 9 of the program adds, to backend-tests on pull requests: bash scripts/mutation.sh --changed (with fetch-depth 0).
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: ['<main branch>', '<other deploying branch>']
+  schedule:
+    - cron: '<cron expression: once a day>'
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: <maximum minutes>
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [gate, static, guards, repo]
+    env:
+      CHECK_BASE: ${{ github.base_ref }}
+      CHECK_HEAD: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@<commit sha of the release the project pins>
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - run: <install dependencies from the lock file>
+      - run: <install gitleaks at a pinned version, checked against its checksum>
+      - run: bash scripts/checks.sh --part ${{ matrix.part }}
+
+  checks-main:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: <maximum minutes>
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [gate, static, guards, repo]
+    steps:
+      - uses: actions/checkout@<commit sha of the release the project pins>
+      - run: <install dependencies from the lock file>
+      - run: bash scripts/checks.sh --main --part ${{ matrix.part }}
+
+  backend-tests:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: <maximum minutes>
+    services:
+      database:
+        image: <the image of DATABASE_IMAGE in scripts/kit-config.sh>
+    steps:
+      - uses: actions/checkout@<commit sha of the release the project pins>
+        with:
+          fetch-depth: 0
+      - run: <install dependencies from the lock file>
+      - run: <backend test command, with coverage held at the committed floor (tools/README.md, "Coverage")>
+
+  frontend-tests:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: <maximum minutes>
+    steps:
+      - uses: actions/checkout@<commit sha of the release the project pins>
+      - run: <install dependencies from the lock file>
+      - run: <frontend test command, with coverage held at the committed floor (tools/README.md, "Coverage")>
+
+  smoke:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: <maximum minutes>
+    services:
+      database:
+        image: <the image of DATABASE_IMAGE in scripts/kit-config.sh>
+    steps:
+      - uses: actions/checkout@<commit sha of the release the project pins>
+      - run: <install dependencies from the lock file>
+      - run: <boot the stack with seeded data and the production drivers (cache store, queue, database engine)>
+      - run: <smoke suite command, in a browser where the project has a frontend, after installing that browser at a pinned version>
+
+  scheduled:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: <maximum minutes>
+    steps:
+      - uses: actions/checkout@<commit sha of the release the project pins>
+        with:
+          fetch-depth: 0
+      - run: <install dependencies from the lock file>
+      - run: bash scripts/checks.sh --scheduled
+      - run: bash scripts/mutation.sh

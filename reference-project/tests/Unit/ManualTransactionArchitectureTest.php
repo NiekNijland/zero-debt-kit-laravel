@@ -1,0 +1,49 @@
+<?php
+
+declare(strict_types=1);
+
+use Tests\Support\Architecture\ManualTransactionGuard;
+use Tests\Support\Architecture\PhpFileInspector;
+
+dataset('transactions handled by hand', [
+    'begin and commit' => ["<?php\nnamespace App;\nuse Illuminate\\Support\\Facades\\DB;\nfinal class Save { public function handle(): void { DB::beginTransaction(); \$this->write(); DB::commit(); } }\n", 'committed by hand,opened by hand'],
+    'begin, commit and a rollback in a catch' => ["<?php\nnamespace App;\nuse Illuminate\\Support\\Facades\\DB;\nfinal class Save { public function handle(): void { DB::beginTransaction(); try { \$this->write(); DB::commit(); } catch (\\Throwable \$e) { DB::rollBack(); throw \$e; } } }\n", 'committed by hand,opened by hand,rolled back by hand'],
+    'a named connection' => ["<?php\nnamespace App;\nuse Illuminate\\Support\\Facades\\DB;\nDB::connection('landlord')->beginTransaction();\nDB::connection('landlord')->commit();\n", 'opened by hand,committed by hand'],
+    'an injected connection' => ["<?php\nnamespace App;\nfinal class Save { public function handle(): void { \$this->connection->beginTransaction(); \$this->connection->rollBack(); } }\n", 'opened by hand,rolled back by hand'],
+    'the global alias' => ["<?php\nnamespace App;\n\\DB::beginTransaction();\n\\DB::commit();\n", 'opened by hand,committed by hand'],
+    'a dry run whose rollback sits in another method' => ["<?php\nnamespace App;\nuse Illuminate\\Support\\Facades\\DB;\nfinal class Preview { public function a(): void { DB::beginTransaction(); } public function b(): void { try { f(); } finally { DB::rollBack(); } } }\n", 'opened by hand'],
+]);
+
+it('detects a transaction that is opened, committed or rolled back by hand', function (string $source, string $reasons): void {
+    $violations = new ManualTransactionGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source);
+
+    expect($violations)->toHaveCount(count(explode(',', $reasons)));
+
+    foreach (explode(',', $reasons) as $index => $reason) {
+        expect($violations[$index])->toContain($reason)->toContain('DB::transaction(fn () => ...)');
+    }
+})->with('transactions handled by hand');
+
+it('accepts DB::transaction, a dry run that always rolls back and a commit that is not of the database', function (): void {
+    $source = <<<'PHP'
+        <?php
+        namespace App;
+        use Illuminate\Support\Facades\DB;
+        final class Save
+        {
+            public function handle(): int { return DB::transaction(fn (): int => $this->write()); }
+            public function preview(): int
+            {
+                DB::beginTransaction();
+                try { return DB::transaction(fn (): int => $this->write()); } finally { DB::rollBack(); }
+            }
+            public function later(): void { DB::afterCommit(fn () => $this->notify()); $this->repository->commit(); }
+        }
+        PHP;
+
+    expect(new ManualTransactionGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source))->toBe([]);
+});
+
+it('opens every transaction in app through DB::transaction', function (): void {
+    expect(new ManualTransactionGuard(new PhpFileInspector(), dirname(__DIR__, 2))->violations())->toBe([]);
+});

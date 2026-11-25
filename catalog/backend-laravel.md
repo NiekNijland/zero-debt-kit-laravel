@@ -1,0 +1,271 @@
+# Catalog: backend (PHP, Laravel)
+
+Per task: the one way, how to count the old ways, and the guard. This file is the PHP and Laravel form; tool and class names here are that stack's. Another stack: `catalog/other-stacks.md`, which has a row for every row here.
+
+Every project converges to these patterns; code that differs is debt (`01-principles.md`, "Who decides what"). A row marked with a technique (SQL, multi-tenant) applies where the project uses it. Counts are text matches in tracked files, run from the repository root on the main branch; `app` stands for the source folder.
+
+**Reading the Guard column.** A file name is the worked example under `reference-project/` (a bare name: `tests/Unit/` for the tests, `tests/Support/Architecture/` for the `*Guard.php` detector classes; a longer path is given in full), and its kind says which mechanism of `04-guards.md` C1 builds it: `phpstan.neon` disallowed calls is a banned-call rule; an analyser switch is named; `Arch*Test.php` is an architecture test; a `*Guard.php` with its `*ArchitectureTest.php` is a guard class with its thin test; a `*CoverageTest.php` is a coverage test; a ratchet row is named in backticks. The reference tests are Pest; what a PHPUnit project copies and what it rewrites is in `04-guards.md` C1. "Not in the reference project" means the kit prescribes the guard and the first project to build it writes it back; what that project counted and did not bring to zero is in `reference-project/README.md`. "Review; rubric item N" is a judgement, numbered in `templates/repo-docs.md`.
+
+## Version floor per row
+
+Step 2 opens with the platform PRs up to this floor (`05-program.md` D2). A row cannot be met below its floor. The floor is the release that introduced the feature, to the kit's best knowledge: check each against the release notes when you measure the distance in step 1. Where a cell says "read in", the name was found in an installed copy of that release and the release that introduced it was not looked up: verify in step 1 against the installed version.
+
+| Platform part | Floor | The rows that need it |
+| --- | --- | --- |
+| PHP | 8.3 | "Overriding a method" (`#[Override]`, 8.3); "Class shape" (`final readonly class`, 8.2); "Structure" enum rows (8.1) |
+| Laravel | 12 | "Binding of an own class" (class attributes for bindings, a 12.x release); "Model" (`casts()` method, 11); "Log context" (the context facade, 11); "Wait" (the sleep helper, 10); "Redirect" (`to_route()`, 9); "Runtime strictness" and "Strict models" (every call of "The strictness calls": read in 12.44 and 13.26); "Hermetic base set-up" (the six calls: read in 12.44 and 13.26) |
+| The analyser (PHPStan with Larastan) | PHPStan 2, Larastan 3 | "Analyser" (level 10 exists from 2.0; the include `conf/bleedingEdge.neon`: read in 2.2); the `noEnvCallsOutsideOfConfig` switch |
+| The date library (Carbon) | 3 | "Analyser": its `extension.neon` for the analyser (read in 3.13) |
+| The refactoring tool (Rector, with `driftingly/rector-laravel`) | Rector 2, rector-laravel 2 | "Refactoring tool": the six prepared sets, `withPhpSets()`, `withComposerBased(laravel: true)`, `withImportNames(removeUnusedImports: true)` (read in Rector 2.6) and the ten `LaravelSetList` constants (read in rector-laravel 2.5); the rename rules of `05-program.md` D9 |
+| The formatter (Pint) | 1.30 | "Formatting": every rule name of the kit's config (read in 1.30) |
+| Composer | 2.11 | "Manifest floor": `composer bump --dry-run` exits 1 when the manifest is behind (read in 2.11) |
+| Pest, where the project uses it | 3 | mutation testing (`--mutate`); the `arch()` helper is from 2; "Architecture presets" (`php` and `security`, and what `strict` and `laravel` assert: read in 5.1); "Composer scripts" (`--type-coverage --min`: read in the type-coverage plugin's 5.0); "Smoke suite" in a browser (the browser plugin: not read in an installed copy, verify in step 1) |
+| PHPUnit, where the project uses it | 10 | attributes (`#[DataProvider]`, `#[Group]`) instead of annotations; "Smoke suite" in a browser (`laravel/dusk`: not read in an installed copy, verify in step 1) |
+| Livewire, where the project uses it | 3 | "Livewire": form objects and `#[Locked]` |
+
+## Tooling per row
+
+The package behind each pattern, so no project picks its own. A project on another package swaps it (`05-program.md` D2, "Tool swaps"). A package that cannot be installed is an owner exception with a decision row (`03-conventions.md` B4), never a second tool and never a reason to drop the row.
+
+| Need | Package | Rows |
+| --- | --- | --- |
+| DTOs | `spatie/laravel-data` | "JSON endpoint", "Page props (Inertia)", "Frontend DTO properties (Inertia)" |
+| Frontend types generated from PHP | `spatie/laravel-typescript-transformer` | "Page props (Inertia)", generated-types drift |
+| Permissions | `spatie/laravel-permission` | "Authorization" |
+| Banned calls | `spaze/phpstan-disallowed-calls` | every "disallowed calls" guard |
+| Analyser and framework extension | `phpstan/phpstan`, `larastan/larastan`, `phpstan/phpstan-strict-rules` | "Analyser" |
+| Type coverage | `tomasvotruba/type-coverage` in the analyser config, in both test frameworks; the script `composer test:type-coverage` runs Pest's `pestphp/pest-plugin-type-coverage` in a Pest project and the analyser in a PHPUnit project (`catalog/tests-database-ci-docs.md`, "Composer scripts") | "Analyser" |
+| Analyser extension of the date library | the `extension.neon` that `nesbot/carbon` ships | "Analyser" |
+| Dead code | `shipmonk/dead-code-detector` | "Dead code" |
+| Source reader for guard classes | `nikic/php-parser` | every guard class |
+| Formatter | `laravel/pint` with the kit's config | "Formatting" |
+| Refactoring tool | `rector/rector` and `driftingly/rector-laravel` with the kit's sets | "Refactoring tool", codemods, moves |
+| Advisory block | `roave/security-advisories` at `dev-latest`, as a development dependency | "Advisory-blocking dependency" (`catalog/tests-database-ci-docs.md`) |
+| Dependency bot | Renovate with the kit's config | "Dependency bot" (`catalog/tests-database-ci-docs.md`) |
+| Architecture presets | Pest's own presets in a Pest project; the detector classes of the kit in a PHPUnit project | "Architecture presets" (`catalog/tests-database-ci-docs.md`) |
+| Browser smoke suite | `pestphp/pest-plugin-browser` in a Pest project; `laravel/dusk` in a PHPUnit project | "Smoke suite" (`catalog/tests-database-ci-docs.md`) |
+| Syntax lint | `php-parallel-lint/php-parallel-lint` | CI |
+| Mutation testing | Pest's `--mutate` in a Pest project; `infection/infection` in a PHPUnit project. Commands and the floor: `tools/README.md`, "Mutation" | "Mutation testing" (`catalog/tests-database-ci-docs.md`) |
+| Coverage | the test runner's own coverage with `pcov` as the driver, written as a clover report | "Coverage" (`catalog/tests-database-ci-docs.md`) |
+| Unused packages | `icanhazstring/composer-unused` | "Unused packages" (`catalog/tests-database-ci-docs.md`) |
+| YAML reader for the contract test | `symfony/yaml`, as a development dependency | the contract test over the CI files (`04-guards.md` C4) |
+| Secret scan | gitleaks (every stack) | "Secrets" (`catalog/tests-database-ci-docs.md`) |
+
+The formatter and Prettier configs to copy, the refactoring-tool sets and the dependency bot's config are in `templates/tool-configs.md`, with the list of what the kit considered and rejected.
+
+## Structure
+
+| Task | The one way | Count the old way | Guard |
+| --- | --- | --- | --- |
+| Where a class lives | the framework layer flat, as the stock framework has it; domain code in one module per domain under the module root `app/Modules/<Domain>`, using only the folders of the table below. The root has this name in every project: another root is renamed in step 5, and two roots merge into it | `git ls-files 'app/*.php' \| awk -F/ '{print $2}' \| sort \| uniq -c \| sort -rn` | `LayoutTest.php`, `LayoutGuard.php` (generated from the layout table) |
+| One module per domain | no two modules that differ by a plural or prefix; a project with one domain has one module | list the module folders, look for pairs | `OneModulePerDomainArchitectureTest.php` |
+| File size | at most 400 lines per PHP file, tests included; exempt by category only | `git ls-files -z 'app/*.php' \| xargs -0 wc -l \| awk '$2!="total" && $1>400' \| wc -l` | `FileSizeTest.php`, `FileSizeGuard.php` |
+| Method size | at most 80 lines; a controller action at most 40 | parse with the source reader | `MethodLengthArchitectureTest.php`, `ThinControllersArchitectureTest.php` |
+| Single-use traits | none: a trait used once is a hidden part of its class | traits with one `use` site | `NoSingleUseTraitsArchitectureTest.php` |
+| Pure layers | contracts, enums, exceptions, value objects and the domain-free support folder never touch models or the database; a DTO names a model only in its static `from*` factories, the one sanctioned crossing | grep model and `DB` imports in those folders | `TestTierArchitectureTest.php`, `TestTierGuard.php` |
+| Class shape | controllers and actions `final readonly` (the `final` half is "Final by default" and the formatter's; this row's guard holds `readonly`); action = verb and noun, no `Action` suffix; enums string-backed (never a pure or an integer enum), UPPER_CASE cases; DTOs end in `Data` | `git grep -LE '^final readonly class' -- app/Http/Controllers`; `git grep -nE '^enum [A-Za-z]+( \{\|: int)' -- app \| wc -l` | `FinalReadonlyArchitectureTest.php`, `ActionNamingArchitectureTest.php`, `ArchClassShapeTest.php` with `StringBackedEnumGuard.php` |
+| Final by default | every concrete class in the source is `final`. A parent class is abstract: an abstract class is allowed where the framework or a real shared base needs one, and a concrete class is never extended (it becomes abstract, or its children are folded into it). One mechanism closes classes: the formatter rule `final_class`, which leaves an abstract class alone and lands in its own sub-step with its pre-scan (`05-program.md` D8). A concrete class that stays open is a decision row and carries the docblock tag `@final`, the one marker the rule skips. A hook the framework declares protected (`casts()`, `booted()`, `prepareForValidation()`) keeps that visibility; the formatter rule `protected_to_private` of the same sub-step only makes private what a final class that extends nothing declared protected | `git grep -lE '^(readonly )?class ' -- app \| wc -l` | the formatter check with `final_class` on, held by the row `formatter-rules`; the dashboard row `open-classes` with its cap and the ratchet row `cap-open-classes` (`04-guards.md` C3) is the rule's counter: every open concrete class while the rule is off, a concrete parent among them, and afterwards the classes the rule skipped. Not in the reference project |
+
+The module folders. This set is the kit's; a project adds no folder to it without an owner decision row.
+
+| Folder | Holds | Name |
+| --- | --- | --- |
+| Fake providers the running application can select by config | source, not test support: they live in the module's `Services` (a keyless environment boots them), and the real provider is chosen by config | classes named `Fake*` outside the tests folder | the layout guard places them; the test support folder holds only what no environment boots |
+| `Actions` | one change of state: `final readonly`, dependencies in the constructor, one public `handle()` | verb and noun, never an `Action` suffix; the entry method named `handle` in every action, counted per name (`git grep -hoE 'public function (handle\|execute\|__invoke\|run)\(' -- <actions> \| sort \| uniq -c`): another name is a rename by codemod |
+| `Services` | reads that several callers share, and clients of an external system | `<X>Service`, `<X>Client` |
+| `Data` | DTOs: what goes to the frontend, and request and response shapes of an API | `<X>Data` |
+| `ValueObjects` | every other domain value, `final readonly` | noun |
+| `Support` | domain helpers that are neither an Action nor a Service: parsers, trackers, static helpers, traits and scopes of the module's models | noun |
+| `Enums` | string-backed enums with UPPER_CASE cases | noun |
+| `Events`, `Listeners` | events and the listeners that handle them | `<X>Event`; a listener says what it does |
+| `Jobs` | queued work | `<X>Job` |
+| `Commands` | console commands | `<X>Command` |
+| `Mail`, `Notifications` | mailables and notifications | `<X>Mail`, `<X>Notification` |
+| `Exceptions` | exceptions | `<X>Exception` |
+| `Contracts` | interfaces | noun |
+| `Facades` | facades over a service of the module | noun |
+
+Nothing sits in the module root. Controllers, requests, middleware, models, policies and providers never sit in a module: they stay in the framework layer, under their area. An area is a route group: the route file, URL prefix and middleware a request enters through (`Admin`, `Api`), never the domain. A folder may group files per subdomain (`Actions/Billing/CreateInvoice.php`); the dashboard's test rows count those files too. The `Support` folder directly under `app` holds code that knows no domain.
+
+## HTTP
+
+| Task | The one way | Count the old way | Guard |
+| --- | --- | --- | --- |
+| Controller | single action, `<Area>/<Noun>/<Verb>Controller`, with the area as under "Structure" and the noun what the action acts on. The verb comes from one list in the guard: it starts as the framework's seven (`Index`, `Show`, `Create`, `Store`, `Edit`, `Update`, `Destroy`); another verb joins the list with the first controller that needs it, and the guard fails a listed verb no controller uses | controllers with more than one public method; names repeating the folder noun | `ArchHttpTest.php` |
+| Thin controller | read validated input, call one action or page service, return; no transaction, lock or model write | `git grep -nE 'DB::(transaction\|table)\|->(save\|update\|create\|delete)\(' -- app/Http/Controllers \| wc -l` | `ThinControllersArchitectureTest.php` |
+| Validation | a form request; never inline | `git grep -nE '\$request->validate\(\|->validate\(\[\|Validator::make\(' -- app \| grep -v Http/Requests \| wc -l` | `ArchHttpTest.php` |
+| Form request shape | the rules of a field are an array, never one string; no `authorize()` that only returns `true`: without the method the request passes and the route carries the check. Such a method is kept only to switch off the check of a parent request, with the override marker | `git grep -nA3 'function authorize' -- app/Http/Requests \| grep -c 'return true;'`; `git grep -nE "=> '(required\|nullable\|sometimes)[\|']" -- app/Http/Requests \| wc -l` | `FormRequestArchitectureTest.php`, `FormRequestGuard.php` |
+| Request input | `$request->validated()`; no raw `input()`, `query()`, `safe()` or typed readers in controllers | `git grep -nE '\$request->(input\|string\|boolean\|query\|get\|all\|safe)\(' -- app/Http/Controllers \| wc -l` | `ValidatedInputArchitectureTest.php` |
+| Authorization | by permission, never by role name, and on the route: a check that needs only a permission is the route's `can` with a case of the permission enum; a check on a record is the model's policy, called from the route with the route parameter. Every route has one of the two, so a route for every signed-in user gets a permission every signed-in user holds. A form request's `authorize()` only for a check that depends on the input, and the route still carries its own. No `abort(403)`, `Gate::` or `->authorize(` in controllers; outside the HTTP layer a refusal is a domain exception that extends the framework's authorization exception | `git grep -nE 'abort_(unless\|if)\(\|Gate::(allows\|denies\|authorize)\|->authorize\(' -- app/Http/Controllers \| wc -l`; `git grep -nE 'hasRole\|hasAnyRole' -- app \| wc -l` | `ArchAuthorizationTest.php`, `ArchHttpTest.php`, `tests/Feature/Http/RoutePermissionCoverageTest.php` (a coverage test, no list) |
+| Rate limit | every route carries `throttle:<name>`, where the name is a limiter registered in the one rate-limit provider with its number in config; a route without its own inherits the default tier of its route group (one for reads, one for writes). Never a plain `throttle:N,M`, no number or constant inside a limiter, no limiter outside the provider | routes without throttle middleware, from the route list; numeric literals in `Limit::per*()` | `tests/Feature/Http/RouteRateLimitCoverageTest.php`, `RateLimiterArchitectureTest.php` with `RateLimiterGuard.php` |
+| Redirect | `to_route()` to a named route, `back()` to the previous page | `git grep -nE 'redirect\(\)->(route\|back)\|redirect\(route' -- app \| wc -l` | `ArchHttpTest.php` |
+| Flash message | one translated line under a fixed set of keys (`success`, `error`, `info`); never an array, a literal or the session | flash calls with another key or an untranslated value | `FlashMessageArchitectureTest.php`, `FlashMessageGuard.php` |
+| JSON endpoint | return a DTO or a DTO collection; a write wraps it with its status; never `response()->json()`, a bare array or an API Resource class (the DTO replaces the stock API Resource: a deliberate deviation from the stock framework, because one class then types the backend and the frontend) | `git grep -nE 'response\(\)->json\|new JsonResponse\(\[\|extends JsonResource' -- app \| wc -l` | `ArchJsonEndpointsTest.php` |
+| Page props (Inertia) | DTOs under camelCase keys | snake_case keys in render calls | `ArchHttpTest.php`, generated-types drift step |
+| Frontend DTO properties (Inertia) | camelCase public properties; a mapped output name for a snake_case key on the wire | snake_case public properties on DTO classes | `FrontendDataNamingArchitectureTest.php` |
+| Routes | only in `routes/`; binding on the model, not in a provider | `git grep -nE 'Route::\|loadRoutesFrom' -- app \| wc -l` | `ArchContainerTest.php` |
+| Route declaration | one HTTP verb for one single-action controller; never a resource, singleton, `any` or `match` route, never a closure; a route parameter is camelCase and carries the name of the controller argument it binds to (channel parameters too) | `git grep -nE 'Route::(resource\|apiResource\|singleton\|apiSingleton\|any\|match)\(' -- routes \| wc -l`; `git grep -noE '\{[A-Za-z]*[_-][A-Za-z_-]*[:?}]' -- routes \| wc -l` | `phpstan.neon` disallowed calls (facade, router and registrar forms); `RouteParameterGuard.php`, run by `ArchHttpTest.php` |
+| Render a page (Inertia) | the page is named by a literal string, and that string names a file in the pages folder; never a variable or a built string | render calls whose first argument is not a string; page names without a file | `InertiaPageGuard.php`, run by `ArchHttpTest.php` (the facade, the helper and a page in a route default) |
+| Middleware around the next handler | a middleware that wraps the next handler decides on the response, never on whether an exception arrived; a lock is released in `finally`. The reason and the shape of the fix: `10-hazards.md`, "A test with exception handling off" | `git grep -lE 'DB::transaction\|try \{' -- app/Http/Middleware \| wc -l`, then read each file | a test per such middleware: a real request to a route that throws, exception handling on, asserting the side effect did not happen; and a guard class on the call shape ("the next handler is called inside a transaction closure or a `try`, and the response's exception is not read"). The guard class is not in the reference project |
+
+## Livewire (where the project has Livewire components)
+
+A component action is an entry point like a route, but the route list does not show it. Not in the reference project, which has no Livewire screens of its own: the first project that builds these guards writes them back.
+
+| Task | The one way | Count the old way | Guard |
+| --- | --- | --- | --- |
+| Component validation | in a form object (a class that extends the Livewire form), one per form; the component calls `$this->form->validate()`. Never rules or a `validate([...])` call inside the component | `git grep -nE 'validate\(\[\|function rules\(' -- app/Livewire \| wc -l`, minus the form objects | a guard class over the component classes |
+| Component authorization | the first statement of every public action method, and of `mount()`, is an authorization call on the record it acts on; a check that needs only a permission uses the permission enum. The page route of a full-page component carries its own check too | public action methods whose first statement is not an authorization call, by parser | the same guard class |
+| Locked properties | every public property that holds a record, a record id or anything the client must not change carries `#[Locked]` | public properties typed as a model or named `*Id` without the attribute | the same guard class |
+| Component actions coverage | every public action of every component is called in a test as someone from another tenant or without the right, and the test asserts the refusal | none: the coverage test is the counter | a coverage test over the component classes and their public methods (`catalog/tests-database-ci-docs.md`, "Object-level access") |
+| Thin component | a component reads its form, calls one action or service, and sets state; no transaction, lock or model write | writes and `DB::` calls in `app/Livewire` | the thin-controller guard, extended to components |
+
+The rows "Validation", "Request input" and "Authorization" of the HTTP table hold for controllers; a guard that enforces them takes the component folder as the Livewire rows' subject, not as a violation.
+
+## API (where the project serves an API to other systems)
+
+The HTTP rows hold. These are added. Not in the reference project beyond the DTO rule.
+
+| Task | The one way | Count the old way | Guard |
+| --- | --- | --- | --- |
+| Resource shape | the DTO rule of "JSON endpoint", stated for an API: every response body is a DTO or a DTO collection, and the same DTO class is the documented shape. No API Resource classes | `git grep -n 'extends JsonResource' -- app \| wc -l` | `ArchJsonEndpointsTest.php`, extended to the API routes |
+| Error envelope | one shape for every error, produced by the exception handler alone: the framework's own JSON error body (`message`, and `errors` for validation). A controller or action never builds an error body | error arrays built outside the handler: `git grep -nE "'(error\|errors\|message)' =>" -- app/Http \| wc -l` | a banned-shape guard class over the HTTP layer; a test per error class that asserts the envelope |
+| API pagination | every list endpoint is paginated by the framework's paginator and returned as a paginated DTO collection; the page size has a maximum in config. Never an unbounded `get()` or `all()` behind a list route | list routes whose handler returns an unpaginated collection | a coverage test over the API routes named `*.index`: each response carries the pagination meta |
+| Versioning | the version is a prefix in the path (`/v1`), one route file per version; never a header or a query parameter | API routes outside a version prefix, from the route list | a coverage test over the API route list |
+| Principals that are not users | a token that authenticates as a project, consumer or machine has no user permission model: the row "Authorization" applies in the form of "Token abilities" plus a policy on the route; the permission package is then an owner exception with a decision row, not a second mechanism | routes guarded by such a token, from the route list | the coverage test of "Token abilities" |
+| Tool-server entry points (MCP: tools, resources, prompts) | they stay in `app/Mcp`, count as an area of the framework layer, validate with the package's own `$request->validate()`, and are entry points of the object-level access coverage test like a route | classes under the server's folder; entry points without a refusal test | the coverage test of "Object-level access" (`catalog/tests-database-ci-docs.md`) over their list |
+| Token abilities | every token route names the ability it needs with the framework's ability middleware; a token without that ability is refused; no route accepts "any valid token" | token routes without an ability, from the route list | a coverage test over the token-guarded routes, the same form as `tests/Feature/Http/RoutePermissionCoverageTest.php` |
+
+## Container, config, bootstrap
+
+| Task | The one way | Count the old way | Guard |
+| --- | --- | --- | --- |
+| Dependency | constructor injection; `handle()` for jobs and commands; no service location | `git grep -nE '(^\|[^A-Za-z_>:])(app\|resolve)\(\|App::make\(' -- app \| wc -l` | `ArchContainerTest.php` (no exceptions besides providers) |
+| Config read | a typed accessor of the config facade, default in the config file, so the read has one argument | `git grep -noE "(^\|[^A-Za-z_>:])config\('\|Config::get\(" -- app \| wc -l`, and separately the two-argument form (a default at the read: `git grep -noE "config\('[^']+',[^)]" -- app \| wc -l`; most of a large count can be this form) | `phpstan.neon` disallowed calls, `ArchMigrationsConfigTest.php` |
+| `env()` | only in config files, always cast, default there | `git grep -n 'env(' -- app \| wc -l`; uncast reads in `config` | the analyser switch `noEnvCallsOutsideOfConfig`; a config test that boots with an empty environment and asserts the typed defaults |
+| Binding of an own class | an attribute on the class; providers bind vendor classes only | `git grep -nE '\$this->app->(bind\|singleton\|scoped)\(' -- app/Providers \| wc -l` | `ArchContainerTest.php` |
+| Listener | found by discovery, and discovery covers the module root: the bootstrap file names the `Listeners` and `Commands` folders of the modules. No manual registration | `git grep -nE 'Event::(listen\|subscribe)' -- app \| wc -l`; listener and command classes in a module folder that the booted application does not list | `ArchContainerTest.php`; a config test that asks the booted application for its registered listeners and commands and fails a class in a module's `Listeners` or `Commands` folder that is not among them. The config test is not in the reference project |
+| Processes and native file work | one owner class per binary run (a class runs `pdftotext`, another `ffmpeg`) and per kind of file work (temporary files, streams); never a `Process::` call, `fopen` or `tempnam` in an action or controller. The mechanical form is "a binary is run by one class": two names of one suite are two binaries to a parser, and "one class per kind of file" is review | `git grep -nE 'Process::\|proc_open\|shell_exec\|(^\|[^A-Za-z_>:$])(fopen\|tempnam\|tmpfile)\(' -- app \| wc -l` | a banned-call rule per layer; the one-owner part is a candidate of `04-guards.md` C7 |
+| Scheduled work | a command, `onOneServer`, and its overlap lock with an explicit expiry written out as a number: the time after which a run that never finished frees the next one. Never the default expiry, never a closure in the schedule, and `Schedule::job(...)` is not a command either: queue the job from a command | closures in the console routes file; `git grep -c 'Schedule::' -- routes/console.php` against `git grep -cE 'withoutOverlapping\([0-9]+\)' -- routes/console.php` | `ArchContainerTest.php`, `ScheduledTaskArchitectureTest.php` with `ScheduledTaskGuard.php` (the expiry is declared). That the expiry fits the interval is a decision list until every task meets it (`04-guards.md` C7), then the same guard; until then review, rubric item 19 |
+| Per-tenant runtime state (multi-tenant) | set by the one tenant-switch mechanism: a class that runs on every switch of tenant and is registered in one list; never a provider that reads the current tenant at boot | runtime config writes outside those classes | `PerTenantStateArchitectureTest.php`, `PerTenantStateGuard.php` |
+| A registry and its implementers | every implementer of the interface is in the registry list, and every entry implements it | compare the list with the implementers | a register guard; example `RegistryArchitectureTest.php` |
+| Runtime strictness | the framework's strictness switches are calls in `boot()` of the one application service provider, written out as under the table ("The strictness calls"); never a package that sets them, and no such call anywhere else | each call of the block missing from the provider; each of those methods called outside it | a config test with one assertion per switch on the booted application, as the block lists them; `phpstan.neon` disallowed calls that allow each switch method in the provider only. Not in the reference project |
+| Destructive commands | the commands that drop tables or wipe the database refuse to run in production: `DB::prohibitDestructiveCommands($this->app->isProduction())` | the call missing from the provider | the config test of "Runtime strictness": with the environment set to production, the wipe command exits with a failure and the tables are still there |
+| HTTPS URLs | every generated URL is HTTPS in production: `URL::forceHttps($this->app->isProduction())`; never `forceScheme()` | `git grep -n 'forceScheme' -- app \| wc -l` | the same config test: in production a generated URL starts with `https://`; `phpstan.neon` disallowed calls (`forceScheme`) |
+| Password rule | one rule for every password, set with `Password::defaults()` in the provider; every password field validates with `Password::defaults()` and nothing else. What the rule demands is the owner's (users notice it); its breach check (`uncompromised()`) is on in production only, because it calls an external service | `git grep -nE "Password::(min\|default\(\))" -- app \| grep -v Providers \| wc -l`; password fields validated with a string rule: `git grep -nE "'password' => \[?'" -- app/Http/Requests \| wc -l` | the same config test (`Password::default()` returns the rule the provider set); a guard class over the form requests: a field named `password` or `*_password` whose rules hold no `Password::defaults()` fails, and so does a `Password::` builder call outside the provider. Not in the reference project |
+| Model events | `booted()` on the model; no observers | `git grep -nE 'ObservedBy\|::observe\(' -- app \| wc -l` | `NoObserversArchitectureTest.php` |
+
+**The strictness calls.** This block is the one place that lists them; the rows "Runtime strictness", "Destructive commands", "HTTPS URLs", "Password rule", "Strict models", "Relation loading" and "Current time and dates" point here. In `boot()` of the application service provider:
+
+```php
+Model::shouldBeStrict();
+
+if ($this->app->isProduction()) {
+    Model::handleLazyLoadingViolationUsing(static function (Model $model, string $relation): void {
+        report(new LazyLoadingViolationException($model, $relation));
+    });
+}
+
+DB::prohibitDestructiveCommands($this->app->isProduction());
+URL::forceHttps($this->app->isProduction());
+Date::use(CarbonImmutable::class);
+Password::defaults(fn (): Password => /* the owner's rule; ->uncompromised() only when $this->app->isProduction() */);
+```
+
+`Model::shouldBeStrict()` switches on three checks in every environment: no lazy loading, no silently discarded attribute, no read of an attribute that was not loaded. The handler makes the first one report instead of throw in production; the other two throw there too. `Model::automaticallyEagerLoadRelationships()` is never called (`templates/tool-configs.md`, "Considered and rejected"). What the config test asserts, one assertion each: `Model::preventsLazyLoading()`, `Model::preventsSilentlyDiscardingAttributes()` and `Model::preventsAccessingMissingAttributes()` are true and `Model::isAutomaticallyEagerLoadingRelationships()` is false; `now()` returns the immutable date class; and the three production facts of the rows above, in an application booted with the production environment. How the switches land in an application that already runs: `05-program.md` D2, step 4, and `10-hazards.md`, "Strict models".
+
+## Models and data access
+
+| Task | The one way | Count the old way | Guard |
+| --- | --- | --- | --- |
+| Ordering a read | every ordering a read model returns ends in a unique key (`latest()` is followed by `id`): a tie is a flake that a test pins by luck, and a helper that sorts an expectation hides it. A test that pins an order holds a case written in the opposite order, or asserts the `order by` clause (a small table can come out sorted by accident) | `git grep -nE 'latest\(\)\|orderBy' -- app` read for a unique tail; helpers that sort an expectation, in the tests | a candidate of `04-guards.md` C7 (a call-shape guard on the chain); the flake sweep of step 4 reads the same list |
+| Model | `casts()` method, immutable date casts (the cast names the immutable type for the analyser, also now that the date switch makes every date immutable), `$fillable`, `Attribute::make()`, typed relations | `git grep -nE "'(datetime\|date)'" -- app/Models \| wc -l` | `ArchModelsTest.php` |
+| Query | start at `Model::query()`; scopes for filter, sort and search; no custom builder, no query-string package | `git grep -nE '[A-Z][A-Za-z]+::(where\|find\|first\|all)\(' -- app \| wc -l` | `ArchModelsTest.php` |
+| Raw tables (SQL) | none outside migrations; every table has a model | `git grep -nE 'DB::(table\|select\|statement\|raw)' -- app \| wc -l` | `NoRawTableArchitectureTest.php` |
+| Scope bypass (multi-tenant) | one named scope; never `withoutGlobalScope` | `git grep -n 'withoutGlobalScope' -- app \| wc -l` | `ArchModelsTest.php` |
+| Existence and uniqueness rules | `Rule::exists(Model::class, 'column')` and `Rule::unique(Model::class, 'column')`; never a table name, `getTable()` or the string forms. The rule skips the model's scope, so a tenant-scoped model gets the tenant column constrained in the same chain | `git grep -nE "Rule::(exists\|unique)\('\|'exists:\|'unique:\|getTable\(\)" -- app \| wc -l` | `DatabaseRuleArchitectureTest.php`, `DatabaseRuleGuard.php`, no list |
+| Object-level access | every entry point that takes a record id binds the model, checks a policy at the entry point, and is in the coverage test for someone else's record | entry points with a record parameter that the coverage test cannot build a foreign record for | the coverage test of `catalog/tests-database-ci-docs.md`, "Object-level access"; the sweep of step 8 (`09-reviewer-brief.md`). The reference project has the test for its platform routes only |
+| Search | one helper that escapes wildcards; case-insensitive search only through it (per engine: `catalog/tests-database-ci-docs.md`, "Database") | `git grep -niE "like \?\|'like'\|'ilike'" -- app \| wc -l` | the helper's test; `LikeSearchArchitectureTest.php` with `LikeSearchGuard.php` fails the case-insensitive forms outside the helper; the case-sensitive form with a variable pattern is a decision list |
+| Iterating many rows | `lazyById` for a read, `chunkById` where rows are changed while iterating | `git grep -nE -e '->(chunk\|each\|cursor\|lazy)\(' -- app \| wc -l` | a banned-call rule on the query builder's other forms; not at zero in the reference project |
+| Transaction (SQL) | the closure form; a manual begin only for a dry run that rolls back in `finally`; never a manual commit | `git grep -nE 'beginTransaction\|DB::commit' -- app \| wc -l` | `ManualTransactionArchitectureTest.php`, `ManualTransactionGuard.php` |
+| Strict models | the three checks of `Model::shouldBeStrict()` are on in every environment; a lazy load is reported in production and throws everywhere else; a discarded attribute and a read of a missing attribute throw everywhere ("The strictness calls") | the violations themselves: the row `model-strictness-violations` over the counted list of the landing procedure (`05-program.md` D2, step 4) | the config test of "Runtime strictness"; `phpstan.neon` disallowed calls for the calls that undo it outside the provider (`preventLazyLoading`, `preventSilentlyDiscardingAttributes`, `preventAccessingMissingAttributes`, `shouldBeStrict`, and the three `handle...ViolationUsing` methods). Not in the reference project |
+| Relation loading | a relation is loaded where the query is built, with `with()` or `load()`; never by the framework's automatic eager loading, which hides the query a reader has to see | `git grep -n 'automaticallyEagerLoadRelationships' -- app \| wc -l` | `phpstan.neon` disallowed calls (`automaticallyEagerLoadRelationships`, on the model class and on a collection); strict models make a missing `with()` fail in a test |
+| Mass assignment | stays guarded; a column that is not fillable is set with `forceFill()` or `forceCreate()`, never after switching the guard off | `git grep -nE '::(unguard\|reguard\|unguarded)\(' -- app \| wc -l` | `phpstan.neon` disallowed calls |
+| Soft deletes | prunable with one retention key in config, unless the rows are read | models with `SoftDeletes` and no `Prunable` | a schema-and-model test; example `tests/Feature/Models/SoftDeletePruningTest.php` |
+| Cached values | arrays and scalars only; never a model, a date object or another object: the real store can refuse to unserialize what the tests' in-memory store returns unchanged | cache writes whose value or closure result is an object, by parser | a guard class on the cache write calls, and the round-trip test (`catalog/tests-database-ci-docs.md`, "Cache round trip"). Not in the reference project |
+| Locks | a lock is taken in one class per kind of lock (the cache lock, the row lock, an engine advisory lock); that class owns the key, the expiry and the release in `finally`. A call site names the lock and passes the work; it never builds a lock | `git grep -nE 'Cache::lock\|lockForUpdate\|pg_advisory\|GET_LOCK' -- app \| wc -l`, minus the lock classes | a banned-call rule that allows the lock calls in the lock classes only (configured per layer, `04-guards.md` C1). Not at zero in the reference project |
+
+## Errors, logging, events, jobs
+
+| Task | The one way | Count the old way | Guard |
+| --- | --- | --- | --- |
+| Report an error | `report($e)`; details in the exception's `context()`; the error tracker's own facade only in the provider | calls to the error tracker's facade outside the provider (in the reference project: `git grep -nE 'Sentry::' -- app \| wc -l`) | `ArchClassShapeTest.php`, `ReportNotLogArchitectureTest.php` |
+| Catch | name the exception; a broad catch reports, rescues or rethrows; never empty | `git grep -nE 'catch ?\(([^)]*[ \|\\])?(Throwable\|Exception)[ )\|]' -- app \| wc -l` (misses a catch split over lines; a tokenizer count is the accurate one) | `EmptyCatchArchitectureTest.php` |
+| Log context | tenant and request ids through the framework's context, not as hand-written keys; log `['exception' => $e]`, never the exception message | `git grep -lE "Log::" -- app \| xargs grep -lE "'tenant_id'" \| wc -l`; `git grep -nE 'Log::.*getMessage\(' -- app \| wc -l` | `ReportNotLogArchitectureTest.php`, `LogMessageArchitectureTest.php` with `LogMessageGuard.php` |
+| Events in a transaction (SQL) | an event that is dispatched inside a transaction, or that records an audit entry, implements the framework's dispatch-after-commit contract; never an `afterCommit` closure at the call site | `git grep -n 'DB::afterCommit' -- app \| wc -l`; event classes dispatched inside a transaction closure without the contract, by parser | a guard class over the dispatch calls inside transaction closures; the reference project has the audit-event half as `tests/Feature/Modules/Events/AuditEventTest.php` |
+| Jobs | unique jobs have a unique id; failure handled through a failed event and a listener; no `displayName` | `ShouldBeUnique` classes without `uniqueId` | `ArchClassShapeTest.php` (`displayName`), `UniqueJobArchitectureTest.php` with `UniqueJobGuard.php` |
+| Limits of a queued class | every queued class (job, queued listener, queued mail, queued notification) declares its own `$timeout`, and `$tries` for work with a fixed number of attempts or `retryUntil()` for work with a deadline. "Queued" means the queue contract, a contract that extends it, or a parent that has either. Tries is 1 where a second run would repeat a side effect | classes with the queue contract and no `$timeout`, or neither `$tries` nor `retryUntil()`, by parser | `QueuedClassLimitsArchitectureTest.php`, `QueuedClassLimitsGuard.php`. That the timeout stays under the worker's own timeout: review; rubric item 19 (the queue of a class is chosen at dispatch) |
+| Queue name | a case of one enum, and every case has a worker; never a string, in a dispatch call, a property or a routing method | `git grep -nE "(onQueue\|allOnQueue)\('\|\\\$queue = '" -- app \| wc -l` | `QueueNameArchitectureTest.php`, `QueueNameGuard.php` |
+| Dispatch an event | through the event's own `<X>Event::dispatch(...)`; the facade only for an event object that is built earlier or comes from a vendor; never the global helper, never the facade around `new <X>Event` | `git grep -nE '(^\|[^A-Za-z_>:$])event\(\|Event::dispatch\(new ' -- app \| wc -l` | `phpstan.neon` disallowed calls (`event()`), `EventDispatchArchitectureTest.php`, `EventDispatchGuard.php` |
+| Broadcast channel | an event broadcasts on a channel whose name starts with the prefix of a channel registered with its authorization; every registered channel has a test that joins as the owner and is refused as someone else | channel names in events against the registered channels; registered channels without a test | `BroadcastChannelArchitectureTest.php`, `BroadcastChannelGuard.php` |
+| Class names stored in data | every class whose name is stored (events in an audit table, notifications, queued jobs and mails) is on a register, one sorted file per kind; adding a class adds its line; moving or renaming one goes by `05-program.md` D9 | none: the guard is the counter | `StoredClassNameArchitectureTest.php`, `StoredClassNameGuard.php` (a register guard). It cannot see a data migration: review; rubric item 4 |
+| HTTP clients | one macro per external system, with a return type on its closure; call sites use it; a client always verifies the certificate (a host with a private authority gets its bundle) | `git grep -nE 'Http::(get\|post\|withToken\|baseUrl)' -- app \| grep -v Providers \| wc -l`; `git grep -n 'withoutVerifying' -- app \| wc -l` | `phpstan.neon` disallowed calls for the certificate; for the macro rule a banned-call rule on the direct client calls outside the provider, which is a decision list in the reference project |
+| Wait | the framework's sleep helper, which the base test set-up fakes for every test (`catalog/tests-database-ci-docs.md`, "Hermetic base set-up"); never `sleep()` or `usleep()` | `git grep -nE '(^\|[^A-Za-z_>:])u?sleep\(' -- app tests \| wc -l` | `phpstan.neon` disallowed calls (tests included) |
+| Debug and exit | no `dd`, `dump`, `var_dump`, `ray`, `print_r` or `var_export`, in any form; no `echo` or `print` in a class; no `exit` or `die`. Text for a log is built with `json_encode` and the throwing flag | `git grep -nE '(^\|[^A-Za-z_>:])(dd\|dump\|var_dump\|ray\|print_r\|var_export\|exit\|die)\(' -- app tests \| wc -l` | `phpstan.neon` disallowed calls (tests included), `ExitArchitectureTest.php` with `ExitGuard.php`; the `php` preset ("Architecture presets", `catalog/tests-database-ci-docs.md`), which is why the returning form of `print_r` and `var_export` is banned too |
+| Current time and dates | `now()` (with a timezone argument, or `->getTimestamp()` for seconds) and the immutable date class: it is the clock a test moves. The switch that makes the framework hand out immutable dates is `Date::use(CarbonImmutable::class)` in the provider ("The strictness calls"). Never `time()`, never the `now()` of the date class or the date facade, never the mutable class or the language's own `DateTime`, by static call or `new` | `git grep -nE '(^\|[^A-Za-z])Carbon::' -- app \| wc -l`; `git grep -nE '(^\|[^A-Za-z_>:$])time\(\)\|CarbonImmutable::now\(\|Date::now\(' -- app \| wc -l`; the row `mutable-dates` | `phpstan.neon` disallowed calls; the formatter rule `date_time_immutable` (`templates/tool-configs.md`, "Rules that can change behavior"); the config test of "Runtime strictness" for the switch |
+
+## Types
+
+| Task | The one way | Count the old way | Guard |
+| --- | --- | --- | --- |
+| Analyser | level 10 on source and tests, with the analyser's bleeding-edge include next to it (`conf/bleedingEdge.neon`: the checks of the next major, today), strict rules, type coverage 100, no baseline, no ignores. Type coverage is a percentage: held by the measured number in the config and the `min` row, never by baseline entries (a message holds the totals, so every entry stops matching when any parameter is added anywhere). The paths are every folder that holds PHP of the project: the source, `bootstrap`, `config`, `database`, `routes`, `public` and the tests. The extensions are included by name in the config, never through an installer plugin that includes them unseen: the framework extension and the date library's (`vendor/nesbot/carbon/extension.neon`). The switches the level does not include are on: a missing override marker, a return type wider than what is returned, a type widened in a `@var` tag, and the framework extension's checks for environment reads outside config and for long-running workers | a scratch config at level 10 with the include and each switch; `git grep -n '@phpstan-ignore' -- app tests \| wc -l`; the folders with PHP files that the config's paths do not name | ratchet rows `analyser-baseline`, `analyser-ignore`, `analyser-level` and `analyser-switches`, which counts the two includes with the five switches (`tools/README.md`, "The rows that ship"); the contract test over the CI files compares the paths with the folders (`04-guards.md` C4, point 15) |
+| Narrowing | a check the analyser verifies and that throws at runtime; never an inline `@var` cast or `assert()` | `git grep -n '@var' -- app \| wc -l` | `NoInlineVarCastArchitectureTest.php` |
+| Dead code | none | the dead-code detector on the whole tree | the detector as an analyser rule on source and tests together; example `phpstan-tests.neon` |
+| Refactoring tool | the kit's config (`templates/tool-configs.md`): the six prepared sets, the language sets by the PHP version of the manifest, the ten framework sets of `driftingly/rector-laravel` with the framework version read from the manifest, names imported and unused imports removed; no skip of a rule or a path | `grep -cE 'withSkip\|->skip\(' rector.php`; the sets of the kit's config that the project's lacks | ratchet rows `refactor-skip` (every skip entry) and `refactor-sets` (a `min` row over the 19 switches); the dry run on the whole tree, a line of the checks step (`04-guards.md` C4) |
+| Formatting | the formatter with the kit's config checks the whole tree in CI and fails; nothing writes or commits. The config holds the strictness list: 21 rules that enforce a pattern (strict comparison, closed classes, private members, immutable dates, multibyte string functions, one order of class elements, and the rest). The ones that change behavior land one by one, each after a count to zero (`templates/tool-configs.md`, "Rules that can change behavior") | the formatter's test mode on the whole tree; per rule that is still off, its counting row | the checks step (`04-guards.md` C4); the `min` ratchet row `formatter-rules`; the counting rows `strict-types-missing`, `loose-comparisons`, `mutable-dates`, `byte-string-functions` and the dashboard row `open-classes` |
+| Strict comparison | `===` and `!==`; never `==` or `!=`, in source, tests and templates | the row `loose-comparisons` | the formatter rule `strict_comparison` for PHP files; the row `loose-comparisons`, which also counts the templates the formatter does not read |
+| Text and bytes | a string function is the multibyte one, or the framework's string helper; code that works on bytes calls the one byte helper (`templates/tool-configs.md`, "Rules that can change behavior") | the row `byte-string-functions` | the formatter rule `mb_str_functions`; the row; the byte helper's own test |
+| Comments | none; one only when a future reader would act differently because of it | the regex of the row `comments` (`tools/README.md`) | ratchet row `comments`, shrink-only (`04-guards.md` C6); the reason of an override: review; rubric item 22 |
+| Migrations | no application class; strings and query builder only | `git grep -lE 'App\\[A-Z]' -- database/migrations \| wc -l` | `ArchMigrationsConfigTest.php` |
+
+## One spelling per construct
+
+Where the language or the framework offers two ways to write the same thing, the codebase has one. Each is converted by codemod in one commit and guarded in the same commit; the analyser's own switch or a banned-call rule comes before a hand-written guard (`04-guards.md` C1). The rows "Current time and dates", "Dispatch an event", "`env()`" and "Config read" above are of this kind too. A switch that the tree already meets is switched on without a decision.
+
+| Construct | The one spelling | Count the old way | Guard |
+| --- | --- | --- | --- |
+| Overriding a method | `#[Override]` on every method that overrides a parent's or implements an interface's | the analyser with the switch on, in a scratch config | the analyser switch `checkMissingOverrideMethodAttribute`. An overriding property: review; rubric item 21 |
+| Decode and encode JSON | with the flag that throws on failure; one helper for the two cases where a failure is expected (text that may not be JSON, a value that may not be valid UTF-8), which returns `null` | `git grep -nE '(^\|[^A-Za-z_>:$])json_(de\|en)code\(' -- app \| grep -vc JSON_THROW_ON_ERROR` | `phpstan.neon` disallowed calls, which allow the call only with the flag; the helper's example is `reference-project/app/Support/Json.php`. Whether the helper's `null` is handled: review; rubric item 21 |
+| Compare with null | `=== null` | `git grep -nE '(^\|[^A-Za-z_>:$])is_null\(' -- app \| wc -l` | `phpstan.neon` disallowed calls |
+| Read the session | from the request object | `git grep -nE '(^\|[^A-Za-z_>:$])session\(' -- app \| wc -l` | `phpstan.neon` disallowed calls |
+| Translate | the `__()` helper for text in the language files; a second source of text (translations in a database) has exactly one helper of its own; never `trans()` | `git grep -nE '(^\|[^A-Za-z_>:$])trans\(' -- app \| wc -l` | `phpstan.neon` disallowed calls |
+
+## Top level in source
+
+Method: `05-program.md` D7.
+
+| Cause | Fix |
+| --- | --- |
+| An HTTP client macro whose closure has no return type: every call site is `mixed` | a return type on the closure (`fn (...): PendingRequest => ...`) |
+| Decoded JSON, config or a database row enters as `mixed` | narrow once, where it enters, with a checked helper (examples: `reference-project/app/Support/Scalar.php`, `reference-project/app/Support/StringKeyed.php`); never a cast on an unchecked value |
+| A producer that returns a bare `array` | an array shape in its `@return`, so every consumer is typed |
+| An empty `collect()` passed to a typed collection parameter | `new Collection()`: it is inferred as `Collection<never, never>`, while an empty `collect()` is untyped |
+| A vendor macro without a return type | a stub file does not help: the macro extension wins. Use the macro's body at the call site and record it as a deliberate deviation from the framework idiom |
+| The `$next` closure of a middleware | a docblock type on the parameter |
+
+Traps: clear the result cache after a change to a provider or an analyser extension; a checked helper changes behavior for input of an unexpected type only (an empty value instead of a coercion or a `TypeError`), and each such site goes in the PR description.
+
+## Framework traps
+
+- A public `report()` method on an exception is called by the framework automatically. Name such helpers something else.
+- `Exceptions::fake()` matches only the exact exception class and never runs the real handler's report step. Assert with a log spy or a handler proxy when the handler's behavior matters.
+- A model that was loaded with a column list, or built without being read back, throws on the first read of a column it does not hold once missing attributes are forbidden. A test signs in with a model it read from the database (`->fresh()` after the factory), and a query that selects columns selects every column its consumers read. An earlier run left this check off for that reason; the kit switches it on and counts the sites first (`10-hazards.md`, "Strict models").
+- With lazy loading forbidden, load relations at the query. Turning it on surfaces real N+1 bugs as failures: fix them, never allow them.
+- The breach check of the password rule calls an external service: under the hermetic base set-up it throws in a test, which is why the rule has it in production only.
+- A public method named after an attribute is an accessor only when it returns the attribute class; widening a hook to `public` changes nothing the framework reads.
+- Typed config turns "silently null" into an exception at boot. List every key that is really optional, and hand the owner the list of required keys before the deploy (`05-program.md` D2, step 6).
+- A bare DTO returned from a POST answers 201 with the DTO library; wrap it with its status.
+- A tenant switch outside a request can leave session state stale in tests: reset it in the scenario helper.
+- A class declared `readonly` as a whole cannot declare a property with a default value, and the queue reads `$timeout`, `$tries` and `$backoff` as plain properties. A queued class that needs them is `final class` with `readonly` on its constructor properties.
+- A contract can be reached through a sub-contract (queued "after commit" extends queued) or a parent class: a guard on the contract follows both.
+- Guard tests declared with Pest's `arch()` helper land in the `arch` group wherever they sit; a group excluded from the suite and absent from the checks step runs nowhere (`04-guards.md` C1, last rules).
