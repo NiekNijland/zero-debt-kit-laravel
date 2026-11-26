@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Tests\Support\Architecture\PerTenantStateGuard;
 use Tests\Support\Architecture\PhpFileInspector;
 
+uses()->group('arch');
+
 dataset('config writes in the wrong place', [
     'a provider that reads the current tenant' => ["<?php\nnamespace App\\Providers;\nuse App\\Models\\Landlord\\Tenant;\nuse Illuminate\\Support\\Facades\\Config;\nuse Illuminate\\Support\\ServiceProvider;\nfinal class NameServiceProvider extends ServiceProvider { public function boot(): void { Config::set('app.name', Tenant::current()?->name); } }\n", 'a provider reads the current tenant to set config'],
     'a provider that checks for a tenant in a closure' => ["<?php\nnamespace App\\Providers;\nuse App\\Models\\Landlord\\Tenant;\nuse Illuminate\\Support\\Facades\\Config;\nuse Illuminate\\Support\\ServiceProvider;\nfinal class LocaleServiceProvider extends ServiceProvider { public function boot(): void { \$this->app->booted(function (): void { if (Tenant::checkCurrent()) { Config::set('app.locale', 'fr'); } }); } }\n", 'a provider reads the current tenant to set config'],
@@ -15,7 +17,7 @@ dataset('config writes in the wrong place', [
 ]);
 
 it('detects config that is written for the current tenant outside a switch task', function (string $source, string $reason): void {
-    $violations = new PerTenantStateGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source);
+    $violations = new PerTenantStateGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', 'config/multitenancy.php')->inSource($source);
 
     expect($violations)->toHaveCount(1)
         ->and($violations[0])->toContain($reason)
@@ -43,13 +45,13 @@ it('accepts a switch task, a provider that sets config without the tenant and ev
         }
         PHP;
 
-    expect(new PerTenantStateGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source))->toBe([]);
+    expect(new PerTenantStateGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', 'config/multitenancy.php')->inSource($source))->toBe([]);
 });
 
 it('writes config at runtime only in a switch task, or in a provider that does not read the current tenant', function (): void {
-    expect(new PerTenantStateGuard(new PhpFileInspector(), dirname(__DIR__, 2))->violations())->toBe([]);
+    expect(new PerTenantStateGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', 'config/multitenancy.php')->violations())->toBe([]);
 });
 
 it('lists every switch task of app in config/multitenancy.php', function (): void {
-    expect(new PerTenantStateGuard(new PhpFileInspector(), dirname(__DIR__, 2))->unlistedTasks())->toBe([]);
+    expect(new PerTenantStateGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', 'config/multitenancy.php')->unlistedTasks())->toBe([]);
 });

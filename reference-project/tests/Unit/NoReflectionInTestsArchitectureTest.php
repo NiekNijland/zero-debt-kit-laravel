@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Tests\Support\Unit\NoReflectionInTestsArchitectureHelpers;
 
+uses()->group('arch');
+
 dataset('reflection that reaches into a class', [
     'reflection method' => ["<?php\nnew ReflectionMethod(\$job, 'handle')->invoke(\$job);\n"],
     'imported reflection property' => ["<?php\nuse ReflectionProperty;\n\$p = new ReflectionProperty(Foo::class, 'state');\n"],

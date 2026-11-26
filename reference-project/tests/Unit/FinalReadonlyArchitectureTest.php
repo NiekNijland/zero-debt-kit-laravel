@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+uses()->group('arch');
+
 arch('controllers are final readonly')
     ->expect('App\Http\Controllers')
     ->classes()

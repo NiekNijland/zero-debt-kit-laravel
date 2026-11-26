@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Tests\Support\Unit\NoInlineVarCastArchitectureHelpers;
 
+uses()->group('arch');
+
 dataset('inline var casts', [
     'assignment in a method' => ["<?php\nfinal class C { public function f(): void { /** @var int \$x */ \$x = g(); } }\n"],
     'assignment in a function' => ["<?php\nfunction f(): void {\n    /** @var list<int> \$ids */\n    \$ids = g();\n}\n"],

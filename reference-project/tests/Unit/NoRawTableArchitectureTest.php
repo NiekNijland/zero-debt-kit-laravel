@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Tests\Support\Unit\NoRawTableArchitectureHelpers;
 
+uses()->group('arch');
+
 it('reaches the database through models: raw tables and raw SQL live in database/ and in the PostgreSQL advisory lock', function (): void {
     expect(NoRawTableArchitectureHelpers::offenders())->toBe([]);
 });

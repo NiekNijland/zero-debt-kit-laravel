@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Tests\Support\Architecture\LayoutGuard;
 use Tests\Support\InstancesOf;
 
+uses()->group('arch');
+
 it('keeps every class in the layout from app/AGENTS.md', function (): void {
     expect(new LayoutGuard(dirname(__DIR__, 2))->violations())->toBe([]);
 });

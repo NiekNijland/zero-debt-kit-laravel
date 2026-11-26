@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Tests\Support\Unit\ThinControllersArchitectureHelpers;
 
+uses()->group('arch');
+
 dataset('controller business logic', [
     'transaction' => ["<?php\nuse Illuminate\\Support\\Facades\\DB;\nDB::transaction(fn () => null);\n"],
     'fully qualified DB facade' => ["<?php\n\\Illuminate\\Support\\Facades\\DB::table('orders')->get();\n"],

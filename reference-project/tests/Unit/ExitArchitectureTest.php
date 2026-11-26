@@ -5,8 +5,10 @@ declare(strict_types=1);
 use Tests\Support\Architecture\ExitGuard;
 use Tests\Support\Architecture\PhpFileInspector;
 
+uses()->group('arch');
+
 it('detects exit and die in every spelling', function (string $source, string $construct): void {
-    $violations = new ExitGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source);
+    $violations = new ExitGuard(new PhpFileInspector(), dirname(__DIR__, 2), ['app', 'bootstrap', 'config', 'database', 'routes', 'tests'])->inSource($source);
 
     expect($violations)->toHaveCount(1)
         ->and($violations[0])->toStartWith('3: ' . $construct . ' ends the process')
@@ -37,9 +39,9 @@ it('accepts a return, an exception, an exit code and the word in text', function
         }
         PHP;
 
-    expect(new ExitGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source))->toBe([]);
+    expect(new ExitGuard(new PhpFileInspector(), dirname(__DIR__, 2), ['app', 'bootstrap', 'config', 'database', 'routes', 'tests'])->inSource($source))->toBe([]);
 });
 
 it('never ends the process with exit or die in app, bootstrap, config, database, routes and tests', function (): void {
-    expect(new ExitGuard(new PhpFileInspector(), dirname(__DIR__, 2))->violations())->toBe([]);
+    expect(new ExitGuard(new PhpFileInspector(), dirname(__DIR__, 2), ['app', 'bootstrap', 'config', 'database', 'routes', 'tests'])->violations())->toBe([]);
 });

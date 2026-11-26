@@ -13,7 +13,17 @@ it('lists the php files below a directory in a stable order and nothing else', f
         $files = array_map(static fn (string $file): string => substr($file, strlen($root) + 1), new PhpFileInspector()->phpFiles($root));
 
         expect($files)->toBe(['a/c.php', 'b.php'])
-            ->and(new PhpFileInspector()->phpFiles($root . '/missing'))->toBe([]);
+            ->and(new PhpFileInspector()->phpFiles($root . '/missing', mayBeAbsent: true))->toBe([]);
+    } finally {
+        SourceSandbox::remove($root);
+    }
+});
+
+it('fails on a directory that does not exist, so a guard over a renamed folder cannot pass without reading a file', function (): void {
+    $root = SourceSandbox::create(['b.php' => '<?php']);
+
+    try {
+        expect(static fn (): array => new PhpFileInspector()->phpFiles($root . '/missing'))->toThrow(InvalidArgumentException::class, 'does not exist');
     } finally {
         SourceSandbox::remove($root);
     }

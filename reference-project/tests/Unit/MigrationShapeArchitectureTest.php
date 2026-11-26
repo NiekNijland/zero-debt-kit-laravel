@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Tests\Support\Architecture\MigrationShapeGuard;
 
+uses()->group('arch');
+
 dataset('migrations out of shape', [
     'no down()' => ["public function up(): void\n{\n    Schema::create('shipments', fn (Blueprint \$table) => \$table->id());\n}", 'a migration without down(): add public function down(): void'],
     'an empty down() after a schema change' => ["public function up(): void\n{\n    Schema::table('shipments', fn (Blueprint \$table) => \$table->string('tracking_code')->nullable());\n}\npublic function down(): void\n{\n}", 'an empty down() in a migration that changes the schema: undo up() in it'],
@@ -15,7 +17,7 @@ dataset('migrations out of shape', [
 
 it('detects a migration that cannot roll back or leaves a choice of the schema open', function (string $members, string $reason): void {
     $source = "<?php\nuse Illuminate\\Database\\Migrations\\Migration;\nreturn new class() extends Migration\n{\n" . $members . "\n};\n";
-    $violations = new MigrationShapeGuard(dirname(__DIR__, 2))->inSource($source);
+    $violations = new MigrationShapeGuard(dirname(__DIR__, 2), 'database/migrations')->inSource($source);
 
     expect($violations)->toHaveCount(1)
         ->and($violations[0])->toContain($reason);
@@ -57,12 +59,12 @@ it('accepts a migration that undoes its schema change and one that changes rows 
             }
         };
         PHP;
-    $guard = new MigrationShapeGuard(dirname(__DIR__, 2));
+    $guard = new MigrationShapeGuard(dirname(__DIR__, 2), 'database/migrations');
 
     expect($guard->inSource($schema))->toBe([])
         ->and($guard->inSource($rows))->toBe([]);
 });
 
 it('keeps every migration dated 2025-01-01 or later in shape', function (): void {
-    expect(new MigrationShapeGuard(dirname(__DIR__, 2))->violations())->toBe([]);
+    expect(new MigrationShapeGuard(dirname(__DIR__, 2), 'database/migrations')->violations())->toBe([]);
 });

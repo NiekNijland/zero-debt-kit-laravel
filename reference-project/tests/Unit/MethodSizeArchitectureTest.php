@@ -7,6 +7,8 @@ use Tests\Support\Architecture\PhpFileInspector;
 use Tests\Support\Narrow;
 use Tests\Support\SourceSandbox;
 
+uses()->group('arch');
+
 $sentence = 'A PHP file has at most 400 lines; a method at most 80 lines, a controller action at most 40.';
 
 $body = static fn (int $lines): string => str_repeat("        \$value = 1;\n", $lines);

@@ -7,6 +7,8 @@ use Tests\Support\Architecture\PhpFileInspector;
 use Tests\Support\Narrow;
 use Tests\Support\SourceSandbox;
 
+uses()->group('arch');
+
 $run = static function (array $files, array $open = []): array {
     $tree = ['app/.gitkeep' => ''];
 

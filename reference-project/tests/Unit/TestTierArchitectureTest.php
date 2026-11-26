@@ -7,6 +7,8 @@ use Tests\Support\Architecture\TestClassGuard;
 use Tests\Support\Architecture\TestHelperFunctionGuard;
 use Tests\Support\Unit\TestTierArchitectureHelpers;
 
+uses()->group('arch');
+
 dataset('booting unit test sources', [
     'plain import' => ["<?php\nuse Tests\\FeatureTestCase;\nuses(FeatureTestCase::class);\n"],
     'aliased import' => ["<?php\nuse Tests\\FeatureTestCase as Base;\nuses(Base::class);\n"],

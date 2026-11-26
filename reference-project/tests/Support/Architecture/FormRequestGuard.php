@@ -18,6 +18,7 @@ final readonly class FormRequestGuard
     public function __construct(
         private PhpFileInspector $inspector,
         private string $root,
+        private string $source,
     ) {
     }
 
@@ -28,7 +29,7 @@ final readonly class FormRequestGuard
     {
         $violations = [];
 
-        foreach ($this->inspector->phpFiles($this->root . '/app/Http/Requests') as $file) {
+        foreach ($this->inspector->phpFiles($this->root . '/' . $this->source) as $file) {
             foreach ($this->inSource((string) file_get_contents($file)) as $violation) {
                 $violations[] = substr($file, strlen($this->root) + 1) . ':' . $violation;
             }
@@ -53,14 +54,36 @@ final readonly class FormRequestGuard
                 $violations[] = $authorize->getStartLine() . ': authorize() that only returns true: remove the method, a form request without one lets the request through and the route carries the permission or policy; keep it with #[Override] only to switch off the check of a parent request';
             }
 
-            foreach ($finder->findInstanceOf($class->getMethod('rules')->stmts ?? [], Node\ArrayItem::class) as $item) {
-                if ($item->key instanceof String_ && $item->value instanceof String_) {
-                    $violations[] = $item->getStartLine() . ': the rules of a field as one string: write them as an array, [' . implode(', ', array_map(static fn (string $rule): string => "'" . $rule . "'", explode('|', $item->value->value))) . ']';
+            $rules = $class->getMethod('rules')->stmts ?? [];
+            $held = [];
+
+            foreach ($finder->findInstanceOf($rules, Node\Expr\Assign::class) as $assign) {
+                if ($assign->var instanceof Node\Expr\Variable && is_string($assign->var->name) && self::isText($assign->expr)) {
+                    $held[] = $assign->var->name;
+                }
+            }
+
+            foreach ($finder->findInstanceOf($rules, Node\ArrayItem::class) as $item) {
+                $asString = self::isText($item->value) || ($item->value instanceof Node\Expr\Variable && is_string($item->value->name) && in_array($item->value->name, $held, true));
+
+                if ($item->key instanceof String_ && $asString) {
+                    $violations[] = $item->value instanceof String_
+                        ? $item->getStartLine() . ': the rules of a field as one string: write them as an array, [' . implode(', ', array_map(static fn (string $rule): string => "'" . $rule . "'", explode('|', $item->value->value))) . ']'
+                        : $item->getStartLine() . ': the rules of a field as text that is held in a variable or joined: write them as an array, [\'required\', \'string\']';
                 }
             }
         }
 
         return $violations;
+    }
+
+    /**
+     * Text, or text joined to text (`'required|' . 'string'`).
+     */
+    private static function isText(Node $value): bool
+    {
+        return $value instanceof String_
+            || ($value instanceof Node\Expr\BinaryOp\Concat && self::isText($value->left) && self::isText($value->right));
     }
 
     private static function onlyReturnsTrue(ClassMethod $method): bool

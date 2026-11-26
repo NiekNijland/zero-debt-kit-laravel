@@ -6,6 +6,8 @@ use Illuminate\Filesystem\Filesystem;
 use Tests\Support\Narrow;
 use Tests\Support\Unit\ConcurrentIndexMigrationHelpers;
 
+uses()->group('arch');
+
 dataset('blocking index migrations', [
     'index on an existing table' => ["Schema::table('products', function (Blueprint \$table): void {\n    \$table->index('sku');\n});", '', ['products']],
     'unique column on an existing table' => ["Schema::table('coupons', fn (Blueprint \$table) => \$table->string('code')->unique());", '', ['coupons']],

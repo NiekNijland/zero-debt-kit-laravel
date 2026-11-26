@@ -6,6 +6,8 @@ use Tests\Support\Architecture\PhpFileInspector;
 use Tests\Support\Architecture\TestHelperMirrorGuard;
 use Tests\Support\SourceSandbox;
 
+uses()->group('arch');
+
 it('reports helpers and scenarios in the mirrored tree that no test at the mirrored path owns', function (): void {
     $class = static fn (string $namespace, string $name, string $body = ''): string => "<?php\nnamespace Tests\\Support\\" . $namespace . ";\nfinal class " . $name . ' { ' . $body . " }\n";
     $root = SourceSandbox::create([

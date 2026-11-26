@@ -24,6 +24,8 @@ final readonly class MigrationShapeGuard
 
     public function __construct(
         private string $root,
+        /** @var string the folder of the migrations, relative to the root */
+        private string $migrations,
     ) {
     }
 
@@ -34,7 +36,7 @@ final readonly class MigrationShapeGuard
     {
         $violations = [];
 
-        foreach (Globs::of($this->root . '/database/migrations/*.php') as $file) {
+        foreach (Globs::of($this->root . '/' . $this->migrations . '/*.php') as $file) {
             if (strcmp(basename($file), self::FIRST_FILE) < 0) {
                 continue;
             }

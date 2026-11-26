@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace Tests\Support\Architecture;
 
 use App\Providers\RateLimitServiceProvider;
+use Illuminate\Cache\RateLimiter as CacheRateLimiter;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\RateLimiter;
 use PhpParser\Node;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr\ClassConstFetch;
+use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Expr\New_;
 use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Identifier;
@@ -30,6 +32,7 @@ final readonly class RateLimiterGuard
     public function __construct(
         private PhpFileInspector $inspector,
         private string $root,
+        private string $source,
     ) {
     }
 
@@ -40,7 +43,7 @@ final readonly class RateLimiterGuard
     {
         $violations = [];
 
-        foreach ($this->inspector->phpFiles($this->root . '/app') as $file) {
+        foreach ($this->inspector->phpFiles($this->root . '/' . $this->source) as $file) {
             foreach ($this->inSource((string) file_get_contents($file)) as $violation) {
                 $violations[] = substr($file, strlen($this->root) + 1) . ':' . $violation;
             }
@@ -71,8 +74,19 @@ final readonly class RateLimiterGuard
             }
         }
 
-        foreach ($finder->findInstanceOf($statements, StaticCall::class) as $call) {
-            if (! $call->class instanceof Name || ltrim($call->class->toString(), '\\') !== RateLimiter::class || ! $call->name instanceof Identifier || $call->name->toLowerString() !== 'for') {
+        $limiters = TypedReceivers::in($statements, [RateLimiter::class, CacheRateLimiter::class]);
+
+        foreach ($finder->find($statements, static fn (Node $node): bool => $node instanceof StaticCall || $node instanceof MethodCall) as $call) {
+            if (! ($call instanceof StaticCall || $call instanceof MethodCall) || ! $call->name instanceof Identifier || $call->name->toLowerString() !== 'for') {
+                continue;
+            }
+
+            // The facade, an injected limiter and `app(RateLimiter::class)` are the same call.
+            $onLimiter = $call instanceof StaticCall
+                ? $call->class instanceof Name && ltrim($call->class->toString(), '\\') === RateLimiter::class
+                : $limiters->holds($call->var);
+
+            if (! $onLimiter) {
                 continue;
             }
 
@@ -88,6 +102,12 @@ final readonly class RateLimiterGuard
 
             if ($name instanceof Arg && $name->value instanceof String_ && preg_match('/^[a-z][a-z0-9]*(_[a-z0-9]+)*$/', $name->value->value) !== 1) {
                 $violations[] = $call->getStartLine() . ': the limiter "' . $name->value->value . '" is not named in snake_case, like product_search';
+            }
+        }
+
+        foreach ($finder->findInstanceOf($statements, String_::class) as $text) {
+            if (preg_match('/^throttle:\d/', $text->value) === 1) {
+                $violations[] = $text->getStartLine() . ': a throttle with numbers in the route ("' . $text->value . '"): ' . self::NUMBER_IN_CONFIG . '; the route takes the limiter with throttle:<name>';
             }
         }
 

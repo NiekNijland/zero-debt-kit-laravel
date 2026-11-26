@@ -175,7 +175,7 @@ test('enum cases are UPPER_CASE', function (): void {
 });
 
 it('detects an enum that is not backed by a string', function (string $source, string $reason): void {
-    $violations = new StringBackedEnumGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source);
+    $violations = new StringBackedEnumGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source);
 
     expect($violations)->toHaveCount(1)
         ->and($violations[0])->toContain($reason)
@@ -186,7 +186,7 @@ it('detects an enum that is not backed by a string', function (string $source, s
 ]);
 
 it('backs every enum in app by a string', function (): void {
-    $guard = new StringBackedEnumGuard(new PhpFileInspector(), dirname(__DIR__, 2));
+    $guard = new StringBackedEnumGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app');
 
     expect($guard->inSource("<?php\nnamespace App;\nenum Status: string { case PLACED = 'placed'; }\nfinal class Enum {}\n"))->toBe([])
         ->and($guard->violations())->toBe([]);

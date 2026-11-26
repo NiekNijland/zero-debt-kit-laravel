@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Support\Architecture;
 
+use InvalidArgumentException;
 use Override;
 use PhpParser\Node;
 use PhpParser\Node\Expr\FuncCall;
@@ -188,12 +189,20 @@ final class PhpFileInspector
     }
 
     /**
+     * A directory that does not exist is an error, not an empty tree: a real-tree case over a renamed or missing folder
+     * must fail instead of passing without having read a file. A caller that walks a list of trees where some may be
+     * absent passes `mayBeAbsent: true`.
+     *
      * @return list<string> absolute paths of the PHP files below the directory
      */
-    public function phpFiles(string $directory): array
+    public function phpFiles(string $directory, bool $mayBeAbsent = false): array
     {
         if (! is_dir($directory)) {
-            return [];
+            if ($mayBeAbsent) {
+                return [];
+            }
+
+            throw new InvalidArgumentException('The directory ' . $directory . ' does not exist: a guard over a missing folder would pass without reading a file');
         }
 
         $files = [];
@@ -219,7 +228,8 @@ final class PhpFileInspector
      */
     public function callsIn(string $file): array
     {
-        $key = $file . '@' . (string) filemtime($file);
+        // The key is the content, not the modification time: two writes inside one second (a test that rewrites a file) must not read the first parse.
+        $key = $file . '@' . (string) md5_file($file);
 
         return self::$calls[$key] ??= $this->calls((string) file_get_contents($file));
     }

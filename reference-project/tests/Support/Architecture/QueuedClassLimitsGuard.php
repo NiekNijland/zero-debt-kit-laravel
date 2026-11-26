@@ -5,17 +5,22 @@ declare(strict_types=1);
 namespace Tests\Support\Architecture;
 
 use Illuminate\Contracts\Queue\ShouldQueue;
-use PhpParser\Node\Stmt\Class_;
-use PhpParser\NodeFinder;
-use PhpParser\NodeTraverser;
-use PhpParser\NodeVisitor\NameResolver;
-use PhpParser\ParserFactory;
+use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
 
+/**
+ * A queued concrete class states its limits itself: `$timeout`, and `$tries` or `retryUntil()`. The class, a parent, a
+ * trait, a promoted constructor parameter and the attribute form (`#[Timeout]`, `#[Tries]`; the attributes of the
+ * framework's queue namespace, verify the names against the installed release in step 1) all count. A queued class is
+ * one that reaches the contract through a parent, an interface or a sub-interface (`ClassGraph`).
+ */
 final readonly class QueuedClassLimitsGuard
 {
+    private const array QUEUED = [ShouldQueue::class, ShouldQueueAfterCommit::class];
+
     public function __construct(
         private PhpFileInspector $inspector,
         private string $root,
+        private string $source,
     ) {
     }
 
@@ -24,15 +29,13 @@ final readonly class QueuedClassLimitsGuard
      */
     public function violations(): array
     {
-        $violations = [];
+        $sources = [];
 
-        foreach ($this->inspector->phpFiles($this->root . '/app') as $file) {
-            foreach ($this->inSource((string) file_get_contents($file)) as $violation) {
-                $violations[] = substr($file, strlen($this->root) + 1) . ': ' . $violation;
-            }
+        foreach ($this->inspector->phpFiles($this->root . '/' . $this->source) as $file) {
+            $sources[substr($file, strlen($this->root) + 1)] = (string) file_get_contents($file);
         }
 
-        return $violations;
+        return $this->check($sources);
     }
 
     /**
@@ -40,48 +43,35 @@ final readonly class QueuedClassLimitsGuard
      */
     public function inSource(string $source): array
     {
-        $statements = (new NodeTraverser(new NameResolver()))->traverse((new ParserFactory())->createForHostVersion()->parse($source) ?? []);
+        return $this->check(['' => $source]);
+    }
+
+    /**
+     * @param array<string, string> $sources
+     *
+     * @return list<string>
+     */
+    private function check(array $sources): array
+    {
+        $graph = ClassGraph::of($sources);
         $violations = [];
 
-        foreach ((new NodeFinder())->findInstanceOf($statements, Class_::class) as $class) {
-            if (! self::isQueued($class)) {
+        foreach ($graph->concreteClasses() as $class) {
+            if ($graph->reaches($class, self::QUEUED) === null) {
                 continue;
             }
 
-            $name = $class->namespacedName?->toString() ?? 'an anonymous class on line ' . $class->getStartLine();
+            $prefix = ($class['path'] === '' ? '' : $class['path'] . ': ') . $class['name'];
 
-            if (! self::declares($class, 'timeout')) {
-                $violations[] = $name . ' is queued without $timeout: declare public int $timeout = <seconds>, at most the timeout of the supervisor of its queue in config/horizon.php, so the limit of the work stands in the class';
+            if ($graph->property($class, 'timeout') === null && ! $graph->hasAttribute($class, 'Timeout')) {
+                $violations[] = $prefix . ' is queued without $timeout: declare public int $timeout = <seconds>, at most the timeout of the supervisor of its queue in config/horizon.php, so the limit of the work stands in the class';
             }
 
-            if (! self::declares($class, 'tries') && $class->getMethod('retryUntil') === null && ! self::inherits($class, 'retryUntil')) {
-                $violations[] = $name . ' is queued without $tries: declare public int $tries = <attempts> (1 when a second run would repeat a side effect), or retryUntil() when the work retries until a moment';
+            if ($graph->property($class, 'tries') === null && ! $graph->hasMethod($class, 'retryUntil') && ! $graph->hasAttribute($class, 'Tries')) {
+                $violations[] = $prefix . ' is queued without $tries: declare public int $tries = <attempts> (1 when a second run would repeat a side effect), or retryUntil() when the work retries until a moment';
             }
         }
 
         return $violations;
-    }
-
-    private static function isQueued(Class_ $class): bool
-    {
-        foreach ([...$class->implements, ...array_filter([$class->extends])] as $ancestor) {
-            if (is_a(ltrim($ancestor->toString(), '\\'), ShouldQueue::class, true)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static function declares(Class_ $class, string $property): bool
-    {
-        return $class->getProperty($property) !== null || self::inherits($class, $property);
-    }
-
-    private static function inherits(Class_ $class, string $member): bool
-    {
-        $parent = $class->extends === null ? null : ltrim($class->extends->toString(), '\\');
-
-        return $parent !== null && class_exists($parent) && (property_exists($parent, $member) || method_exists($parent, $member));
     }
 }

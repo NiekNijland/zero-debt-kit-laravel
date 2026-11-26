@@ -7,6 +7,8 @@ use Tests\Support\Architecture\PhpFileInspector;
 use Tests\Support\Narrow;
 use Tests\Support\SourceSandbox;
 
+uses()->group('arch');
+
 dataset('broadcast channels out of line', [
     'a channel that is not registered' => [
         ['app/Events/DoneEvent.php' => "<?php\nnamespace App\\Events;\nuse Illuminate\\Broadcasting\\PrivateChannel;\nfinal class DoneEvent { public function broadcastOn(): array { return [new PrivateChannel('invoice.' . \$this->key)]; } }\n"],
@@ -31,10 +33,10 @@ dataset('broadcast channels out of line', [
 ]);
 
 it('detects a broadcast channel that is not registered or not tested', function (array $files, string $reason): void {
-    $root = SourceSandbox::create(Narrow::stringMap($files));
+    $root = SourceSandbox::create(['app/.gitkeep' => '', ...Narrow::stringMap($files)]);
 
     try {
-        $violations = new BroadcastChannelGuard(new PhpFileInspector(), $root)->violations();
+        $violations = new BroadcastChannelGuard(new PhpFileInspector(), $root, 'app')->violations();
 
         expect($violations)->toHaveCount(1)
             ->and($violations[0])->toContain($reason)
@@ -52,14 +54,14 @@ it('accepts a registered channel with its test and a class that is only named Ch
     ]);
 
     try {
-        expect(new BroadcastChannelGuard(new PhpFileInspector(), $root)->violations())->toBe([]);
+        expect(new BroadcastChannelGuard(new PhpFileInspector(), $root, 'app')->violations())->toBe([]);
     } finally {
         SourceSandbox::remove($root);
     }
 });
 
 it('registers and tests every broadcast channel the application sends on', function (): void {
-    $guard = new BroadcastChannelGuard(new PhpFileInspector(), dirname(__DIR__, 2));
+    $guard = new BroadcastChannelGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app');
 
     expect($guard->registered())->not->toBe([])
         ->and($guard->violations())->toBe([]);

@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Tests\Support\Architecture\DatabaseRuleGuard;
 use Tests\Support\Architecture\PhpFileInspector;
 
+uses()->group('arch');
+
 dataset('database rules that skip the model or the tenant', [
     'a table name' => ["<?php\nuse Illuminate\\Validation\\Rule;\n\$r = Rule::exists('users', 'id')->where('tenant_id', \$id);\n", 'without a model class'],
     'a table name by the fully qualified facade' => ["<?php\n\$r = \\Illuminate\\Validation\\Rule::unique('coupons', 'name')->whereNull('tenant_id');\n", 'without a model class'],
@@ -22,7 +24,7 @@ dataset('database rules that skip the model or the tenant', [
 ]);
 
 it('detects an existence or uniqueness rule that skips the model or the tenant', function (string $source, string $reason): void {
-    $violations = (new DatabaseRuleGuard(new PhpFileInspector(), dirname(__DIR__, 2)))->inSource($source);
+    $violations = (new DatabaseRuleGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app'))->inSource($source);
 
     expect($violations)->toHaveCount(1)
         ->and($violations[0])->toContain($reason)
@@ -53,9 +55,9 @@ it('accepts a rule on the model class that names tenant_id when the model belong
         $exists = Storage::exists('unique') && $query->exists() && $collection->unique('tenant_id')->isNotEmpty();
         PHP;
 
-    expect((new DatabaseRuleGuard(new PhpFileInspector(), dirname(__DIR__, 2)))->inSource($source))->toBe([]);
+    expect((new DatabaseRuleGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app'))->inSource($source))->toBe([]);
 });
 
 it('writes every existence and uniqueness rule in app on its model class and inside its tenant', function (): void {
-    expect((new DatabaseRuleGuard(new PhpFileInspector(), dirname(__DIR__, 2)))->violations())->toBe([]);
+    expect((new DatabaseRuleGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app'))->violations())->toBe([]);
 });

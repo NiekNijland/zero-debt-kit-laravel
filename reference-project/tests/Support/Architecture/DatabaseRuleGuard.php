@@ -41,6 +41,7 @@ final class DatabaseRuleGuard
     public function __construct(
         private readonly PhpFileInspector $inspector,
         private readonly string $root,
+        private string $source,
     ) {
     }
 
@@ -51,7 +52,7 @@ final class DatabaseRuleGuard
     {
         $violations = [];
 
-        foreach ($this->inspector->phpFiles($this->root . '/app') as $file) {
+        foreach ($this->inspector->phpFiles($this->root . '/' . $this->source) as $file) {
             foreach ($this->inSource((string) file_get_contents($file)) as $violation) {
                 $violations[] = substr($file, strlen($this->root) + 1) . ':' . $violation;
             }

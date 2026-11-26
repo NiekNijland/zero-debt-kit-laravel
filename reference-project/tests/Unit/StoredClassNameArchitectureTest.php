@@ -8,6 +8,8 @@ use Tests\Support\Architecture\StoredClassNameGuard;
 use Tests\Support\Narrow;
 use Tests\Support\SourceSandbox;
 
+uses()->group('arch');
+
 dataset('stored class names out of line', [
     'a new event that is not in the snapshot' => [
         ['app/Modules/Orders/Events/OrderPlacedEvent.php' => "<?php\n", 'tests/Support/Architecture/stored-class-names/events.php' => "<?php\nreturn [];\n"],

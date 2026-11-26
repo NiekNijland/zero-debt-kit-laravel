@@ -7,6 +7,8 @@ use Tests\Support\Architecture\PhpFileInspector;
 use Tests\Support\Narrow;
 use Tests\Support\SourceSandbox;
 
+uses()->group('arch');
+
 $table = <<<'MD'
     Domain code lives in one module per domain, `app/Modules/<Domain>`, using only these folders:
 
@@ -72,7 +74,7 @@ dataset('classes inside the module table', [
     'a class of a folder with no suffix' => [['app/Modules/Orders/ValueObjects/Money.php']],
     'one folder of subdomain' => [['app/Modules/Orders/Actions/Returns/CancelReturn.php']],
     'a name that only contains a forbidden suffix' => [['app/Modules/Orders/Actions/ActionPlan.php']],
-    'a class outside the modules, which this guard does not read' => [['app/Support/Helper.php', 'app/Http/Controllers/Orders/ShowOrderController.php']],
+    'a class outside the modules, which this guard does not read' => [['app/Support/Helper.php', 'app/Http/Controllers/Orders/ShowOrderController.php', 'app/Modules/Orders/Actions/PlaceOrder.php']],
 ]);
 
 it('accepts the folders of the table, a subdomain folder and a class outside the modules', function (array $files) use ($run): void {

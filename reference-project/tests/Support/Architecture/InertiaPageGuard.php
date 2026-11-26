@@ -8,13 +8,13 @@ use Inertia\Inertia;
 
 final readonly class InertiaPageGuard
 {
-    private const array SOURCES = ['app', 'bootstrap', 'routes'];
-
-    private const string PAGES = 'resources/js/Pages';
-
     public function __construct(
         private PhpFileInspector $inspector,
         private string $root,
+        /** @var list<string> the folders that render pages, relative to the root; any of them may be absent */
+        private array $sources,
+        /** @var string the folder of the page files, relative to the root */
+        private string $pages,
     ) {
     }
 
@@ -25,8 +25,8 @@ final readonly class InertiaPageGuard
     {
         $violations = [];
 
-        foreach (self::SOURCES as $directory) {
-            foreach ($this->inspector->phpFiles($this->root . '/' . $directory) as $file) {
+        foreach ($this->sources as $directory) {
+            foreach ($this->inspector->phpFiles($this->root . '/' . $directory, mayBeAbsent: true) as $file) {
                 foreach ($this->inSource((string) file_get_contents($file)) as $violation) {
                     $violations[] = substr($file, strlen($this->root) + 1) . ':' . $violation;
                 }
@@ -56,13 +56,13 @@ final readonly class InertiaPageGuard
             }
 
             if (preg_match('/^\'([^\'\\\\$]+)\'$/', $page, $matches) !== 1) {
-                $violations[] = $call['line'] . ': an Inertia page that is not named by a string: write the page as text, as in Inertia::render(\'Order/Show\', ...), so the file in ' . self::PAGES . ' can be found';
+                $violations[] = $call['line'] . ': an Inertia page that is not named by a string: write the page as text, as in Inertia::render(\'Order/Show\', ...), so the file in ' . $this->pages . ' can be found';
 
                 continue;
             }
 
-            if (! is_file($this->root . '/' . self::PAGES . '/' . $matches[1] . '.tsx')) {
-                $violations[] = $call['line'] . ': the Inertia page ' . $matches[1] . ' has no file: add ' . self::PAGES . '/' . $matches[1] . '.tsx or render the page that exists';
+            if (! is_file($this->root . '/' . $this->pages . '/' . $matches[1] . '.tsx')) {
+                $violations[] = $call['line'] . ': the Inertia page ' . $matches[1] . ' has no file: add ' . $this->pages . '/' . $matches[1] . '.tsx or render the page that exists';
             }
         }
 

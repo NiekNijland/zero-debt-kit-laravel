@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Tests\Support\Architecture\PhpFileInspector;
 
+uses()->group('arch');
+
 arch('models register their events in booted(), never through an observer attribute')
     ->expect('App')
     ->not->toHaveAttribute(ObservedBy::class);

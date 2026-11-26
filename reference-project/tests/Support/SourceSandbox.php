@@ -8,10 +8,12 @@ final class SourceSandbox
 {
     /**
      * @param array<string, string> $files
+     * @param string $prefix the folder name before the random part: a guard's test passes a dot-prefixed one (`.checkout-`)
+     *                       to prove that it filters on the path relative to the root, not on the absolute path
      */
-    public static function create(array $files): string
+    public static function create(array $files, string $prefix = 'source-sandbox-'): string
     {
-        $root = sys_get_temp_dir() . '/source-sandbox-' . bin2hex(random_bytes(6));
+        $root = sys_get_temp_dir() . '/' . $prefix . bin2hex(random_bytes(6));
 
         foreach ($files as $path => $contents) {
             $absolute = $root . '/' . $path;

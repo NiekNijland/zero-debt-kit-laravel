@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Support\Architecture;
 
+use Illuminate\Database\Connection;
+use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\DatabaseManager;
 use Illuminate\Support\Facades\DB;
 use PhpParser\Node;
 use PhpParser\Node\Expr\MethodCall;
@@ -22,11 +25,14 @@ final readonly class ManualTransactionGuard
 {
     private const array DB_FACADES = ['DB', DB::class];
 
+    private const array CONNECTIONS = [ConnectionInterface::class, Connection::class, DatabaseManager::class];
+
     private const string ONE_WAY = 'wrap the work in DB::transaction(fn () => ...), which commits, rolls back and rethrows for you';
 
     public function __construct(
         private PhpFileInspector $inspector,
         private string $root,
+        private string $source,
     ) {
     }
 
@@ -37,7 +43,7 @@ final readonly class ManualTransactionGuard
     {
         $violations = [];
 
-        foreach ($this->inspector->phpFiles($this->root . '/app') as $file) {
+        foreach ($this->inspector->phpFiles($this->root . '/' . $this->source) as $file) {
             foreach ($this->inSource((string) file_get_contents($file)) as $violation) {
                 $violations[] = substr($file, strlen($this->root) + 1) . ':' . $violation;
             }
@@ -53,6 +59,7 @@ final readonly class ManualTransactionGuard
     {
         $statements = (new NodeTraverser(new NameResolver()))->traverse((new ParserFactory())->createForHostVersion()->parse($source) ?? []);
         $finder = new NodeFinder();
+        $connections = TypedReceivers::in($statements, self::CONNECTIONS, ['db']);
         $scopes = [$statements];
 
         foreach ($finder->findInstanceOf($statements, FunctionLike::class) as $function) {
@@ -86,13 +93,16 @@ final readonly class ManualTransactionGuard
         }
 
         foreach (self::callsNamed($statements, 'rollback') as $rollBack) {
-            if (! in_array($rollBack->getStartLine(), $inFinally, true)) {
+            // The connection's method is `rollBack()`; another receiver with a method `rollback()` (the migrator) is not a transaction.
+            $isTransaction = $rollBack->name instanceof Identifier && $rollBack->name->toString() === 'rollBack' || self::isOnDatabase($rollBack, $connections);
+
+            if ($isTransaction && ! in_array($rollBack->getStartLine(), $inFinally, true)) {
                 $violations[$rollBack->getStartLine() . ' rolled back'] = $rollBack->getStartLine() . ': a transaction rolled back by hand: ' . self::ONE_WAY . ' (throw to roll back)';
             }
         }
 
         foreach (self::callsNamed($statements, 'commit') as $commit) {
-            if (self::isOnDatabase($commit)) {
+            if (self::isOnDatabase($commit, $connections)) {
                 $violations[$commit->getStartLine() . ' committed'] = $commit->getStartLine() . ': a transaction committed by hand: ' . self::ONE_WAY;
             }
         }
@@ -119,7 +129,7 @@ final readonly class ManualTransactionGuard
         return $calls;
     }
 
-    private static function isOnDatabase(StaticCall|MethodCall|NullsafeMethodCall $call): bool
+    private static function isOnDatabase(StaticCall|MethodCall|NullsafeMethodCall $call, TypedReceivers $connections): bool
     {
         $receiver = $call instanceof StaticCall ? $call : $call->var;
 
@@ -127,6 +137,7 @@ final readonly class ManualTransactionGuard
             $receiver = $receiver->var;
         }
 
-        return $receiver instanceof StaticCall && $receiver->class instanceof Name && in_array(ltrim($receiver->class->toString(), '\\'), self::DB_FACADES, true);
+        return ($receiver instanceof StaticCall && $receiver->class instanceof Name && in_array(ltrim($receiver->class->toString(), '\\'), self::DB_FACADES, true))
+            || $connections->holds($receiver);
     }
 }

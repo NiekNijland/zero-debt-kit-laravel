@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Tests\Support\Unit\ReportNotLogArchitectureHelpers;
 
+uses()->group('arch');
+
 dataset('severe logs in a catch', [
     'imported facade' => ["<?php\nnamespace App;\nuse Illuminate\\Support\\Facades\\Log;\ntry { f(); } catch (\\Throwable \$e) { Log::error('failed', ['exception' => \$e]); }\n"],
     'global alias' => ["<?php\nnamespace App;\ntry { f(); } catch (\\RuntimeException \$e) { \\Log::error('failed'); }\n"],

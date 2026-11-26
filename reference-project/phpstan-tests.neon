@@ -37,6 +37,8 @@ parameters:
     universalObjectCratesClasses:
         - Pest\Mixins\Expectation
 
+    # Added to the paths of phpstan.neon (a list in an included file is merged by appending), so the dead-code detector reads the source and the tests together.
+    # Reasoned, not run: if the analyser ever overrides a list instead, write the source folders here too.
     paths:
         - tests
 

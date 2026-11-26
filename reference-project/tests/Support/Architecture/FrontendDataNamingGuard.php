@@ -15,11 +15,11 @@ final class FrontendDataNamingGuard
     /**
      * @return list<string>
      */
-    public static function violations(PhpFileInspector $inspector, string $root): array
+    public static function violations(PhpFileInspector $inspector, string $root, string $folder): array
     {
         $violations = [];
 
-        foreach ($inspector->phpFiles($root . '/app') as $file) {
+        foreach ($inspector->phpFiles($root . '/' . $folder) as $file) {
             if (! str_contains((string) file_get_contents($file), '#[TypeScript')) {
                 continue;
             }

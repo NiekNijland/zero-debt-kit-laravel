@@ -34,7 +34,7 @@ final class NoRawTableArchitectureHelpers
         $offenders = [];
 
         foreach (['app', 'routes', 'bootstrap', 'config'] as $directory) {
-            foreach ($inspector->phpFiles($root . '/' . $directory) as $file) {
+            foreach ($inspector->phpFiles($root . '/' . $directory, mayBeAbsent: true) as $file) {
                 if ($file === $advisoryLock) {
                     continue;
                 }

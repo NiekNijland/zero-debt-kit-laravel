@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Tests\Support\Architecture\LogMessageGuard;
 use Tests\Support\Architecture\PhpFileInspector;
 
+uses()->group('arch');
+
 dataset('log lines built from the message of an exception', [
     'the message itself' => ["<?php\nnamespace App;\nuse Illuminate\\Support\\Facades\\Log;\ntry { f(); } catch (RefusedException \$e) { Log::info(\$e->getMessage()); }\n"],
     'a concatenated message' => ["<?php\nnamespace App;\nuse Illuminate\\Support\\Facades\\Log;\nLog::warning('Export failed: ' . \$exception->getMessage(), ['order_id' => 1]);\n"],
@@ -16,6 +18,12 @@ dataset('log lines built from the message of an exception', [
     'Log::log with a level' => ["<?php\nnamespace App;\nuse Illuminate\\Support\\Facades\\Log;\nLog::log('info', \$e->getMessage());\n"],
     'the logger helper' => ["<?php\nnamespace App;\nlogger()->info(\$e->getMessage());\n"],
     'the logger helper with a message' => ["<?php\nnamespace App;\nlogger('Export failed: ' . \$e->getMessage());\n"],
+    'an injected logger' => ["<?php\nnamespace App;\nuse Psr\\Log\\LoggerInterface;\nfinal class X { public function __construct(private LoggerInterface \$logger) {} public function f(\$e): void { \$this->logger->warning(\$e->getMessage()); } }\n"],
+    'a logger received as a parameter' => ["<?php\nnamespace App;\nuse Psr\\Log\\LoggerInterface;\nfinal class X { public function f(LoggerInterface \$logger, \$e): void { \$logger->error('x: ' . \$e->getMessage()); } }\n"],
+    'the container string' => ["<?php\nnamespace App;\napp('log')->warning(\$e->getMessage());\n"],
+    'a chain of several calls from the facade' => ["<?php\nnamespace App;\nuse Illuminate\\Support\\Facades\\Log;\nLog::channel('a')->withContext(['k' => 1])->warning(\$e->getMessage());\n"],
+    'a message held in a variable' => ["<?php\nnamespace App;\nuse Illuminate\\Support\\Facades\\Log;\n\$message = \$e->getMessage();\nLog::warning(\$message);\n"],
+    'a message held in a variable and put in the context' => ["<?php\nnamespace App;\nuse Illuminate\\Support\\Facades\\Log;\n\$text = 'x: ' . \$e->getMessage();\nLog::warning('Export failed', ['error' => \$text]);\n"],
     'a context key' => ["<?php\nnamespace App;\nuse Illuminate\\Support\\Facades\\Log;\nLog::warning('Export failed', ['order_id' => 1, 'message' => \$e->getMessage()]);\n"],
     'a context key of a nullable exception' => ["<?php\nnamespace App;\nuse Illuminate\\Support\\Facades\\Log;\nLog::warning('Export failed', ['error' => \$e?->getMessage()]);\n"],
     'a nested context key' => ["<?php\nnamespace App;\nuse Illuminate\\Support\\Facades\\Log;\nLog::channel('daily')->info('Export failed', ['cause' => ['text' => 'x: ' . \$e->getMessage()]]);\n"],
@@ -24,7 +32,7 @@ dataset('log lines built from the message of an exception', [
 ]);
 
 it('detects a log line whose message or context is built from getMessage()', function (string $source): void {
-    $violations = new LogMessageGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source);
+    $violations = new LogMessageGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source);
 
     expect($violations)->toHaveCount(1)
         ->and($violations[0])->toContain("['exception' => \$e]");
@@ -44,11 +52,16 @@ it('accepts a fixed line with the exception as context, a console line and a res
         report($e);
         Log::info(...);
         $failure = ['message' => $e->getMessage()];
+        $this->logger->info('fixed line');
+        $this->untyped->warning($e->getMessage());
+        Log::channel('a')->withContext(['k' => 1])->warning('what failed', ['exception' => $e]);
+        $count = count($rows);
+        Log::info($count);
         PHP;
 
-    expect(new LogMessageGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source))->toBe([]);
+    expect(new LogMessageGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source))->toBe([]);
 });
 
 it('never builds a log message or its context in app from the message of an exception', function (): void {
-    expect(new LogMessageGuard(new PhpFileInspector(), dirname(__DIR__, 2))->violations())->toBe([]);
+    expect(new LogMessageGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->violations())->toBe([]);
 });

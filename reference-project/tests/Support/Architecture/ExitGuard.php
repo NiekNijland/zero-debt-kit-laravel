@@ -13,11 +13,11 @@ use PhpParser\ParserFactory;
 
 final readonly class ExitGuard
 {
-    private const array TREES = ['app', 'bootstrap', 'config', 'database', 'routes', 'tests'];
-
     public function __construct(
         private PhpFileInspector $inspector,
         private string $root,
+        /** @var list<string> the folders to scan, relative to the root; any of them may be absent */
+        private array $trees,
     ) {
     }
 
@@ -28,8 +28,8 @@ final readonly class ExitGuard
     {
         $violations = [];
 
-        foreach (self::TREES as $tree) {
-            foreach ($this->inspector->phpFiles($this->root . '/' . $tree) as $file) {
+        foreach ($this->trees as $tree) {
+            foreach ($this->inspector->phpFiles($this->root . '/' . $tree, mayBeAbsent: true) as $file) {
                 foreach ($this->inSource((string) file_get_contents($file)) as $violation) {
                     $violations[] = substr($file, strlen($this->root) + 1) . ':' . $violation;
                 }

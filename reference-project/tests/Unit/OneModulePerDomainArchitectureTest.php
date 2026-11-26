@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Tests\Support\Unit\OneModulePerDomainArchitectureHelpers;
 
+uses()->group('arch');
+
 it('has one module per domain, never two that differ only by a plural or a prefix', function (): void {
     expect(OneModulePerDomainArchitectureHelpers::modules())->toContain('Tenants', 'Users', 'Roles')
         ->and(OneModulePerDomainArchitectureHelpers::overlaps(OneModulePerDomainArchitectureHelpers::modules()))->toBe([])

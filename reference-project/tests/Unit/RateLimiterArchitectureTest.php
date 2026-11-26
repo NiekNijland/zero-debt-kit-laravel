@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Tests\Support\Architecture\PhpFileInspector;
 use Tests\Support\Architecture\RateLimiterGuard;
 
+uses()->group('arch');
+
 dataset('limiters that leave the one way', [
     'a number of attempts' => ["<?php\nnamespace App\\Providers;\nuse Illuminate\\Cache\\RateLimiting\\Limit;\nuse Illuminate\\Support\\Facades\\RateLimiter;\nfinal class RateLimitServiceProvider { public function boot(): void { RateLimiter::for('uploads', static fn (): Limit => Limit::perMinute(60)->by('x')); } }\n", 'a limit with a number or a constant in the code'],
     'a number per hour' => ["<?php\nnamespace App\\Providers;\nuse Illuminate\\Cache\\RateLimiting\\Limit;\nLimit::perHour(1000);\n", 'a limit with a number or a constant in the code'],
@@ -15,12 +17,15 @@ dataset('limiters that leave the one way', [
     'a fully qualified limit' => ["<?php\nnamespace App\\Providers;\n\\Illuminate\\Cache\\RateLimiting\\Limit::perDay(10);\n", 'a limit with a number or a constant in the code'],
     'a limiter in another provider' => ["<?php\nnamespace App\\Providers;\nuse Illuminate\\Cache\\RateLimiting\\Limit;\nuse Illuminate\\Support\\Facades\\Config;\nuse Illuminate\\Support\\Facades\\RateLimiter;\nfinal class AppServiceProvider { public function boot(): void { RateLimiter::for('uploads', static fn (): Limit => Limit::perMinute(Config::integer('rate_limiting.uploads_per_minute'))); } }\n", 'a limiter defined outside App\\Providers\\RateLimitServiceProvider'],
     'a limiter in a module' => ["<?php\nnamespace App\\Modules\\Products\\Support;\nuse Illuminate\\Cache\\RateLimiting\\Limit;\nuse Illuminate\\Support\\Facades\\Config;\nuse Illuminate\\Support\\Facades\\RateLimiter;\nRateLimiter::for('uploads', static fn (): Limit => Limit::perMinute(Config::integer('rate_limiting.uploads_per_minute')));\n", 'a limiter defined outside App\\Providers\\RateLimitServiceProvider'],
+    'a limiter defined through the container' => ["<?php\nnamespace App\\Modules\\Products\\Support;\nuse Illuminate\\Cache\\RateLimiter;\nuse Illuminate\\Cache\\RateLimiting\\Limit;\nuse Illuminate\\Support\\Facades\\Config;\napp(RateLimiter::class)->for('uploads', static fn (): Limit => Limit::perMinute(Config::integer('rate_limiting.uploads_per_minute')));\n", 'a limiter defined outside App\\Providers\\RateLimitServiceProvider'],
+    'a limiter defined on an injected limiter' => ["<?php\nnamespace App\\Modules\\Products\\Support;\nuse Illuminate\\Cache\\RateLimiter;\nfinal class Boot { public function __construct(private RateLimiter \$limiter) {} public function run(): void { \$this->limiter->for('uploads', fn () => null); } }\n", 'a limiter defined outside App\\Providers\\RateLimitServiceProvider'],
+    'a throttle with numbers in a route' => ["<?php\nnamespace App\\Http;\nRoute::middleware('throttle:60,1')->get('/x', fn () => 1);\n", 'a throttle with numbers in the route ("throttle:60,1")'],
     'a name in kebab case' => ["<?php\nnamespace App\\Providers;\nuse Illuminate\\Cache\\RateLimiting\\Limit;\nuse Illuminate\\Support\\Facades\\Config;\nuse Illuminate\\Support\\Facades\\RateLimiter;\nfinal class RateLimitServiceProvider { public function boot(): void { RateLimiter::for('image-uploads', static fn (): Limit => Limit::perMinute(Config::integer('rate_limiting.uploads_per_minute'))); } }\n", 'the limiter "image-uploads" is not named in snake_case'],
     'a name in camel case' => ["<?php\nnamespace App\\Providers;\nuse Illuminate\\Cache\\RateLimiting\\Limit;\nuse Illuminate\\Support\\Facades\\Config;\nuse Illuminate\\Support\\Facades\\RateLimiter;\nfinal class RateLimitServiceProvider { public function boot(): void { RateLimiter::for('imageUploads', static fn (): Limit => Limit::perMinute(Config::integer('rate_limiting.uploads_per_minute'))); } }\n", 'the limiter "imageUploads" is not named in snake_case'],
 ]);
 
 it('detects a limit with a number in the code, a limiter outside the provider and a name that is not snake_case', function (string $source, string $reason): void {
-    $violations = new RateLimiterGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source);
+    $violations = new RateLimiterGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source);
 
     expect($violations)->toHaveCount(1)
         ->and($violations[0])->toContain($reason);
@@ -56,9 +61,9 @@ it('accepts limits that read config, a limit copied from another and a limiter n
         StockLimit::perMinute(5);
         PHP;
 
-    expect(new RateLimiterGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source))->toBe([]);
+    expect(new RateLimiterGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source))->toBe([]);
 });
 
 it('keeps every limiter in the rate limit provider, named in snake_case, with its number in config', function (): void {
-    expect(new RateLimiterGuard(new PhpFileInspector(), dirname(__DIR__, 2))->violations())->toBe([]);
+    expect(new RateLimiterGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->violations())->toBe([]);
 });

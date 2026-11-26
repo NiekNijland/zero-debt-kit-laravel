@@ -6,6 +6,8 @@ use Tests\Support\Architecture\GuideRulesGuard;
 use Tests\Support\Narrow;
 use Tests\Support\SourceSandbox;
 
+uses()->group('arch');
+
 const RULE_ROWS = "| Rule id | The guide must say | Instead |\n| --- | --- | --- |\n| unique-job-key | `uniqueId()`; one key per record | declare uniqueId() |\n";
 
 dataset('rules and guides that disagree', [
@@ -14,6 +16,22 @@ dataset('rules and guides that disagree', [
     'words the guide lost' => [['unique-job-key'], "A job declares a key.\n", 'the guides no longer say "uniqueId()"'],
     'half of the words' => [['unique-job-key'], "A job declares uniqueId().\n", 'the guides no longer say "one key per record"'],
 ]);
+
+dataset('tables that are not one row per rule', [
+    'a row inside a fenced block' => ["| Rule id | The guide must say | Instead |\n| --- | --- | --- |\n```\n| unique-job-key | `uniqueId()` | declare uniqueId() |\n```\n", 'rule unique-job-key has no row'],
+    'a row inside an indented block' => ["| Rule id | The guide must say | Instead |\n| --- | --- | --- |\n\n    | unique-job-key | `uniqueId()` | declare uniqueId() |\n", 'rule unique-job-key has no row'],
+    'a rule id that appears twice' => [RULE_ROWS . "| unique-job-key | `a key` | declare a key |\n", 'row unique-job-key appears twice'],
+]);
+
+it('reads a table row only outside a code block and only once', function (string $rows, string $reason): void {
+    $root = SourceSandbox::create(['docs/guards/rules.md' => $rows, 'AGENTS.md' => "A job declares uniqueId().\n"]);
+
+    try {
+        expect(implode("\n", new GuideRulesGuard($root . '/docs/guards/rules.md', [$root . '/AGENTS.md'], ['unique-job-key'])->violations()))->toContain($reason);
+    } finally {
+        SourceSandbox::remove($root);
+    }
+})->with('tables that are not one row per rule');
 
 it('fails a guide that lost the words of a rule, and a rule and a row that do not match', function (array $ruleIds, string $guide, string $reason): void {
     $root = SourceSandbox::create(['docs/guards/rules.md' => RULE_ROWS, 'AGENTS.md' => $guide]);
