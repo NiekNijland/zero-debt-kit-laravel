@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 
 # >>> config: the project sets every value in this block; the example values are a PHP backend with a TypeScript frontend
-# Comma lists of tracked folders or files. A trailing ? means "may be missing". Empty means "none".
-SOURCE_PATHS="app,bootstrap,config,database,routes,resources/views?"
+# Comma lists of tracked folders or files. A trailing ? means "may be missing". Empty means "none". Every row reads tracked files only
+# (git grep, git ls-files), so the generated, untracked files of a framework (bootstrap/cache, storage) are never counted: a folder
+# that also holds generated files stays one entry. debt-dashboard.sh has the same folders in SOURCE_FILES.
+SOURCE_PATHS="app,bootstrap,config,database,routes,lang?,resources/views?"
 TEST_PATHS="tests"
 # The test folders whose tests are written in the backend's test framework: the row test-skip counts there.
 # Empty in a project whose only language is TypeScript: frontend-test-skip counts its skips.
@@ -20,11 +22,11 @@ TYPE_CHECKER_CONFIGS="tsconfig.json?"
 # or after a brace or comma, so a switch that is commented out (# or //) is not counted.
 ANALYSER_SWITCHES="(^|[{,])[[:space:]]*[^A-Za-z[:space:]#/]?(checkTooWideReturnTypesInProtectedAndPublicMethods|checkMissingOverrideMethodAttribute|reportAnyTypeWideningInVarTag|checkOctaneCompatibility|noEnvCallsOutsideOfConfig|strict|noUncheckedIndexedAccess|noImplicitOverride|noImplicitReturns|noFallthroughCasesInSwitch|noUnusedLocals|noUnusedParameters|noUncheckedSideEffectImports)[^A-Za-z:[:space:]]?[[:space:]]*:[[:space:]]*true|(^|[{,])[[:space:]]*[^A-Za-z[:space:]#/]?(allowJs|allowUnreachableCode|allowUnusedLabels)[^A-Za-z:[:space:]]?[[:space:]]*:[[:space:]]*false|^[[:space:]]*-[[:space:]]+[^#[:space:]]*/conf/bleedingEdge[.]neon|^[[:space:]]*-[[:space:]]+[^#[:space:]]*/carbon/extension[.]neon"
 REFACTOR_CONFIG="rector.php?"
-# One extended regular expression that matches a set or switch of the refactoring tool that is on, in REFACTOR_CONFIG: the six
+# One extended regular expression that matches a set or switch of the refactoring tool that is on, in REFACTOR_CONFIG: the five
 # prepared sets, the ten framework sets, the language sets, the framework version read from the manifest, and unused imports
 # removed (templates/tool-configs.md). The row refactor-sets counts the matches and only goes up. No double quote, backslash
 # or dollar sign in the value: the merge base is read as text. A set after // or # at the line start is not counted.
-REFACTOR_SETS="(^[[:space:]]*|,[[:space:]]*|(^[[:space:]]*|[]A-Za-z0-9_)])->withPreparedSets[(][[:space:]]*)(deadCode|codeQuality|codingStyle|typeDeclarations|privatization|earlyReturn):[[:space:]]*true|(^[[:space:]]*|[,([][[:space:]]*)LaravelSetList::LARAVEL_(ARRAYACCESS_TO_METHOD_CALL|ARRAY_STR_FUNCTION_TO_STATIC_CALL|CODE_QUALITY|COLLECTION|CONTAINER_STRING_TO_FULLY_QUALIFIED_NAME|ELOQUENT_MAGIC_METHOD_TO_QUERY_BUILDER|FACADE_ALIASES_TO_FULL_NAMES|FACTORIES|IF_HELPERS|LEGACY_FACTORIES_TO_CLASSES)|(^[[:space:]]*|[]A-Za-z0-9_)])->withPhpSets[(][)]|(^[[:space:]]*|[]A-Za-z0-9_)])->withComposerBased[(]laravel:[[:space:]]*true[)]|(^[[:space:]]*|,[[:space:]]*|(^[[:space:]]*|[]A-Za-z0-9_)])->withImportNames[(][[:space:]]*)removeUnusedImports:[[:space:]]*true"
+REFACTOR_SETS="(^[[:space:]]*|,[[:space:]]*|(^[[:space:]]*|[]A-Za-z0-9_)])->withPreparedSets[(][[:space:]]*)(deadCode|codeQuality|codingStyle|typeDeclarations|privatization):[[:space:]]*true|(^[[:space:]]*|[,([][[:space:]]*)LaravelSetList::LARAVEL_(ARRAYACCESS_TO_METHOD_CALL|ARRAY_STR_FUNCTION_TO_STATIC_CALL|CODE_QUALITY|COLLECTION|CONTAINER_STRING_TO_FULLY_QUALIFIED_NAME|ELOQUENT_MAGIC_METHOD_TO_QUERY_BUILDER|FACADE_ALIASES_TO_FULL_NAMES|FACTORIES|IF_HELPERS|LEGACY_FACTORIES_TO_CLASSES)|(^[[:space:]]*|[]A-Za-z0-9_)])->withPhpSets[(][)]|(^[[:space:]]*|[]A-Za-z0-9_)])->withComposerBased[(]laravel:[[:space:]]*true[)]|(^[[:space:]]*|,[[:space:]]*|(^[[:space:]]*|[]A-Za-z0-9_)])->withImportNames[(][[:space:]]*)removeUnusedImports:[[:space:]]*true"
 # The formatter's config, and one extended regular expression that matches a rule of the kit's strictness list that is on in it
 # (true, or an object of options). The row formatter-rules counts the matches and only goes up: a rule that is switched off
 # for its own pull request (templates/tool-configs.md, "Rules that can change behavior") is not counted until it is on.
@@ -42,8 +44,11 @@ CI_FILES="bitbucket-pipelines.yml?,.github/workflows?,.gitlab-ci.yml?,scripts"
 # The values that other scripts read too (the caps file, the base branch, the remote) are in kit-config.sh, next to this script.
 GUARDED_FILES=".gitattributes?,CODEOWNERS?,.github/CODEOWNERS?,docs/CODEOWNERS?,.gitlab/CODEOWNERS?,scripts/kit-config.sh?,scripts/debt-dashboard.sh?,scripts/ci-commit-messages.sh?,scripts/ci-parallel.sh?,scripts/keyed-baseline.sh?,scripts/audit-gate.sh?,scripts/mutation.sh?,scripts/checks.sh?,bitbucket-pipelines.yml?,.github/workflows?,.gitlab-ci.yml?"
 # The rows that never go below 0 but still take an override at 0 (a reason that is itself a decision: a justified comment, a pinned
-# major, a dated advisory exception whose commit names the advisory). A comma list of row names; every other max row at 0 takes none.
-OVERRIDE_AT_ZERO="comments,cap-dependencies-majors-behind,audit-exceptions"
+# major, an abandoned package with no replacement, a dated advisory exception whose commit names the advisory, and the first measurement
+# of a cap that a host measures, such as cap-ci-duration-minutes, which the project adds here with that row: the commit that raises
+# the cap from 0 to the measured value carries [ratchet: cap-<key>] first measurement <n>). A comma list of row names; every other
+# max row at 0 takes none.
+OVERRIDE_AT_ZERO="comments,cap-dependencies-majors-behind,cap-dependencies-abandoned,audit-exceptions"
 # <<< config
 
 SHARED_CONFIG="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/kit-config.sh"
@@ -643,6 +648,8 @@ loose-comparisons                      max  grep   @SOURCE_PATHS,@TEST_PATHS  (^
 mutable-dates                          max  grep   @SOURCE_PATHS,@TEST_PATHS  (^|[^A-Za-z0-9_])(DateTime|Carbon)(::|[[:space:]]*[(;,)])
 byte-string-functions                  max  grep   @SOURCE_PATHS,@TEST_PATHS  (^|[^A-Za-z0-9_>:$\\])\\?(strlen|substr|strpos|strrpos|stripos|strripos|strstr|stristr|strrchr|substr_count|str_split|strtolower|strtoupper)[(]
 guide-future-tense                     max  grep   @SOURCE_PATHS  (^|[^A-Za-z])([Ww]ill|[Ff]or now|[Uu]ntil)([^A-Za-z]|$)
+queue-bus-fake-all                     max  grep   @TEST_PATHS,:(exclude)*.md  (Queue|Bus)::fake(For)?\([[:space:]]*(\[[[:space:]]*\])?[[:space:]]*(\)|$)
+unused-ignore                          max  grep   composer-unused.php?  (NamedFilter|PatternFilter)::fromString
 EXTRA
 }
 
@@ -690,7 +697,7 @@ refactor-skip 1 ->withSkipPath(__DIR__ . '/x')
 refactor-skip 0 ->withSkip([])
 refactor-sets 2     ->withPreparedSets(deadCode: true, codeQuality: true)
 refactor-sets 1     deadCode: true,
-refactor-sets 1 $config->withPreparedSets(earlyReturn: true)
+refactor-sets 0 $config->withPreparedSets(earlyReturn: true)
 refactor-sets 1     ->withPhpSets()
 refactor-sets 1     ->withComposerBased(laravel: true)
 refactor-sets 1     ->withImportNames(removeUnusedImports: true)
@@ -974,6 +981,17 @@ loose-comparisons 1     && $a ==
 mutable-dates 1 DateTime::createFromFormat('Y', $y);
 guide-future-tense 1 For now this holds.
 guide-future-tense 1 We wait until
+queue-bus-fake-all 1 Queue::fake();
+queue-bus-fake-all 1 Bus::fake([]);
+queue-bus-fake-all 1 Queue::fakeFor(
+queue-bus-fake-all 1 Queue::fake(
+queue-bus-fake-all 1 Bus::fake( );
+queue-bus-fake-all 0 Queue::fake([Foo::class]);
+queue-bus-fake-all 0 Bus::fake([Foo::class]);
+queue-bus-fake-all 0 Event::fake();
+unused-ignore@composer-unused.php 1 ->addNamedFilter(NamedFilter::fromString('foo/bar'))
+unused-ignore@composer-unused.php 1 ->addPatternFilter(PatternFilter::fromString('/^foo\//'))
+unused-ignore@composer-unused.php 0 ->setAdditionalFilesFor('foo/bar', [])
 byte-string-functions 1 $n = substr($s, 1);
 byte-string-functions 1 $n = strpos($s, 1);
 byte-string-functions 1 $n = strrpos($s, 1);
@@ -1145,6 +1163,14 @@ selftest() {
             index=$((index + 1))
             continue
         fi
+        # The unused-ignore cases are written for a PHP config counted with a grep row; a project whose tool has a JSON config counts
+        # the key of its list with a json row (tools/README.md, "Adding a row", point 8): the cases do not describe it.
+        if [ "$row" = "unused-ignore" ] && [ "$method" != "grep" ]; then
+            skipped=$((skipped + 1))
+            covered="$covered $row "
+            index=$((index + 1))
+            continue
+        fi
         path="${paths[$index]}"
         [ "$method" != "without" ] || path="$(dirname "$path")"
         status=0
@@ -1193,6 +1219,13 @@ selftest() {
         case "$name" in cap-*) continue ;; esac
         case "$covered" in *" $name "*) ;; *) uncovered="$uncovered $name" ;; esac
     done <<< "$RATCHETS"
+
+    # A row that tools/README.md names (extra_rows) has cases in this file: one that has none fails, in the table or not.
+    local named
+    while read -r named _; do
+        [ -n "$named" ] || continue
+        case "$covered" in *" $named "*) ;; *) selftest_fail "$named is a row the kit names and has no fixture: add its cases to selftest_cases" ;; esac
+    done <<< "$(extra_rows)"
 
     # In CI a case that needs php or node and was skipped for want of it is a check that did not run.
     if [ "$tool_skipped" -gt 0 ] && [ -n "${CI:-}" ]; then
@@ -1282,9 +1315,12 @@ done
 
 # A branch name that starts with a dash would be read as an option: kit-config.sh holds the shared check.
 kit_check_branches || fail "$KIT_BRANCH_ERROR"
+kit_local_base "$BASE_BRANCH" || fail "$KIT_BRANCH_ERROR"
 
 BASE_REF="refs/remotes/$REMOTE/$BASE_BRANCH"
-if ! git fetch -q -- "$REMOTE" "+refs/heads/$BASE_BRANCH:$BASE_REF" 2> /dev/null; then
+if [ "$KIT_LOCAL_BASE" -eq 1 ]; then
+    echo "Ratchets: no remote $REMOTE: the local branch $BASE_BRANCH stands in for $REMOTE/$BASE_BRANCH (a developer's machine only)" >&2
+elif ! git fetch -q -- "$REMOTE" "+refs/heads/$BASE_BRANCH:$BASE_REF" 2> /dev/null; then
     git rev-parse -q --verify "$BASE_REF" > /dev/null || fail "cannot fetch $REMOTE/$BASE_BRANCH"
     [ -z "${CI:-}" ] || fail "cannot fetch $REMOTE/$BASE_BRANCH in a CI run, so the copy already here may be stale. FAILS: nothing was compared"
     echo "Ratchets: cannot fetch $REMOTE/$BASE_BRANCH; comparing against the copy already here (a developer's machine only: fix the fetch command first, see the profile)" >&2
@@ -1359,6 +1395,7 @@ guarded() {
         printf 'Script: %s, allowed\n%s\n' "$label" "$allowed"
     else
         printf 'Script: %s. FAILS without [ratchet: script] <reason> in a commit that touches %s\n' "$label" "$path"
+        printf '        (the first configuration of scripts that an earlier commit on the base copied needs the tag too: [ratchet: script] configure the installed scripts. Copy and configuration in one pull request need none.)\n'
         CHECKS_FAILED=1
     fi
 }

@@ -49,11 +49,11 @@ git init -q -b main "$FX_MUT"
     git commit -q -m "feature"
 ) > /dev/null 2>&1
 fxm() { (cd "$FX_MUT" && "$@"); }
-check FX10 "mutation.sh --changed (pest): CHECK_BASE names the base, only the files changed since release are mutated" 0 '^pest --mutate --parallel --path=app/F\.php --min=50$' fxm env CHECK_BASE=release "$SHELL_BIN" scripts/mutation.sh --changed
-check FX11 "mutation.sh --changed (pest): without CHECK_BASE the host's variable (GITHUB_BASE_REF) is the base" 0 '^pest --mutate --parallel --path=app/F\.php --min=50$' fxm env GITHUB_BASE_REF=release "$SHELL_BIN" scripts/mutation.sh --changed
-check FX12 "mutation.sh --changed (pest): the variable named last in BASE_BRANCH_VARS works too (GitLab)" 0 '^pest --mutate --parallel --path=app/F\.php --min=50$' fxm env CI_MERGE_REQUEST_TARGET_BRANCH_NAME=release "$SHELL_BIN" scripts/mutation.sh --changed
-check FX13 "mutation.sh --changed (pest): CHECK_BASE wins over the host's variable" 0 '^pest --mutate --parallel --path=app/F\.php,app/R\.php --min=50$' fxm env CHECK_BASE=main GITHUB_BASE_REF=release "$SHELL_BIN" scripts/mutation.sh --changed
-check FX14 "mutation.sh --changed (pest): with no variable the default branch is the base" 0 '^pest --mutate --parallel --path=app/F\.php,app/R\.php --min=50$' fxm "$SHELL_BIN" scripts/mutation.sh --changed
+check FX10 "mutation.sh --changed (pest): CHECK_BASE names the base, only the files changed since release are mutated" 0 '^pest --mutate --parallel --processes=4 --path=app/F\.php --min=50$' fxm env CHECK_BASE=release "$SHELL_BIN" scripts/mutation.sh --changed
+check FX11 "mutation.sh --changed (pest): without CHECK_BASE the host's variable (GITHUB_BASE_REF) is the base" 0 '^pest --mutate --parallel --processes=4 --path=app/F\.php --min=50$' fxm env GITHUB_BASE_REF=release "$SHELL_BIN" scripts/mutation.sh --changed
+check FX12 "mutation.sh --changed (pest): the variable named last in BASE_BRANCH_VARS works too (GitLab)" 0 '^pest --mutate --parallel --processes=4 --path=app/F\.php --min=50$' fxm env CI_MERGE_REQUEST_TARGET_BRANCH_NAME=release "$SHELL_BIN" scripts/mutation.sh --changed
+check FX13 "mutation.sh --changed (pest): CHECK_BASE wins over the host's variable" 0 '^pest --mutate --parallel --processes=4 --path=app/F\.php,app/R\.php --min=50$' fxm env CHECK_BASE=main GITHUB_BASE_REF=release "$SHELL_BIN" scripts/mutation.sh --changed
+check FX14 "mutation.sh --changed (pest): with no variable the default branch is the base" 0 '^pest --mutate --parallel --processes=4 --path=app/F\.php,app/R\.php --min=50$' fxm "$SHELL_BIN" scripts/mutation.sh --changed
 check FX15 "mutation.sh --changed (infection): the host's variable reaches --git-diff-base" 0 'infection .*--git-diff-base=origin/release$' fxm env BITBUCKET_PR_DESTINATION_BRANCH=release "$SHELL_BIN" scripts/mutation-infection.sh --changed
 check FX16 "mutation.sh --changed (infection): CHECK_BASE wins and the default is the fallback" 0 'infection .*--git-diff-base=origin/main$' fxm "$SHELL_BIN" scripts/mutation-infection.sh --changed
 

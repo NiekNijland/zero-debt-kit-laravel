@@ -40,7 +40,7 @@ printf 'a\n' > "$VXM/src/[id].ts"
 printf 'a\n' > "$VXM/src/(grp)/page.tsx"
 printf 'a\n' > "$VXM/src/keep.ts"
 (
-    cd "$VXM" && git init -q -b main && git add -A && git commit -q -m "PROJ-1 chore: base" && git update-ref refs/remotes/origin/main HEAD &&
+    cd "$VXM" && git init -q -b main && git add -A && git commit -q -m "PROJ-1 chore: base" && git remote add origin file:///no-such-remote && git update-ref refs/remotes/origin/main HEAD &&
         printf 'b\n' >> src/a.ts && printf 'b\n' >> src/a.test.ts && printf 'b\n' >> src/styles.css && printf 'b\n' >> "src/[id].ts" && printf 'b\n' >> "src/(grp)/page.tsx" &&
         git add -A && git commit -q -m "PROJ-1 chore: change"
 ) > /dev/null 2>&1
@@ -59,7 +59,7 @@ check VX19 "mutation.sh stryker --changed: with only a test file and a .css chan
 # ---------------------------------------------------------------- Infection 0.35.12 and Pest 5.3.7: recorded outputs the script's choices rest on
 check VX20 "infection: a run below --min-msi fails with the MSI message (recorded)" 0 'should be 90%, but actual is 80%' cat "$FX/infection-0.35.12-below-msi.out"
 check VX21 "infection: --git-diff-filter=AM on a renamed and edited file mutates nothing and exits 0 (recorded: why the script passes AMR)" 0 'Could not find any modified files' cat "$FX/infection-0.35.12-filter-AM-rename.out"
-check VX22 "mutation.sh infection --changed passes AMR, not AM, and the base as origin/<base>" 0 'infection --threads=max --min-msi=40 --git-diff-filter=AMR --git-diff-base=origin/main' "$SHELL_BIN" -c "
+check VX22 "mutation.sh infection --changed passes AMR, not AM, and the base as origin/<base>" 0 'infection --threads=4 --min-msi=40 --git-diff-filter=AMR --git-diff-base=origin/main' "$SHELL_BIN" -c "
     cd '$VXM' && git checkout -q vx-only 2>/dev/null; git reset -q --hard HEAD
     mkdir -p vendor/bin && printf '#!/bin/sh\necho \"infection \$*\"\n' > vendor/bin/infection && chmod +x vendor/bin/infection
     sed 's/^MUTATION_TOOL=.*\$/MUTATION_TOOL=\"infection\"/' scripts/mutation.sh > scripts/mutation-infection.sh

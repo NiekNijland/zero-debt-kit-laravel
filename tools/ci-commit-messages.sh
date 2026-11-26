@@ -49,9 +49,12 @@ done
 
 # A branch name that starts with a dash would be read as an option: kit-config.sh holds the shared check.
 kit_check_branches || fail "$KIT_BRANCH_ERROR"
+kit_local_base "$BASE_BRANCH" || fail "$KIT_BRANCH_ERROR"
 
 BASE_REF="refs/remotes/$REMOTE/$BASE_BRANCH"
-if ! git fetch -q -- "$REMOTE" "+refs/heads/$BASE_BRANCH:$BASE_REF" 2> /dev/null; then
+if [ "$KIT_LOCAL_BASE" -eq 1 ]; then
+    echo "Commit messages: no remote $REMOTE: the local branch $BASE_BRANCH stands in for $REMOTE/$BASE_BRANCH (a developer's machine only)" >&2
+elif ! git fetch -q -- "$REMOTE" "+refs/heads/$BASE_BRANCH:$BASE_REF" 2> /dev/null; then
     git rev-parse -q --verify "$BASE_REF" > /dev/null || fail "cannot fetch $REMOTE/$BASE_BRANCH"
     [ -z "${CI:-}" ] || fail "cannot fetch $REMOTE/$BASE_BRANCH in a CI run, so the copy already here may be stale"
     echo "Commit messages: cannot fetch $REMOTE/$BASE_BRANCH; comparing against the copy already here (a developer's machine only)" >&2

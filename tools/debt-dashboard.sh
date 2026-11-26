@@ -6,8 +6,9 @@ RATCHET_SCRIPT=""
 # The caps file is CAPS_FILE in kit-config.sh, next to this script.
 # The kit's limit for a file, in lines.
 MAX_LINES=400
-# Extended regular expressions over tracked paths. Empty means "no such files": the row counts 0.
-SOURCE_FILES='^(app|bootstrap|config)/.*\.php$'
+# Extended regular expressions over tracked paths (generated files such as bootstrap/cache are untracked and never read). Empty means
+# "no such files": the row counts 0. SOURCE_FILES covers the folders of SOURCE_PATHS in the ratchet script: change both together.
+SOURCE_FILES='^(app|bootstrap|config|database|routes|lang)/.*\.php$|^resources/views/.*\.php$'
 FRONTEND_FILES='^resources/js/.*\.(ts|tsx)$'
 TEST_FILES='^tests/.*\.php$|\.test\.tsx?$'
 SIZE_EXEMPT=''
@@ -41,9 +42,9 @@ SHRINK_ONLY="comments test-doubles event-fake-all"
 ANALYSER_SWITCHES_TARGET=18
 # What the other min rows must reach, as "<row>:<number>" split on spaces. --final fails a row below its number, and a name here
 # that has no ratchet row. The numbers are the kit's: coverage of the backend and of the frontend logic at 95, every set of
-# REFACTOR_SETS (19), every rule of FORMATTER_RULES (21), the advisory-blocking package (1). A project without the subject of a
+# REFACTOR_SETS (18), every rule of FORMATTER_RULES (21), the advisory-blocking package (1). A project without the subject of a
 # row removes that entry with the script tag (no frontend: frontend-logic-coverage-floor; no PHP: the last three).
-MIN_ROW_TARGETS="coverage-floor:95 frontend-logic-coverage-floor:95 refactor-sets:19 formatter-rules:21 advisory-block:1"
+MIN_ROW_TARGETS="coverage-floor:95 frontend-logic-coverage-floor:95 refactor-sets:18 formatter-rules:21 advisory-block:1"
 # More rows: "<caps key>::<always|online|shown>::<command that prints one whole number>". online rows are skipped by --offline.
 # A shown row is skipped by --offline too, has no cap and never fails: only dependencies-behind is one.
 # json '<operation> <path>' reads JSON on standard input (tools/README.md, the methods table, "json").
@@ -186,13 +187,13 @@ advice() {
         coverage-floor | frontend-logic-coverage-floor) echo "add the missing tests and raise the committed floor to the measured value, until it is at the kit's end goal" ;;
         refactor-sets) echo "switch on, in REFACTOR_CONFIG, the sets of REFACTOR_SETS that are missing (the kit's templates/tool-configs.md)" ;;
         formatter-rules) echo "switch on, in FORMATTER_CONFIG, the rules of FORMATTER_RULES that are missing; a rule that can change behavior lands in a pull request of its own (the kit's templates/tool-configs.md)" ;;
-        advisory-block) echo "add roave/security-advisories at dev-latest to the development requirements of the manifest" ;;
+        advisory-block) echo "add roave/security-advisories at dev-latest to the development requirements of the manifest; a PHP patch version below its floor is installed with --ignore-platform-req=php on that machine and then upgraded, never pinned with config.platform" ;;
         classes-no-test-names) echo "write a test for each class that imports it or names it before ::" ;;
         classes-without-own-test | support-classes-without-own-test) echo "add the test file <Class>$TEST_NAME_SUFFIX for each class" ;;
         frontend-logic-without-test | frontend-components-without-test) echo "add <file>.$FRONTEND_TEST_INFIX.<extension> next to each file" ;;
         docs-older-than-limit) echo "update each doc, move it to the archive folder or delete it" ;;
         dependency-advisories) echo "update or replace each package that has an advisory; never add it to the audit's ignore list. With no fixed release yet: a decision row in the plan (the kit's 04-guards.md C3) and a time-boxed exception line in scripts/audit-exceptions.json (at most 7 days, never renewed)" ;;
-        dependencies-abandoned) echo "replace each abandoned package; with no replacement yet: a decision row in the plan (the kit's 04-guards.md C3)" ;;
+        dependencies-abandoned) echo "replace each abandoned package; with no replacement yet (an abandoned package that a tool the kit prescribes requires, no release without it): a decision row in the plan with the evidence and an end date (the kit's 04-guards.md C3), the cap at the measured number in $CAPS_FILE and cap-dependencies-abandoned in SHRINK_ONLY (the owner approves it; the cap falls to 0 when the package is gone)" ;;
         dependencies-majors-behind) echo "upgrade each major in a pull request of its own; a major the owner pinned enters SHRINK_ONLY as cap-dependencies-majors-behind, by its decision row" ;;
         files-outside-row-paths) echo "add each folder to SOURCE_PATHS, TEST_PATHS or FRONTEND_PATHS in the ratchet script, or to UNCOUNTED_PATHS when it is deliberately not counted" ;;
         analyser-baseline) echo "fix the errors and delete their entries; at zero, delete the baseline file and its include" ;;
@@ -240,6 +241,9 @@ measured_row() {
         target=0
     fi
     [[ "$now" =~ ^[0-9]+$ ]] || note="${note:-could not be measured}"
+    if [ "$FINAL" -eq 1 ] && [ "$cap" != "?" ] && listed "cap-$name" "$SHRINK_ONLY"; then
+        hint="shrink-only by a decision row: held to the cap"
+    fi
     if [[ "$now" =~ ^[0-9]+$ && "$cap" =~ ^[0-9]+$ ]] && [ "$now" -lt "$cap" ]; then
         hint="lower the cap to $now"
         if [ "$FINAL" -eq 1 ]; then
@@ -302,7 +306,7 @@ min_target() {
 kit_min_target() {
     case "$1" in
         coverage-floor | frontend-logic-coverage-floor) echo 95 ;;
-        refactor-sets) echo 19 ;;
+        refactor-sets) echo 18 ;;
         formatter-rules) echo 21 ;;
         advisory-block) echo 1 ;;
         *) return 1 ;;
@@ -563,6 +567,9 @@ else
 fi
 
 printf '\n%s rows: %s at target or held, %s open, %s not measured, %s skipped\n' "$((TOTAL + SKIPPED))" "$((TOTAL - OPEN - UNKNOWN))" "$OPEN" "$UNKNOWN" "$SKIPPED"
+if [ "$FINAL" -eq 1 ] && [ "$SKIPPED" -gt 0 ]; then
+    printf 'Final: %s row(s) were skipped, so this run does not prove the end state: the run without --offline measures them (a row that needs a host or a registry prints UNKNOWN there when it cannot be measured, and fails).\n' "$SKIPPED"
+fi
 cat "$DETAIL_FILE"
 
 [ "$REPORT" -eq 1 ] || [ "$((OPEN + UNKNOWN))" -eq 0 ]
