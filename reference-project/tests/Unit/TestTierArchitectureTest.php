@@ -252,7 +252,7 @@ it('keeps every class out of the test files', function () use ($suites): void {
     expect((new TestClassGuard(new PhpFileInspector(), dirname(__DIR__, 2), $suites))->violations())->toBe([]);
 });
 
-dataset('functions declared in a test file', [
+dataset('functions and constants declared in a test file', [
     'top level function' => ["<?php\nfunction helper(): void {}\n", ['helper']],
     'function returning by reference' => ["<?php\nfunction &helper(): array { static \$rows = []; return \$rows; }\n", ['helper']],
     'function behind function_exists' => ["<?php\nif (! function_exists('helper')) {\n    function helper(): void {}\n}\n", ['helper']],
@@ -263,9 +263,13 @@ dataset('functions declared in a test file', [
     'function after an anonymous class with a closure argument' => ["<?php\n\$probe = new class(fn () => 1) { public function run(): void {} };\nfunction helper(): void {}\n", ['helper']],
     'function after a class constant fetch' => ["<?php\n\$name = Foo::class;\nfunction helper(): void {}\n", ['helper']],
     'two functions' => ["<?php\nfunction first(): void {}\nfunction second(): void {}\n", ['first', 'second']],
+    'a global constant' => ["<?php\nconst ROWS = [1, 2];\n", ['const ROWS']],
+    'a global constant in a namespace' => ["<?php\nnamespace Tests\\Feature;\nconst ROWS = 1;\n", ['const ROWS']],
+    'a constant defined by define' => ["<?php\ndefine('ROWS', 1);\n", ['define ROWS']],
+    'a constant after a class' => ["<?php\nfinal class Foo { public const A = 1; }\nconst B = 2;\n", ['const B']],
 ]);
 
-it('detects every named function a test file declares', function (string $source, array $functions): void {
+it('detects every named function and global constant a test file declares', function (string $source, array $functions): void {
     $root = SourceSandbox::create(['Feature/FooTest.php' => $source]);
 
     try {
@@ -273,7 +277,7 @@ it('detects every named function a test file declares', function (string $source
     } finally {
         SourceSandbox::remove($root);
     }
-})->with('functions declared in a test file');
+})->with('functions and constants declared in a test file');
 
 dataset('files the test helper function guard allows', [
     'method in a class' => ["<?php\nfinal class Foo { public static function helper(): void {} }\n"],
@@ -285,6 +289,11 @@ dataset('files the test helper function guard allows', [
     'arrow function' => ["<?php\n\$helper = fn (): int => 1;\n"],
     'closure after a class constant fetch' => ["<?php\n\$name = Foo::class;\n\$helper = function (): void {};\n"],
     'imported function' => ["<?php\nuse function Pest\\Laravel\\actingAs;\n"],
+    'imported constant' => ["<?php\nuse const Foo\\BAR;\n"],
+    'class constant' => ["<?php\nfinal class Foo { public const A = 1; private const array B = [1]; }\n"],
+    'enum and interface constant' => ["<?php\nenum Status: string { const DEFAULT = self::A; case A = 'a'; }\ninterface Probe { public const X = 1; }\n"],
+    'a method named define' => ["<?php\n\$builder->define('ROWS', 1);\nFoo::define('ROWS', 1);\n"],
+    'constant in a string' => ["<?php\n\$source = 'const ROWS = 1;';\n"],
     'function in a string' => ["<?php\n\$source = 'function helper() {}';\n"],
     'function in a heredoc' => ["<?php\n\$source = <<<'PHP'\nfunction helper() {}\nPHP;\n"],
     'function in a comment' => ["<?php\n// function helper() {}\n"],
@@ -300,7 +309,7 @@ it('allows methods, closures and function-shaped text in test files', function (
     }
 })->with('files the test helper function guard allows');
 
-it('keeps every function out of the test files', function (): void {
+it('keeps every function and global constant out of the test files', function (): void {
     expect((new TestHelperFunctionGuard(dirname(__DIR__)))->violations())->toBe([]);
 });
 
