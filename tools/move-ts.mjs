@@ -4,7 +4,9 @@
 // Without a flag: git mv each file that is still at its old path (running it again changes nothing), then rewrite the specifiers in
 // the tracked files under the roots: relative, alias, import(), require() and mock calls. --reverse swaps the columns: the same
 // tool takes a group back out of a finished move. --verify changes nothing and exits 1 when an old path still exists, a new path
-// is missing, or a specifier still names an old path.
+// is missing, a specifier still names an old path, or a moved file has a relative or alias specifier that names no file.
+// Every map line is checked before the first git mv (a file that is not tracked, a target that exists): a map that fails
+// leaves nothing half moved.
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
