@@ -8,7 +8,7 @@ Every project converges to these patterns; code that differs is debt (`01-princi
 
 ## Version floor per row
 
-Step 2 opens with the platform PRs up to this floor (`05-program.md` D2). A row cannot be met below its floor. The floor is the release that introduced the feature, to the kit's best knowledge: check each against the release notes when you measure the distance in step 1. Where a cell says "read in", the name was found in an installed copy of that release and the release that introduced it was not looked up: verify in step 1 against the installed version.
+Step 2 opens with the platform PRs up to this floor (`05-program.md` D2). A row cannot be met below its floor. The floor is the release that introduced the feature, to the kit's best knowledge: check each against the release notes when you measure the distance in step 1. Where a cell says "read in", the name was found in an installed copy of that release and the release that introduced it was not looked up: verify in step 1 against the installed version. The Pest and PHPUnit rows were checked against the package registry (Pest 3.8, 4.7 and 5.3 as the newest releases of their majors, and the Laravel framework's and the Pest Laravel plugin's requirements) in November 2026; the rest of the table was not.
 
 | Platform part | Floor | The rows that need it |
 | --- | --- | --- |
@@ -19,8 +19,8 @@ Step 2 opens with the platform PRs up to this floor (`05-program.md` D2). A row 
 | The refactoring tool (Rector, with `driftingly/rector-laravel`) | Rector 2, rector-laravel 2 | "Refactoring tool": the six prepared sets, `withPhpSets()`, `withComposerBased(laravel: true)`, `withImportNames(removeUnusedImports: true)` (read in Rector 2.6) and the ten `LaravelSetList` constants (read in rector-laravel 2.5); the rename rules of `05-program.md` D9 |
 | The formatter (Pint) | 1.30 | "Formatting": every rule name of the kit's config (read in 1.30) |
 | Composer | 2.11 | "Manifest floor": `composer bump --dry-run` exits 1 when the manifest is behind (read in 2.11) |
-| Pest, where the project uses it | 3 | mutation testing (`--mutate`); the `arch()` helper is from 2; "Architecture presets" (`php` and `security`, and what `strict` and `laravel` assert: read in 5.1); "Composer scripts" (`--type-coverage --min`: read in the type-coverage plugin's 5.0); "Smoke suite" in a browser (the browser plugin: not read in an installed copy, verify in step 1) |
-| PHPUnit, where the project uses it | 10 | attributes (`#[DataProvider]`, `#[Group]`) instead of annotations; "Smoke suite" in a browser (`laravel/dusk`: not read in an installed copy, verify in step 1) |
+| Pest, where the project uses it | 3 for the features, 4 on Laravel 13 | mutation testing (`--mutate`) and the architecture presets (`php`, `security`, `strict`, `laravel`) are in the Pest 3 announcement; `arch()` is from 2; "Architecture presets" (what each preset asserts: read in 5.1); "Composer scripts" (`--type-coverage --min`: the type-coverage plugin exists from its 2.0, the release that introduced the `--min` flag was not looked up, read in 5.0); "Smoke suite" in a browser (the browser plugin: not read in an installed copy, verify in step 1). Laravel 13 needs the Pest Laravel plugin 4 or 5: plugin 3 allows Laravel 11 and 12 only. Pest 4 needs PHP 8.3 and PHPUnit 12; Pest 5 needs PHP 8.4 and PHPUnit 13; Pest 3 needs PHP 8.2 and PHPUnit 11 |
+| PHPUnit, where the project uses it | 10 | attributes (`#[DataProvider]`, `#[Group]`) instead of annotations; "Smoke suite" in a browser (`laravel/dusk`: not read in an installed copy, verify in step 1). Laravel 13's own development set allows PHPUnit 11, 12 and 13 |
 | Livewire, where the project uses it | 3 | "Livewire": form objects and `#[Locked]` |
 
 ## Tooling per row
