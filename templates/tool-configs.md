@@ -224,19 +224,24 @@ One bot in every project, on every host: Renovate. The file is committed at the 
 ```json
 {
     "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-    "extends": ["config:recommended"],
+    "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
     "rangeStrategy": "bump",
     "commitMessagePrefix": "<TICKET> chore(deps):",
     "packageRules": [
         {
             "matchUpdateTypes": ["major"],
             "enabled": false
+        },
+        {
+            "matchManagers": ["github-actions"],
+            "matchUpdateTypes": ["major"],
+            "enabled": true
         }
     ]
 }
 ```
 
-`rangeStrategy` set to `bump` raises the lower limit in the manifest with every update, which is what `composer bump` does by hand (`catalog/tests-database-ci-docs.md`, "Manifest floor"). Majors are off: a major is a PR of the program or of the owner, and the dashboard row `dependencies-majors-behind` shows it. `<TICKET>` is the ticket the profile names for the bot, so the commit-message check passes (`07-process.md` section 10). The option names were not read in an installed copy of the bot: verify in step 1 against the bot's documentation.
+`rangeStrategy` set to `bump` raises the lower limit in the manifest with every update, which is what `composer bump` does by hand (`catalog/tests-database-ci-docs.md`, "Manifest floor"). Majors are off: a major is a PR of the program or of the owner, and the dashboard row `dependencies-majors-behind` shows it. The one exception is the `github-actions` manager (a rule after the first one, which wins): an action's runtime deprecations arrive as majors, so a pinned action must be able to take them, and `helpers:pinGitHubActionDigests` keeps every `uses:` line pinned to a commit sha and moves the sha with each release (the version stays in the comment after it). A project on Bitbucket or GitLab has no such manager and both lines do nothing there; the file stays the same on every host. `<TICKET>` is the ticket the profile names for the bot, so the commit-message check passes (`07-process.md` section 10). The option names were not read in an installed copy of the bot: verify in step 1 against the bot's documentation.
 
 ## Rules that can change behavior
 
