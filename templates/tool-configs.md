@@ -217,6 +217,63 @@ return RectorConfig::configure()
 - No `withSkip()`, no `withSkipPath()`: a rule that miscompiles an idiom is handled by fixing the idiom by hand before the pass (`05-program.md` D2, step 2). That holds for the rules that add the override marker too: the kit prescribes the marker (`catalog/backend-laravel.md`, "Overriding a method"). The ratchet row `refactor-skip` holds every skip entry at zero; the `min` row `refactor-sets` counts the 19 switches above (`REFACTOR_SETS` in the ratchet script) and `--final` holds it at 19.
 - The tool runs before the formatter (`composer lint`, `catalog/tests-database-ci-docs.md`, "Composer scripts"): the `codingStyle` set and the formatter touch the same constructs, and the dry run of the checks step is clean only on a tree the formatter has formatted after it. A rule of the two that keeps undoing the other is reported as a kit change, never skipped.
 
+## PHP analyser and type checker (`phpstan.neon`, `tsconfig.json`)
+
+The analyser's strictness is a set of switches, and the ratchet row `analyser-switches` counts the ones that are on (`ANALYSER_SWITCHES` in the ratchet script). There are 18 in all: two includes and five parameters in the analyser config, eleven compiler options in the type-checker config. Copy both blocks as they are in step 2; the paths, the type-coverage numbers and the disallowed-call rules are the project's, and a switch that is off for its own pull request is counted only when it is on (`05-program.md` D2). Worked example of the PHP file: `reference-project/phpstan.neon`.
+
+```neon
+includes:
+    - vendor/larastan/larastan/extension.neon
+    - vendor/phpstan/phpstan/conf/bleedingEdge.neon
+    - vendor/nesbot/carbon/extension.neon
+    - vendor/phpstan/phpstan-strict-rules/rules.neon
+    - vendor/tomasvotruba/type-coverage/config/extension.neon
+
+parameters:
+    paths:
+        - app
+        - bootstrap
+        - config
+        - database
+        - routes
+
+    level: 10
+
+    checkTooWideReturnTypesInProtectedAndPublicMethods: true
+    checkMissingOverrideMethodAttribute: true
+    reportAnyTypeWideningInVarTag: true
+    checkOctaneCompatibility: true
+    noEnvCallsOutsideOfConfig: true
+
+    type_coverage:
+        return: 100
+        param: 100
+        property: 100
+        constant: 100
+```
+
+The two includes the row counts are `conf/bleedingEdge.neon` (the checks of the next major, today) and the date library's `extension.neon`; the other three includes and the `level` are not counted by this row. A baseline file and an `ignoreErrors` entry stay absent (`catalog/backend-laravel.md`, "Types").
+
+```json
+{
+    "compilerOptions": {
+        "strict": true,
+        "noUncheckedIndexedAccess": true,
+        "noImplicitOverride": true,
+        "noImplicitReturns": true,
+        "noFallthroughCasesInSwitch": true,
+        "noUncheckedSideEffectImports": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "allowJs": false,
+        "allowUnreachableCode": false,
+        "allowUnusedLabels": false
+    }
+}
+```
+
+These eleven options merge into the project's own `compilerOptions` (module, JSX, paths and the rest stay the project's). The block holds no comment: a switch that is commented out is not counted, and the row would drop. Verify a copy with the expression of the script (`ANALYSER_SWITCHES`): `grep -o -E "$ANALYSER_SWITCHES" phpstan.neon tsconfig.json | wc -l` prints 18, which is the target `--final` holds the row at.
+
 ## Dependency bot (`renovate.json`)
 
 One bot in every project, on every host: Renovate. The file is committed at the repository root.

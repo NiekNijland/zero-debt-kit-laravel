@@ -107,10 +107,14 @@ final class ClassGraph
             }
 
             if ($type === null && (class_exists($name) || trait_exists($name)) && method_exists($name, $method)) {
-                $reflection = new ReflectionMethod($name, $method);
-
-                if (! $callable || ($reflection->isPublic() && ! $reflection->isStatic() && ! $reflection->isAbstract())) {
+                if (! $callable) {
                     return true;
+                }
+
+                foreach (new ReflectionClass($name)->getMethods(ReflectionMethod::IS_PUBLIC) as $public) {
+                    if (strcasecmp($public->getName(), $method) === 0 && ! $public->isStatic() && ! $public->isAbstract()) {
+                        return true;
+                    }
                 }
             }
         }

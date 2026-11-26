@@ -31,6 +31,19 @@ it('fails on a directory that does not exist, so a guard over a renamed folder c
     }
 });
 
+it('fails on a named file that does not exist, so a guard over a renamed file cannot pass on an empty tree', function (): void {
+    $root = SourceSandbox::create(['b.php' => '<?php class B {}']);
+
+    try {
+        $inspector = new PhpFileInspector();
+
+        expect(static fn (): array => $inspector->referencedNames($root . '/missing.php'))->toThrow(RuntimeException::class, 'does not exist')
+            ->and($inspector->referencedNames($root . '/b.php'))->toBe([]);
+    } finally {
+        SourceSandbox::remove($root);
+    }
+});
+
 it('describes every kind of call with its callee, receiver and line', function (): void {
     $source = "<?php\nnamespace App\\X;\n\nuse Illuminate\\Support\\Facades\\Redirect as R;\n\n\$a = \\app(Foo::class);\nR::route('home');\nredirect()\n    ->back();\n\$this->container->make(Foo::class);\n\$x?->authorize('a');\nabort_if(\$a, 403, 'x');\n";
     $inspector = new PhpFileInspector();
