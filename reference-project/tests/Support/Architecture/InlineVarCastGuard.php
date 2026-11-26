@@ -58,7 +58,7 @@ final readonly class InlineVarCastGuard
         foreach ($this->directories as $directory) {
             foreach ($this->inspector->phpFiles($this->root . '/' . $directory, mayBeAbsent: true) as $file) {
                 foreach ($this->lines((string) file_get_contents($file)) as $line) {
-                    $violations[] = substr($file, strlen($this->root) + 1) . ':' . $line . ': ' . self::MESSAGE;
+                    $violations[] = mb_substr($file, mb_strlen($this->root) + 1) . ':' . $line . ': ' . self::MESSAGE;
                 }
             }
         }

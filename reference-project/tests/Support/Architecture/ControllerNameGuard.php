@@ -62,8 +62,8 @@ final readonly class ControllerNameGuard
     public function inType(string $type): ?string
     {
         $short = basename(str_replace('\\', '/', $type));
-        $namespace = substr($type, 0, -strlen($short) - 1);
-        $verb = substr($short, 0, -strlen('Controller'));
+        $namespace = mb_substr($type, 0, -mb_strlen($short) - 1);
+        $verb = mb_substr($short, 0, -mb_strlen('Controller'));
 
         if ($namespace === $this->namespace) {
             return 'a controller sits in the controller root: put it in a folder named after what it acts on';

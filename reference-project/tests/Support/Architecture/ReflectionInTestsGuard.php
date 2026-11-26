@@ -85,7 +85,7 @@ final readonly class ReflectionInTestsGuard
 
         foreach ($this->inspector->phpFiles($this->root . '/' . $this->folder) as $file) {
             foreach ($this->inSource((string) file_get_contents($file)) as $found) {
-                $violations[] = substr($file, strlen($this->root) + 1) . ':' . $found;
+                $violations[] = mb_substr($file, mb_strlen($this->root) + 1) . ':' . $found;
             }
         }
 

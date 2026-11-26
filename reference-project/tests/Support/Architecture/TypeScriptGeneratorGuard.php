@@ -36,7 +36,7 @@ final readonly class TypeScriptGeneratorGuard
         $violations = [];
 
         foreach ($this->inspector->phpFiles($this->root . '/' . $this->folder) as $file) {
-            $path = substr($file, strlen($this->root) + 1);
+            $path = mb_substr($file, mb_strlen($this->root) + 1);
 
             if (in_array($path, $this->allowed, true) || array_any($this->allowedPrefixes, static fn (string $prefix): bool => str_starts_with($path, $prefix))) {
                 continue;

@@ -37,7 +37,7 @@ final readonly class ContainerBindingGuard
 
         foreach ($files as $file) {
             foreach ($this->inSource((string) file_get_contents($file)) as $message) {
-                $violations[] = substr($file, strlen($this->root) + 1) . ': ' . $message;
+                $violations[] = mb_substr($file, mb_strlen($this->root) + 1) . ': ' . $message;
             }
         }
 

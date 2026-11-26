@@ -32,7 +32,7 @@ final readonly class ModelMagicStaticCallGuard
         foreach ($this->folders as $folder) {
             foreach ($this->inspector->phpFiles($this->root . '/' . $folder) as $file) {
                 foreach ($this->inFile($file) as $message) {
-                    $violations[] = substr($file, strlen($this->root) + 1) . ': ' . $message;
+                    $violations[] = mb_substr($file, mb_strlen($this->root) + 1) . ': ' . $message;
                 }
             }
         }

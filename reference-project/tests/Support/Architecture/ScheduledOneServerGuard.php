@@ -44,7 +44,7 @@ final readonly class ScheduledOneServerGuard
             $source = (string) file_get_contents($file);
 
             foreach ($this->inSource($source) as $message) {
-                $violations[] = substr($file, strlen($this->root) + 1) . ': ' . $message;
+                $violations[] = mb_substr($file, mb_strlen($this->root) + 1) . ': ' . $message;
             }
         }
 

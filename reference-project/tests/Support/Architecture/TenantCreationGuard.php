@@ -39,7 +39,7 @@ final readonly class TenantCreationGuard
         $violations = [];
 
         foreach ($this->inspector->phpFiles($this->root . '/' . $this->folder) as $file) {
-            $class = new ReflectionClass(ClassNames::of($this->namespace . str_replace('/', '\\', substr($file, strlen($this->root . '/' . $this->folder . '/'), -4))));
+            $class = new ReflectionClass(ClassNames::of($this->namespace . str_replace('/', '\\', mb_substr($file, mb_strlen($this->root . '/' . $this->folder . '/'), -4))));
             $arguments = ($class->getAttributes($this->scope)[0] ?? null)?->getArguments();
 
             $violations = [...$violations, ...$this->inClass($class->getName(), array_values(class_uses_recursive($class->getName())), $arguments)];

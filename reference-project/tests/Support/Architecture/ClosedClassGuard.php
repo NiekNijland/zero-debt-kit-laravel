@@ -44,7 +44,7 @@ final readonly class ClosedClassGuard
             try {
                 $statements = PhpSource::statements($file);
             } catch (Error $error) {
-                $found[] = 'unreadable ' . substr($file, strlen($this->root) + 1) . ': ' . $error->getMessage();
+                $found[] = 'unreadable ' . mb_substr($file, mb_strlen($this->root) + 1) . ': ' . $error->getMessage();
 
                 continue;
             }

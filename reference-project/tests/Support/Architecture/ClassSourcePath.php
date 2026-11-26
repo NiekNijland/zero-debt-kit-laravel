@@ -14,6 +14,6 @@ final class ClassSourcePath
      */
     public static function of(string $class, string $root): string
     {
-        return substr((string) new ReflectionClass($class)->getFileName(), strlen($root) + 1);
+        return mb_substr((string) new ReflectionClass($class)->getFileName(), mb_strlen($root) + 1);
     }
 }

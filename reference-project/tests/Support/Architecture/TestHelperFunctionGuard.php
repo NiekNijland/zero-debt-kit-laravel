@@ -29,7 +29,7 @@ final class TestHelperFunctionGuard
             $functions = $this->declaredFunctions((string) file_get_contents($file->getPathname()));
 
             if ($functions !== []) {
-                $violations[substr($file->getPathname(), strlen($this->testsDirectory) + 1)] = $functions;
+                $violations[mb_substr($file->getPathname(), mb_strlen($this->testsDirectory) + 1)] = $functions;
             }
         }
 

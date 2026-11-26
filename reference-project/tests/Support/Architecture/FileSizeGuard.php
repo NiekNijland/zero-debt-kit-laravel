@@ -39,7 +39,7 @@ final readonly class FileSizeGuard
 
         foreach ($this->folders as $folder) {
             foreach ($this->inspector->phpFiles($this->root . '/' . $folder) as $file) {
-                $violation = $this->inSource(substr($file, strlen($this->root) + 1), (string) file_get_contents($file));
+                $violation = $this->inSource(mb_substr($file, mb_strlen($this->root) + 1), (string) file_get_contents($file));
 
                 if ($violation !== null) {
                     $violations[] = $violation;
@@ -52,7 +52,7 @@ final readonly class FileSizeGuard
 
     public function inSource(string $path, string $source): ?string
     {
-        $lines = substr_count($source, "\n");
+        $lines = mb_substr_count($source, "\n");
 
         if ($lines <= self::LIMIT || self::isData($source)) {
             return null;

@@ -40,7 +40,7 @@ final readonly class BareDataReturnGuard
                 $checked++;
 
                 if (class_exists($route['controller']) && $this->isBare($this->invokeReturnType($route['controller']))) {
-                    $violations[] = substr($file, strlen($this->root) + 1) . ': line ' . $route['line'] . ': ' . $route['controller'] . ' returns a bare Data object from a route that writes: return it in a JsonResponse with an explicit status';
+                    $violations[] = mb_substr($file, mb_strlen($this->root) + 1) . ': line ' . $route['line'] . ': ' . $route['controller'] . ' returns a bare Data object from a route that writes: return it in a JsonResponse with an explicit status';
                 }
             }
         }

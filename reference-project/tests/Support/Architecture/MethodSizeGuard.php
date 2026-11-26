@@ -53,7 +53,7 @@ final readonly class MethodSizeGuard
         $findings = [];
 
         foreach ($this->inspector->phpFiles($this->root . '/' . $this->source) as $file) {
-            $path = substr($file, strlen($this->root) + 1);
+            $path = mb_substr($file, mb_strlen($this->root) + 1);
 
             try {
                 $statements = PhpSource::statements($file);

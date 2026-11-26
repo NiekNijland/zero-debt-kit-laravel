@@ -102,7 +102,7 @@ final class ClassGraph
     public function hasMethod(array $info, string $method, bool $callable = false): bool
     {
         foreach ($this->lineage($info) as $name => $type) {
-            if ($type !== null && in_array(strtolower($method), $type[$callable ? 'callable' : 'methods'], true)) {
+            if ($type !== null && in_array(mb_strtolower($method), $type[$callable ? 'callable' : 'methods'], true)) {
                 return true;
             }
 

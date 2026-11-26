@@ -45,7 +45,7 @@ final readonly class TenantScopeBypassGuard
         $violations = [];
 
         foreach ($this->inspector->phpFiles($this->root . '/' . $this->folder) as $file) {
-            $path = substr($file, strlen($this->root) + 1);
+            $path = mb_substr($file, mb_strlen($this->root) + 1);
 
             if ($path === $this->allowed) {
                 if ($this->inSource((string) file_get_contents($file), $tables) === []) {
@@ -108,7 +108,7 @@ final readonly class TenantScopeBypassGuard
         foreach ($tokens as $index => $token) {
             $next = $tokens[$index + 1] ?? null;
 
-            if ($token->is(T_STRING) && in_array(strtolower($token->text), self::BYPASS_METHODS, true) && $next?->text === '(') {
+            if ($token->is(T_STRING) && in_array(mb_strtolower($token->text), self::BYPASS_METHODS, true) && $next?->text === '(') {
                 $messages[] = 'line ' . $token->line . ': ' . $token->text . '() removes the tenant scope: read another tenant\'s rows with ->acrossTenants() on the model, a scope of ' . $this->owner;
             }
 

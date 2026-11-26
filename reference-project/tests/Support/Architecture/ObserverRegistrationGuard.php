@@ -47,7 +47,7 @@ final readonly class ObserverRegistrationGuard
 
         foreach ($this->inspector->phpFiles($this->root . '/' . $this->source) as $file) {
             foreach ($this->inSource((string) file_get_contents($file)) as $message) {
-                $violations[] = substr($file, strlen($this->root) + 1) . ':' . substr($message, strlen('line '));
+                $violations[] = mb_substr($file, mb_strlen($this->root) + 1) . ':' . mb_substr($message, mb_strlen('line '));
             }
         }
 

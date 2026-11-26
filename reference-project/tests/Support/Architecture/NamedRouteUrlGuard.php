@@ -62,7 +62,7 @@ final readonly class NamedRouteUrlGuard
             $found = $this->inSource((string) file_get_contents($file));
 
             if ($found !== []) {
-                $violations[substr($file, strlen($this->root) + 1)] = $found;
+                $violations[mb_substr($file, mb_strlen($this->root) + 1)] = $found;
             }
         }
 
@@ -92,7 +92,7 @@ final readonly class NamedRouteUrlGuard
 
             if ($method === null) {
                 $written = $arguments[0]->value ?? null;
-                $method = $written instanceof String_ ? strtoupper($written->value) : null;
+                $method = $written instanceof String_ ? mb_strtoupper($written->value) : null;
             }
 
             $name = $method === null || $url === null ? null : $this->namedRoute($method, $this->parts($url));
@@ -118,7 +118,7 @@ final readonly class NamedRouteUrlGuard
         }
 
         if ($call instanceof FuncCall && $call->name instanceof Name && str_starts_with(ltrim($call->name->toLowerString(), '\\'), self::PEST_FUNCTIONS)) {
-            $verb = substr(ltrim($call->name->toLowerString(), '\\'), strlen(self::PEST_FUNCTIONS));
+            $verb = mb_substr(ltrim($call->name->toLowerString(), '\\'), mb_strlen(self::PEST_FUNCTIONS));
         }
 
         return $verb !== null && array_key_exists($verb, self::REQUEST_METHODS) ? $verb : null;

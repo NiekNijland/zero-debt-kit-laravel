@@ -40,7 +40,7 @@ final readonly class BootstrapRegistrationGuard
 
         foreach (Globs::of($this->root . '/' . $this->providers . '/*.php') as $file) {
             foreach ($this->providerInSource((string) file_get_contents($file)) as $message) {
-                $violations[] = substr($file, strlen($this->root) + 1) . ': ' . $message;
+                $violations[] = mb_substr($file, mb_strlen($this->root) + 1) . ': ' . $message;
             }
         }
 
@@ -81,8 +81,8 @@ final readonly class BootstrapRegistrationGuard
         }
 
         foreach ($this->tenantPair as $middleware) {
-            if (substr_count($source, $middleware) !== 1) {
-                $messages[] = $middleware . ' is named ' . substr_count($source, $middleware) . ' times: the tenant middleware pair sits in one group, each named once';
+            if (mb_substr_count($source, $middleware) !== 1) {
+                $messages[] = $middleware . ' is named ' . mb_substr_count($source, $middleware) . ' times: the tenant middleware pair sits in one group, each named once';
             }
         }
 
