@@ -1286,6 +1286,12 @@ if [ "$MODE" = "--head" ]; then
         rm -f "$REASON"
         printf '%s %s %s\n' "$name" "$direction" "$value"
     done <<< "$RATCHETS"
+    # --head counts the commit HEAD, as the pipeline does, not the working tree: a file that is new or edited and not committed is
+    # invisible to every row (git grep reads the revision). Say so, so that a counter that looks 0 is not read as clean.
+    if [ -z "${CHECK_HEAD:-}" ]; then
+        PENDING=$(git status --porcelain 2> /dev/null | wc -l | tr -d ' ')
+        [ "$PENDING" -eq 0 ] || echo "Ratchets: --head counts the commit HEAD, not the working tree: $PENDING path(s) with uncommitted or untracked changes are not counted (commit them, or the rows look lower than they are)." >&2
+    fi
     exit "$STATUS"
 fi
 
@@ -1297,7 +1303,7 @@ if [ "$MODE" = "--uncovered" ]; then
 fi
 
 if [ -n "$MODE" ] && { [ "$MODE" != "--guard" ] || [ -z "${2:-}" ]; }; then
-    echo "Usage: bash $SCRIPT_NAME [--head | --uncovered | --self-test [<extra cases file>] | --json '<operation> <path>' | --guard <path of the ratchet script in the repository>]" >&2
+    echo "Usage: bash $SCRIPT_NAME [--head (counts the commit HEAD, not uncommitted files) |--uncovered | --self-test [<extra cases file>] | --json '<operation> <path>' | --guard <path of the ratchet script in the repository>]" >&2
     exit 64
 fi
 
