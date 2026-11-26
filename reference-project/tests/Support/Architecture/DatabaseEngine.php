@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace Tests\Support\Architecture;
 
 /**
- * What a database service container needs, by the engine of DATABASE_IMAGE: the official images exit at start without their
- * password variable, and the job must wait for the engine with the health tool that image carries.
+ * What a service container needs, by the engine of its image (DATABASE_IMAGE, or an auxiliary service such as Redis): the SQL
+ * images exit at start without their password variable, MongoDB and Redis need none, and the job must wait for the engine with the
+ * health tool that image carries.
  */
 final class DatabaseEngine
 {
@@ -18,8 +19,18 @@ final class DatabaseEngine
             str_contains($name, 'mariadb') => 'mariadb',
             str_contains($name, 'mysql') => 'mysql',
             str_contains($name, 'postgres'), str_contains($name, 'postgis') => 'postgres',
+            str_contains($name, 'mongo') => 'mongo',
+            str_contains($name, 'redis') => 'redis',
             default => '',
         };
+    }
+
+    /**
+     * Whether the official image exits at start without a password variable: the SQL engines do, MongoDB and Redis start without one.
+     */
+    public static function needsPassword(string $engine): bool
+    {
+        return ! in_array($engine, ['mongo', 'redis'], true);
     }
 
     /**
@@ -44,6 +55,8 @@ final class DatabaseEngine
             'postgres' => ['pg_isready'],
             'mysql' => ['mysqladmin'],
             'mariadb' => ['healthcheck.sh', 'mariadb-admin', 'mysqladmin'],
+            'mongo' => ['mongosh', 'mongo '],
+            'redis' => ['redis-cli'],
             default => [],
         };
     }

@@ -33,6 +33,8 @@ final readonly class GithubWorkflowGuard
      * @param list<string> $allowedTriggers    owner exceptions: triggers of the kit's file that are no check (`workflow_run`, `workflow_dispatch`)
      * @param list<string> $writingLines       run lines an owner exception allows to write
      * @param list<string> $hardenedWorkflows  other workflow files (by name) whose jobs and hazards the owner has the guard read
+     * @param list<string> $auxiliaryImages    service images besides DATABASE_IMAGE that the jobs start (Redis), compared as written
+     * @param string       $hostVariable       the job variable that holds the database host (a URI for MongoDB: `MONGODB_URI`)
      */
     public function __construct(
         private string $workflowDirectory,
@@ -47,6 +49,8 @@ final readonly class GithubWorkflowGuard
         private array $writingLines = [],
         private array $hardenedWorkflows = [],
         private int $maxTimeoutMinutes = 120,
+        private array $auxiliaryImages = [],
+        private string $hostVariable = 'DB_HOST',
     ) {
     }
 
@@ -115,7 +119,7 @@ final readonly class GithubWorkflowGuard
      */
     private function inWorkflow(array $workflow, bool $isKit, bool $hardened, string $checksText): array
     {
-        $jobRules = new GithubJobRules($this->databaseImage, $this->writingLines, $this->maxTimeoutMinutes);
+        $jobRules = new GithubJobRules($this->databaseImage, $this->writingLines, $this->maxTimeoutMinutes, $this->auxiliaryImages, $this->hostVariable);
 
         if (! $isKit) {
             return $hardened ? [...$jobRules->inWorkflow($workflow), ...GithubWorkflowRules::hazards($workflow)] : [];
@@ -127,6 +131,7 @@ final readonly class GithubWorkflowGuard
             ...$jobRules->inWorkflow($workflow),
             ...GithubWorkflowRules::hazards($workflow),
             ...new GithubWorkflowRules($this->deployBranches, $this->allowedTriggers)->inKitWorkflow($workflow),
+            ...GithubRunnerRules::violations($workflow, $this->frontend),
             ...$checks->violations($workflow),
         ];
     }

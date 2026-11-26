@@ -17,11 +17,15 @@ final readonly class GithubJobRules
      * @param string       $databaseImage     DATABASE_IMAGE of the kit config, compared as written; empty where the project has no database
      * @param list<string> $writingLines      run lines an owner exception allows to write
      * @param int          $maxTimeoutMinutes the longest `timeout-minutes` a job may ask for
+     * @param list<string> $auxiliaryImages   service images besides DATABASE_IMAGE that a job may start (Redis for the cache and the queue), compared as written
+     * @param string       $hostVariable      the job variable that tells the application where its database is (`DB_HOST`; `MONGODB_URI` for MongoDB)
      */
     public function __construct(
         private string $databaseImage,
         private array $writingLines,
         private int $maxTimeoutMinutes,
+        private array $auxiliaryImages = [],
+        private string $hostVariable = 'DB_HOST',
     ) {
     }
 
@@ -104,6 +108,10 @@ final readonly class GithubJobRules
     }
 
     /**
+     * A service container of the two forms of the file: a container job reaches a service by its name on its default port, a runner
+     * job (no `container:`) reaches it at 127.0.0.1 on a port the service publishes. The database service is DATABASE_IMAGE; an
+     * auxiliary service (Redis, for example) is one of the images the owner named.
+     *
      * @param array<mixed> $job
      * @param array<mixed> $service
      * @return list<string>
@@ -111,16 +119,19 @@ final readonly class GithubJobRules
     private function serviceRules(string $label, array $job, string $name, array $service): array
     {
         $violations = [];
-        $engine = DatabaseEngine::of($this->databaseImage);
+        $image = (string) ($service['image'] ?? '');
+        $isDatabase = $image === $this->databaseImage;
+        $known = $isDatabase || in_array($image, $this->auxiliaryImages, true);
+        $engine = DatabaseEngine::of($known ? $image : $this->databaseImage);
         $env = is_array($service['env'] ?? null) ? $service['env'] : [];
         $options = (string) ($service['options'] ?? '');
-        $container = $job['container'] ?? null;
+        $onRunner = empty($job['container']);
 
-        if (($service['image'] ?? '') !== $this->databaseImage) {
-            $violations[] = $label . ' image is not DATABASE_IMAGE of kit-config.sh (`' . $this->databaseImage . '`): the tests run on the production engine and major version';
+        if (! $known) {
+            $violations[] = $label . ' image is not DATABASE_IMAGE of kit-config.sh (`' . $this->databaseImage . '`)' . ($this->auxiliaryImages === [] ? '' : ' or one of the auxiliary service images (`' . implode('`, `', $this->auxiliaryImages) . '`)') . ': the tests run on the production engine and major version';
         }
 
-        if ($engine === '' ? $env === [] : ! array_any(DatabaseEngine::passwordKeys($engine), static fn (string $key): bool => isset($env[$key]))) {
+        if (($engine === '' || DatabaseEngine::needsPassword($engine)) && ($engine === '' ? $env === [] : ! array_any(DatabaseEngine::passwordKeys($engine), static fn (string $key): bool => isset($env[$key])))) {
             $violations[] = $label . ' has no password variable of its engine (' . ($engine === '' ? 'any' : $engine . ': ' . implode(', ', DatabaseEngine::passwordKeys($engine))) . '): the official image exits at start, and the job fails at "Initialize containers"';
         }
 
@@ -128,12 +139,17 @@ final readonly class GithubJobRules
             $violations[] = $label . ' has no health check of its engine (' . ($engine === '' ? '--health-cmd' : implode(' or ', DatabaseEngine::healthTools($engine))) . '): the job must wait for the database, and a check from another engine never passes';
         }
 
-        if (! is_array($container) && ! isset($service['ports'])) {
+        if ($onRunner && empty($service['ports'])) {
             $violations[] = $label . ' publishes no port and the job runs on the runner: it cannot reach the service';
         }
 
-        if (($job['env']['DB_HOST'] ?? null) !== $name) {
-            $violations[] = $label . ' is not the DB_HOST of its job: a container job reaches a service by its name';
+        if ($isDatabase) {
+            $value = (string) ($job['env'][$this->hostVariable] ?? '');
+            $host = $onRunner ? '127.0.0.1' : $name;
+
+            if (preg_match('#(^|[/@])' . preg_quote($host, '#') . '([:/]|$)#', $value) !== 1) {
+                $violations[] = $label . ' is not the ' . $this->hostVariable . ' of its job: ' . ($onRunner ? 'a runner job reaches a service at 127.0.0.1 on its published port, never by the service name' : 'a container job reaches a service by its name');
+            }
         }
 
         return $violations;
