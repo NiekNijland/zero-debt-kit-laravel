@@ -1,0 +1,21 @@
+Unused files (1)
+src/orphan.ts
+Unused devDependencies (1)
+left-pad  package.json:1:151
+Unlisted dependencies (1)
+dayjs  src/more.ts:2:19
+Unresolved imports (1)
+./missing  src/more.ts:3:22
+Unused exports (5)
+unusedExport            src/lib.ts:2:14 
+K             class     src/more.ts:5:14
+a                       src/more.ts:7:10
+b                       src/more.ts:7:18
+default       variable  src/more.ts:8:16
+Unused exported types (2)
+UnusedType  type  src/lib.ts:3:13 
+Color       enum  src/more.ts:4:13
+Configuration hints (3)
+src/ghost/**     Remove from knip.json → ignore (no matches)
+nonexistent-dep  Remove from knip.json → ignoreDependencies 
+nobin            Remove from knip.json → ignoreBinaries     

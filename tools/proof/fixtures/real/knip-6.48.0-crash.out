@@ -1,0 +1,3 @@
+ERROR: Error loading /project/knip.json
+Reason: Error parsing /project/knip.json 
+Configuration file load error? Visit https://knip.dev/reference/known-issues

@@ -103,7 +103,7 @@ cp "$KIT/tools/mutation.sh" "$KIT/tools/kit-config.sh" "$MU/scripts/"
 sed -i.bak 's/<pest, infection or stryker>/pest/; s/<source folders>/app/' "$MU/scripts/mutation.sh"
 printf 'threshold: 70\n' > "$MU/scripts/mutation-floor.txt"
 printf '#!/bin/sh\necho "pest $*"\n' > "$MU/vendor/bin/pest"
-printf '#!/bin/sh\necho "npx $* floor=$MUTATION_FLOOR"\n' > "$MU/bin/npx"
+printf '#!/bin/sh\necho "npx $* floor=$MUTATION_FLOOR"\necho "INFO MutationTestReportHelper Final mutation score of 100.00 is greater than or equal to break threshold $MUTATION_FLOOR"\n' > "$MU/bin/npx"
 chmod +x "$MU/vendor/bin/pest" "$MU/bin/npx"
 UMLAUT=$(printf 'app/\303\234n\303\257.php')
 (

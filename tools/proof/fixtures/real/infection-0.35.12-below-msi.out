@@ -1,0 +1,13 @@
+
+Metrics:
+         Mutation Code Coverage: 100%
+         Covered Code MSI: 80%
+
+Please note that some mutants will inevitably be harmless (i.e. false positives).
+
+Generated Reports:
+
+Time: 0s. Memory: 18.00MB. Threads: 11
+ [ERROR] The minimum required MSI percentage should be 90%, but actual is 80%.  
+         Improve your tests!                                                    
+

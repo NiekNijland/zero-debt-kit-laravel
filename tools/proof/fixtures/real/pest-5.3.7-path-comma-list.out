@@ -1,0 +1,8 @@
+
+  Mutations: 3 uncovered, 5 tested
+  Score:     62.50%
+  Duration:  0.14s
+  Parallel:  12 processes
+
+   FAIL  Mutation score below expected: 62.5 %. Minimum: 95.0 %.
+

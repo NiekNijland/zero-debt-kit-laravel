@@ -9,12 +9,14 @@ FORMATS="tsc knip"
 # tsc: the TypeScript compiler. A finding has a position (plain "file(1,2): error TS1234" and pretty "file:1:2 - error TS1234"); a
 # start-up or config error ("error TS5058: ...") has none and is no finding: the command then fails without a finding.
 FINDING_tsc='\([0-9]+,[0-9]+\): error TS[0-9]+|:[0-9]+:[0-9]+ - error TS[0-9]+'
-NORMALIZE_tsc='s/\(([0-9]+),([0-9]+)\)//; s/:[0-9]+:[0-9]+//'
+NORMALIZE_tsc='s/\(([0-9]+),([0-9]+)\)//; s/:[0-9]+:[0-9]+ - error/: error/'
 SECTION_tsc=''
 # SKIP_<name>: empty, or an extended regular expression for a heading whose lines are not findings (the tool's own hints).
-# knip: the unused-code tool, in its default reporter: a heading per kind ("Unused exports (2)"), then one line per finding.
+# knip: the unused-code tool, in its default reporter: a heading per kind ("Unused exports (2)"), then one line per finding, its
+# columns padded with spaces (a padded last column leaves a trailing space after "file:1:2", so the trailing space goes first).
+# A clean run prints nothing and exits 0; "Configuration hints" follows the findings and is skipped. Read from knip 6.48.
 FINDING_knip='^[^[:space:]]'
-NORMALIZE_knip='s/:[0-9]+:[0-9]+$//; s/[[:space:]]+/ /g; s/ $//'
+NORMALIZE_knip='s/[[:space:]]+$//; s/:[0-9]+:[0-9]+$//; s/[[:space:]]+/ /g'
 SECTION_knip='^[A-Z][A-Za-z ]+ \([0-9]+\)$'
 SKIP_knip='^Configuration hints'
 # <<< config
@@ -72,11 +74,14 @@ trap 'rm -rf "$WORK"' EXIT
 
 STATUS=0
 "$@" > "$WORK/output" 2>&1 || STATUS=$?
+# A tool that colours its output (tsc --pretty colours even into a pipe) must not hide a finding behind escape codes.
+ESC=$(printf '\033')
+sed -E "s/${ESC}\[[0-9;]*[A-Za-z]//g" "$WORK/output" > "$WORK/plain"
 FINDING="$FINDING" SECTION="$SECTION" SKIP="$SKIP" awk '
     ENVIRON["SECTION"] != "" && $0 ~ ENVIRON["SECTION"] { heading = $0; sub(/[[:space:]]*\([0-9]+\)$/, "", heading); skipping = (ENVIRON["SKIP"] != "" && heading ~ ENVIRON["SKIP"]); next }
     skipping { next }
     ENVIRON["SECTION"] != "" && heading == "" { next }
-    $0 ~ ENVIRON["FINDING"] { print (heading == "" ? "" : heading ": ") $0 }' "$WORK/output" | sed -E "${NORMALIZE:-s/^//}" | sort > "$WORK/now"
+    $0 ~ ENVIRON["FINDING"] { print (heading == "" ? "" : heading ": ") $0 }' "$WORK/plain" | sed -E "${NORMALIZE:-s/^//}" | sort > "$WORK/now"
 
 if [ "$STATUS" -ne 0 ] && [ ! -s "$WORK/now" ]; then
     echo "Keyed baseline: the command failed (exit $STATUS) without a finding in the format $FORMAT, so nothing can be compared. Its output:" >&2
