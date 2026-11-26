@@ -1,3 +1,4 @@
+# proof-needs: main
 # Scenarios FX*: the cross-area follow-ups of the CI audit (the self-test in the gate part, the base of mutation.sh, the code-owners
 # files as guarded files). Sourced by ../proof.sh with its helpers in scope (check, check_php, branch, commit, edit, ROOT, KIT, SHELL_BIN).
 # Own scratch repositories under "$ROOT"; the fixture's main branch is put back at the end.

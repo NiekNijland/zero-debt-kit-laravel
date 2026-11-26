@@ -46,7 +46,7 @@ const listFiles = (...paths) =>
 const tracked = listFiles(...roots).filter((file) => EXT.test(file));
 // Every spelling that takes a module path as its first argument: the lead of a quoted specifier.
 const quoted = new RegExp(
-    String.raw`((?:from|import\(|require\(|require\.resolve\(|\.(?:mock|doMock|unmock|doUnmock|importActual|importMock|requireActual|requireMock|setMock)\(|import)\s*)(["'])([^"']+)\2`,
+    String.raw`((?:from|import\(|require\(|require\.resolve\(|\.(?:mock|doMock|unmock|doUnmock|importActual|importMock|requireActual|requireMock|setMock)\(|new\s+URL\(|import)\s*)(["'\u0060])((?:(?!\2)[^$\n]|\$(?!\{))+)\2`,
     "g",
 );
 let problems = 0;

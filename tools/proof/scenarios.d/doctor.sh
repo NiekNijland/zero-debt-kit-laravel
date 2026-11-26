@@ -82,3 +82,31 @@ check DX21 "doctor --apply: the applied scripts still parse" 0 '^$' "$SHELL_BIN"
 cp "$KIT/tools/doctor.sh" "$DX/p-ok/scripts/doctor.sh"
 check DX22 "doctor: run from the project as scripts/doctor.sh with --kit (the kit folder of the scratch kit has no doctor.sh: project-only)" fail 'doctor\.sh +project-only' "$SHELL_BIN" -c "cd '$DX/p-ok' && bash scripts/doctor.sh --kit '$DXK'"
 check DX23 "doctor: without --kit and outside the kit it stops with a usage error" fail '--kit <path to the kit folder> is required' "$SHELL_BIN" -c "cd '$DX/p-ok' && bash scripts/doctor.sh"
+
+# G-06: code in a config block is a divergence, and --apply puts the kit's block back
+dx_project "$DX/p-code" HEAD
+sed -i.bak 's/^# <<< config$/exit 0\
+# <<< config/' "$DX/p-code/scripts/ci-ratchets.sh"
+sed -i.bak 's/^REMOTE="origin"$/REMOTE="origin"; touch \/tmp\/doctor-proof-not-run/' "$DX/p-code/scripts/kit-config.sh"
+sed -i.bak 's/^MAX_LINES=400$/MAX_LINES="$(id -u)"/' "$DX/p-code/scripts/debt-dashboard.sh"
+rm "$DX"/p-code/scripts/*.bak
+dx_project "$DX/p-ok2" HEAD
+check DX24 "G-06: a bare line in a config block (exit 0) is reported, not read as identical" fail 'ci-ratchets\.sh +config-holds-code' dx_doctor --project "$DX/p-code"
+check DX24b "G-06: the line itself is shown" fail '\| exit 0' dx_doctor --project "$DX/p-code"
+check DX24c "G-06: a value with a trailing command is code, not only a config difference" fail 'kit-config\.sh +config-holds-code' dx_doctor --project "$DX/p-code"
+check DX24d "G-06: a value with a command substitution is code" fail 'debt-dashboard\.sh +config-holds-code' dx_doctor --project "$DX/p-code"
+check DX24e "G-06: --json says it too" fail '"name":"ci-ratchets.sh","status":"config-holds-code".*"config_holds_code":true' dx_doctor --project "$DX/p-code" --json
+check DX24f "G-06: the kit's own scripts, with their multi-line and quoted values, are no code" 0 'Summary: 6 identical' dx_doctor --project "$DX/p-ok2"
+check DX25 "G-06: --apply removes the code from the config blocks" 0 'Applied: scripts/ changed:' dx_doctor --project "$DX/p-code" --apply
+check DX25b "G-06: after --apply no config block holds code" 0 'Summary: [0-9]+ identical, [0-9]+ config-differs, 0 body-differs, 0 missing, 0 project-only\.' dx_doctor --project "$DX/p-code"
+
+# G-09: a shallow kit clone is named, and the commits behind count only commits to the scripts
+git clone -q --depth 1 "file://$DXK" "$DX/kshallow" > /dev/null 2>&1
+check DX26 "G-09: a shallow kit clone is named as the reason no kit version is found" 0 'the kit clone .* is shallow' "$SHELL_BIN" "$KIT/tools/doctor.sh" --kit "$DX/kshallow" --project "$DX/p-ok2"
+(cd "$DXK" && echo "docs only" > NOTES.md && git add -A && git commit -q -m "kit docs") > /dev/null 2>&1
+check DX26b "G-09: a docs-only kit commit is not 'behind': the scripts equal the kit's current ones" 0 'the scripts equal the kit.s current ones' dx_doctor --project "$DX/p-ok2"
+
+# G-10: the commands of the plan are copy-paste safe for a path with a space
+mkdir -p "$DX/my proj"
+dx_project "$DX/my proj" v1
+check DX27 "G-10: the plan quotes a project path that holds a space" fail 'my\\ proj --upgrade-plan --apply' dx_doctor --project "$DX/my proj" --upgrade-plan

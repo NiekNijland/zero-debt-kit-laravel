@@ -92,8 +92,10 @@ fi
 if [ "$WRITE" -eq 1 ]; then
     # --write only drops fixed lines. A finding that is not in the file is growth: it needs --init, which is for the first write
     # of a file (step 2), so a command that prints something new cannot be written into the baseline by accident.
-    if [ "$INIT" -eq 0 ] && [ -s "$BASELINE" ]; then
-        sort "$BASELINE" > "$WORK/then"
+    # A missing or empty file is the empty set: with --write alone, every finding is growth (a baseline deleted "at zero" is not
+    # written back by accident).
+    if [ "$INIT" -eq 0 ]; then
+        if [ -f "$BASELINE" ]; then sort "$BASELINE" > "$WORK/then"; else : > "$WORK/then"; fi
         GROWTH=$(comm -23 "$WORK/now" "$WORK/then")
         if [ -n "$GROWTH" ]; then
             echo "Keyed baseline: --write would add findings that are not in $BASELINE. FAILS: fix them; a line is never added to the baseline (--init writes the first file)"

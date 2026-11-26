@@ -3,19 +3,96 @@
 # Builds scratch repositories in a fresh folder, runs every scenario, prints the table.
 # KIT is the kit folder (default: two folders up from this file). PROOF_OUT is where the
 # scratch repositories, proof-<label>.log (full output) and proof-<label>.table go (default: a new temporary folder).
+#
 # PROOF_ONLY=<extended regular expression on the scenario id> runs only the scenarios whose id matches (for example PROOF_ONLY='^DX'
-# or 'R0[1-3]'); the others are not run and not counted. PROOF_LIST=1 prints the scenario ids and runs nothing. Without either, every
-# scenario runs. The exit status is the same: 0 when no scenario that ran was wrong.
+# or 'R0[1-3]'); the others are not run and not counted. A filter that is not a valid expression, or that matches no scenario, stops
+# with exit 64 before anything is built. A scenario that a selected one reads the result of (PROOF_STEPS: a check that writes
+# files or commits) still runs, silently and uncounted, so a filtered run gives the verdicts of the full run. When the selected
+# scenarios live only in scenario files that do not need the fixtures of this file ("# proof-needs: main" is not in their head),
+# those fixtures are not built.
+# PROOF_LIST=1 prints the scenario ids (loop variables expanded) and runs nothing. PROOF_AUDIT=1 records which checks change the
+# scratch tree (proof-steps-<label>.txt): the ids for PROOF_STEPS. Without any of them, every scenario runs.
+# Scenario ids are unique: a duplicate stops every run with exit 1. The exit status is 0 when no scenario that ran was wrong.
 
 set -uo pipefail
 
+SELF_HERE=$(cd "$(dirname "$0")" && pwd)
+
+# proof_ids: "<scenario file><TAB><id>" for every scenario written in proof.sh and scenarios.d/*.sh, in file order. The helpers that
+# wrap check (check_php, message_case, tx_message) count; an id built from a loop variable ("RX36-$tool") is expanded with the
+# words of the nearest "for <variable> in <words>; do" above it.
+proof_ids() {
+    local file
+    for file in "$SELF_HERE/proof.sh" "$SELF_HERE"/scenarios.d/*.sh; do
+        awk -v file="$(basename "$file")" '
+            /^[[:space:]]*for [A-Za-z_][A-Za-z0-9_]* in .*; do[[:space:]]*$/ {
+                line = $0; sub(/^[[:space:]]*for /, "", line)
+                v = line; sub(/ .*/, "", v)
+                words = line; sub(/^[A-Za-z_][A-Za-z0-9_]* in /, "", words); sub(/; do[[:space:]]*$/, "", words)
+                LIST[v] = words
+                next
+            }
+            /^[[:space:]]*(check_php|check|message_case|tx_message)[[:space:]]+"?[A-Za-z0-9_$-]+/ {
+                line = $0
+                sub(/^[[:space:]]*(check_php|check|message_case|tx_message)[[:space:]]+"?/, "", line)
+                match(line, /^[A-Za-z0-9_$-]+/)
+                id = substr(line, 1, RLENGTH)
+                if (id ~ /^[$][0-9@*]*$/) next
+                dollar = index(id, "$")
+                if (dollar == 0) { print file "\t" id; next }
+                name = substr(id, dollar + 1)
+                match(name, /^[A-Za-z_][A-Za-z0-9_]*/)
+                name = substr(name, 1, RLENGTH)
+                count = split(LIST[name], w, " ")
+                if (count == 0) { print file "\t" id; next }
+                for (i = 1; i <= count; i++) {
+                    expanded = id
+                    sub("[$]" name, w[i], expanded)
+                    print file "\t" expanded
+                }
+            }' "$file"
+    done
+}
+
+DUPLICATES=$(proof_ids | cut -f2 | sort | uniq -d | tr '\n' ' ')
+if [ -n "$DUPLICATES" ]; then
+    echo "Proof: scenario ids must be unique; these are used more than once: $DUPLICATES" >&2
+    exit 1
+fi
+
 if [ "${PROOF_LIST:-}" = 1 ]; then
-    # The ids as written in the scenario files (a few are built from a variable, such as S-$script).
-    _here=$(cd "$(dirname "$0")" && pwd)
-    grep -h -o -E '^[[:space:]]*check(_php)?[[:space:]]+"?[A-Za-z0-9_$-]+' "$_here/proof.sh" "$_here"/scenarios.d/*.sh |
-        sed -E 's/^[[:space:]]*check(_php)?[[:space:]]+"?//' | grep -v '^[$]' | sort -u
+    proof_ids | cut -f2 | sort
     exit 0
 fi
+
+# The scenario files whose head says "# proof-needs: main": they use the fixtures and helpers that proof.sh builds below.
+NEEDS_MAIN=" $(grep -l '^# proof-needs: main' "$SELF_HERE"/scenarios.d/*.sh | while read -r f; do basename "$f"; done | tr '\n' ' ')"
+RUN_MAIN=1
+SELECTED_FILES=""
+if [ -n "${PROOF_ONLY:-}" ]; then
+    printf '' | grep -E -e "$PROOF_ONLY" > /dev/null 2>&1
+    if [ "$?" -gt 1 ]; then
+        echo "Proof: PROOF_ONLY is not a valid extended regular expression: $PROOF_ONLY" >&2
+        exit 64
+    fi
+    SELECTED_IDS=$(proof_ids | cut -f2 | grep -E -e "$PROOF_ONLY")
+    if [ -z "$SELECTED_IDS" ]; then
+        echo "Proof: PROOF_ONLY=$PROOF_ONLY matches no scenario id (PROOF_LIST=1 prints them)." >&2
+        exit 64
+    fi
+    SELECTED_FILES=" $(proof_ids | awk -F'\t' 'NR == FNR { selected[$0] = 1; next } $2 in selected && !seen[$1]++ { print $1 }' <(printf '%s\n' "$SELECTED_IDS") - | tr '\n' ' ')"
+    case "$SELECTED_FILES" in *" proof.sh "*) ;; *)
+        RUN_MAIN=0
+        for _f in $SELECTED_FILES; do
+            case "$NEEDS_MAIN" in *" $_f "*) RUN_MAIN=1 ;; esac
+        done
+        ;;
+    esac
+fi
+
+# The checks that write files or commit, so that a later check reads what they leave (found with PROOF_AUDIT=1). Under PROOF_ONLY
+# they run even when the filter does not select them.
+PROOF_STEPS="H01 H02 B01 B07 MU03 MU04 MV01 MV06 CX06b CX08 CX08b CX08c CX08d CX10 CX10b CX10c CX12 CX13 DX14 DX25 RX30 RX30b RX31b TX21 TX24 TX26 TX33 TX39 TX40 VX01 VX09 VX10 VX15 VX16 VX17 VX18 VX19 VX22"
 
 SHELL_BIN="${1:-/bin/bash}"
 LABEL="${2:-bash}"
@@ -25,8 +102,10 @@ OUT="${PROOF_OUT:-$(mktemp -d)}"
 ROOT=$(mktemp -d "$OUT/run-$LABEL-XXXXXX")
 LOG="$OUT/proof-$LABEL.log"
 TABLE="$OUT/proof-$LABEL.table"
+STEPS_FILE="$OUT/proof-steps-$LABEL.txt"
 : > "$LOG"
 : > "$TABLE"
+[ "${PROOF_AUDIT:-}" != 1 ] || : > "$STEPS_FILE"
 
 # The tools call "bash" themselves: make that the binary under test.
 SHIM="$ROOT/shim"
@@ -44,13 +123,30 @@ HAVE_PHP=0
 
 # check <id> <scenario> <expected exit: 0|fail> <expected text (extended regex)> <command...>
 check() {
-    local id="$1" scenario="$2" want_exit="$3" want_text="$4" output status got verdict
+    local id="$1" scenario="$2" want_exit="$3" want_text="$4" output status got verdict counted=1 before=""
     shift 4
     if [ -n "${PROOF_ONLY:-}" ] && ! grep -q -E -e "$PROOF_ONLY" <<< "$id"; then
-        return 0
+        case " $PROOF_STEPS " in
+            *" $id "*) counted=0 ;;
+            *) return 0 ;;
+        esac
     fi
+    [ "${PROOF_AUDIT:-}" != 1 ] || before=$(tree_fingerprint)
     output=$("$@" 2>&1)
     status=$?
+    if [ "${PROOF_AUDIT:-}" = 1 ] && [ "$before" != "$(tree_fingerprint)" ]; then
+        echo "$id" >> "$STEPS_FILE"
+    fi
+    if [ "$counted" -eq 0 ]; then
+        {
+            echo "================================================================"
+            echo "$id  (a step of the proof: run for the checks that read what it leaves, not counted)"
+            echo "command: $*"
+            echo "exit: $status"
+            echo "$output"
+        } >> "$LOG"
+        return 0
+    fi
     {
         echo "================================================================"
         echo "$id  $scenario"
@@ -75,6 +171,9 @@ check() {
 # check_php: a scenario that needs php on the PATH (the default fixture counts a NEON file). Without php it is skipped, not failed.
 check_php() {
     if [ -n "${PROOF_ONLY:-}" ] && ! grep -q -E -e "$PROOF_ONLY" <<< "$1"; then
+        case " $PROOF_STEPS " in
+            *" $1 "*) [ "$HAVE_PHP" -eq 0 ] || check "$@" ;;
+        esac
         return 0
     fi
     if [ "$HAVE_PHP" -eq 1 ]; then
@@ -83,6 +182,12 @@ check_php() {
     fi
     SKIPPED=$((SKIPPED + 1))
     printf '%s | %s | %s | %s | %s\n' "$1" "$2" "-" "skipped: needs php" "skipped" >> "$TABLE"
+}
+
+# tree_fingerprint: the files of the scratch tree (not the object store, logs, index or fetch bookkeeping of a repository) with
+# their size and modification time. A check that changes it is a step (PROOF_AUDIT=1).
+tree_fingerprint() {
+    find "$ROOT" -type f ! -path '*/.git/objects/*' ! -path '*/.git/logs/*' ! -path '*/.git/index' ! -path '*/.git/FETCH_HEAD' ! -path '*/.git/*.lock' ! -path '*/objects/*' -exec stat -f '%Fm %z %N' {} + 2> /dev/null | sort | cksum
 }
 
 big_file() {
@@ -206,6 +311,10 @@ fill_placeholders() {
     edit scripts/kit-config.sh 's/^DATABASE_IMAGE=.*$/DATABASE_IMAGE="postgres:17"/'
     edit scripts/ci-commit-messages.sh "s/^TICKET=.*$/TICKET='PROJ-[0-9]+'/; s/^EXAMPLE=.*$/EXAMPLE='PROJ-123 feat: add the export'/"
 }
+
+# Under PROOF_ONLY the scenarios of this file and the fixtures they share are skipped when every selected scenario lives in a
+# scenario file that builds its own (RUN_MAIN=0).
+if [ "$RUN_MAIN" -eq 1 ]; then
 
 build_fixture
 
@@ -821,6 +930,8 @@ message_case C06 "commit check rejects: another project's ticket" fail 'OTHER-1 
 message_case C07 "commit check rejects: an unknown type" fail 'PROJ-12 wip' "PROJ-12 wip: add the export"
 message_case C08 "commit check rejects: no subject" fail 'PROJ-12 feat:' "PROJ-12 feat: "
 message_case C09 "commit check accepts: a revert generated by git" 0 '1 commits between' 'Revert "PROJ-12 feat: add the export"'
+message_case C09b "G-15: a revert of a subject without the form is rejected" fail 'Revert "no ticket here"' 'Revert "no ticket here"'
+message_case C09c "G-15: a revert of a revert of a subject with the form is accepted" 0 '1 commits between' 'Reapply "Revert "PROJ-12 feat: add the export""'
 
 branch c-merge
 echo x > docs/x.md
@@ -833,7 +944,7 @@ git checkout -q c-merge
 git merge -q --no-ff -m "Merge branch 'side' into c-merge" side
 check C10 "commit check accepts: a merge commit" 0 '2 commits between' commits
 git commit -q --allow-empty -m "Merge 1234567 into 89abcde"
-check C11 "commit check accepts: GitHub's synthetic merge subject" 0 '3 commits between' commits
+check C11 "G-15: a single-parent commit titled like a synthetic merge has no form and is counted and rejected" fail '89abcde' commits
 
 branch c-env
 echo z > docs/z.md
@@ -883,7 +994,7 @@ printf 'src/a.ts(13,5): error TS2532: Object is possibly undefined.\nsrc/a.ts(40
 printf 'src/a.ts(3,5): error TS2532: Object is possibly undefined.\nsrc/a.ts(9,1): error TS2532: Object is possibly undefined.\nsrc/b.ts(1,1): error TS7006: Parameter x implicitly has an any type.\n' > more.txt
 printf 'src/a.ts(3,5): error TS2532: Object is possibly undefined.\nsrc/a.ts(9,1): error TS2532: Object is possibly undefined.\nsrc/a.ts(11,1): error TS2532: Object is possibly undefined.\n' > third.txt
 printf 'src/a.ts(3,5): error TS2532: Object is possibly undefined.\n' > fewer.txt
-check B01 "keyed-baseline --write: writes one line per finding" 0 'baseline.txt rewritten, 2 lines' "$SHELL_BIN" "$KIT/tools/keyed-baseline.sh" baseline.txt --write --format tsc -- cat first.txt
+check B01 "keyed-baseline --init: writes one line per finding" 0 'baseline.txt rewritten, 2 lines' "$SHELL_BIN" "$KIT/tools/keyed-baseline.sh" baseline.txt --init --format tsc -- cat first.txt
 check B01b "keyed-baseline: the file holds no line or column number" 0 '^0$' "$SHELL_BIN" -c 'grep -c -E "[0-9]+,[0-9]+" baseline.txt; exit 0'
 check B02 "keyed-baseline: the same findings on other lines pass" 0 '2 findings, the same as baseline.txt' "$SHELL_BIN" "$KIT/tools/keyed-baseline.sh" baseline.txt --format tsc -- cat moved.txt
 check B03 "keyed-baseline: a new finding fails and is named" fail '^  src/b.ts: error TS7006' "$SHELL_BIN" "$KIT/tools/keyed-baseline.sh" baseline.txt --format tsc -- cat more.txt
@@ -913,7 +1024,7 @@ cat > knip-fewer.sh <<'KNIP'
 printf 'Unused exports (1)\napp  src/http/server.ts:1:14\n'
 exit 1
 KNIP
-check B07 "keyed-baseline --format knip --write: the unused-code tool's findings are written, one line each (5), although the tool exits 1" 0 'knip.txt rewritten, 5 lines' "$SHELL_BIN" "$KIT/tools/keyed-baseline.sh" knip.txt --write --format knip -- "$SHELL_BIN" knip-first.sh
+check B07 "keyed-baseline --format knip --init: the unused-code tool's findings are written, one line each (5), although the tool exits 1" 0 'knip.txt rewritten, 5 lines' "$SHELL_BIN" "$KIT/tools/keyed-baseline.sh" knip.txt --init --format knip -- "$SHELL_BIN" knip-first.sh
 check B07b "keyed-baseline: a line holds its heading, no count, no position and no column padding" 0 '^Unused exports: listener src/http/server.ts$' cat knip.txt
 check B07c "keyed-baseline: a finding that is only a path (an unused file) is kept under its heading" 0 '^Unused files: src/old.ts$' cat knip.txt
 check B08 "keyed-baseline --format knip: the same findings on other lines pass" 0 '5 findings, the same as knip.txt' "$SHELL_BIN" "$KIT/tools/keyed-baseline.sh" knip.txt --format knip -- "$SHELL_BIN" knip-moved.sh
@@ -1354,10 +1465,10 @@ chmod +x "$MUT_DIR/vendor/bin/pest"
     cd "$MUT_DIR" && git init -q -b main && echo a > app/a.php && git add -A && git commit -q -m "PROJ-1 chore: base" &&
         git update-ref refs/remotes/origin/main HEAD && echo b > app/b.php && git add -A && git commit -q -m "PROJ-1 chore: change"
 ) > /dev/null 2>&1
-check M01 "mutation.sh: the whole tree runs the tool with the committed floor" 0 '^pest --mutate --everything --parallel --min=70$' "$SHELL_BIN" -c "cd '$MUT_DIR' && bash scripts/mutation.sh"
-check M02 "mutation.sh --changed: only the files the branch changes, with the same floor" 0 '^pest --mutate --parallel --path=app/b\.php --min=70$' "$SHELL_BIN" -c "cd '$MUT_DIR' && CHECK_BASE=main bash scripts/mutation.sh --changed"
-check M03 "mutation.sh: a floor file without a threshold line fails" fail 'holds no line "threshold: N"' "$SHELL_BIN" -c "cd '$MUT_DIR' && echo nothing > scripts/mutation-floor.txt && bash scripts/mutation.sh"
-check M04 "mutation.sh: the shipped placeholders stop the run" fail 'still holds a placeholder' "$SHELL_BIN" -c "cd '$MUT_DIR' && cp '$KIT/tools/mutation.sh' scripts/mutation.sh && bash scripts/mutation.sh"
+check MU01 "mutation.sh: the whole tree runs the tool with the committed floor" 0 '^pest --mutate --everything --parallel --min=70$' "$SHELL_BIN" -c "cd '$MUT_DIR' && bash scripts/mutation.sh"
+check MU02 "mutation.sh --changed: only the files the branch changes, with the same floor" 0 '^pest --mutate --parallel --path=app/b\.php --min=70$' "$SHELL_BIN" -c "cd '$MUT_DIR' && CHECK_BASE=main bash scripts/mutation.sh --changed"
+check MU03 "mutation.sh: a floor file without a threshold line fails" fail 'holds no line "threshold: N"' "$SHELL_BIN" -c "cd '$MUT_DIR' && echo nothing > scripts/mutation-floor.txt && bash scripts/mutation.sh"
+check MU04 "mutation.sh: the shipped placeholders stop the run" fail 'still holds a placeholder' "$SHELL_BIN" -c "cd '$MUT_DIR' && cp '$KIT/tools/mutation.sh' scripts/mutation.sh && bash scripts/mutation.sh"
 
 # move-ts.mjs: files move from a map, specifiers follow, a second run changes nothing, --verify and --reverse work
 MV_DIR="$ROOT/move-ts"
@@ -1368,18 +1479,18 @@ mkdir -p "$MV_DIR/src/a" "$MV_DIR/src/b" "$MV_DIR/tests"
         echo 'export const y = 2;' > src/b/y.ts && printf 'import { w } from "@/a/w";\nvi.mock("../src/a/x");\n' > tests/t.test.ts &&
         git add -A && git commit -q -m "PROJ-1 chore: base" && printf 'src/a/x.ts\tsrc/c/x.ts\nsrc/a/w.ts#w\tsrc/d/e/w.ts\n' > moves.tsv
 ) > /dev/null 2>&1
-check V01 "move-ts: files move and the specifiers of the moved file and of its importers follow" 0 'Move: 2 map lines applied' "$SHELL_BIN" -c "cd '$MV_DIR' && node '$KIT/tools/move-ts.mjs' moves.tsv --roots src,tests"
-check V02 "move-ts: a relative import of a moved file is recomputed from its new folder" 0 'from "../../c/x";' cat "$MV_DIR/src/d/e/w.ts"
-check V03 "move-ts: an alias import and a mock path follow the move" 0 '^import \{ w \} from "@/d/e/w";$' cat "$MV_DIR/tests/t.test.ts"
-check V04 "move-ts --verify: nothing names an old path" 0 'no specifier names an old path' "$SHELL_BIN" -c "cd '$MV_DIR' && node '$KIT/tools/move-ts.mjs' moves.tsv --roots src,tests --verify"
-check V05 "move-ts: a second run changes no file" 0 '^$' "$SHELL_BIN" -c "cd '$MV_DIR' && git add -A && node '$KIT/tools/move-ts.mjs' moves.tsv --roots src,tests > /dev/null && git diff --stat"
-check V06 "move-ts --reverse: the same tool takes the group back out" 0 'from "\./x";' "$SHELL_BIN" -c "cd '$MV_DIR' && node '$KIT/tools/move-ts.mjs' moves.tsv --reverse --roots src,tests > /dev/null && cat src/a/w.ts"
-check V07 "move-ts --verify after the reverse move with the forward map fails" fail 'still exists|missing' "$SHELL_BIN" -c "cd '$MV_DIR' && node '$KIT/tools/move-ts.mjs' moves.tsv --roots src,tests --verify"
+check MV01 "move-ts: files move and the specifiers of the moved file and of its importers follow" 0 'Move: 2 map lines applied' "$SHELL_BIN" -c "cd '$MV_DIR' && node '$KIT/tools/move-ts.mjs' moves.tsv --roots src,tests"
+check MV02 "move-ts: a relative import of a moved file is recomputed from its new folder" 0 'from "../../c/x";' cat "$MV_DIR/src/d/e/w.ts"
+check MV03 "move-ts: an alias import and a mock path follow the move" 0 '^import \{ w \} from "@/d/e/w";$' cat "$MV_DIR/tests/t.test.ts"
+check MV04 "move-ts --verify: nothing names an old path" 0 'no specifier names an old path' "$SHELL_BIN" -c "cd '$MV_DIR' && node '$KIT/tools/move-ts.mjs' moves.tsv --roots src,tests --verify"
+check MV05 "move-ts: a second run changes no file" 0 '^$' "$SHELL_BIN" -c "cd '$MV_DIR' && git add -A && node '$KIT/tools/move-ts.mjs' moves.tsv --roots src,tests > /dev/null && git diff --stat"
+check MV06 "move-ts --reverse: the same tool takes the group back out" 0 'from "\./x";' "$SHELL_BIN" -c "cd '$MV_DIR' && node '$KIT/tools/move-ts.mjs' moves.tsv --reverse --roots src,tests > /dev/null && cat src/a/w.ts"
+check MV07 "move-ts --verify after the reverse move with the forward map fails" fail 'still exists|missing' "$SHELL_BIN" -c "cd '$MV_DIR' && node '$KIT/tools/move-ts.mjs' moves.tsv --roots src,tests --verify"
 
 # map-normalise.sh: the names of a moved stack map back to the old names, longest first, doubled backslashes too
 printf 'App\\Old\\Foo\tApp\\New\\Foo\nApp\\Old\\FooBar\tApp\\New\\FooBar\n' > "$ROOT/names.tsv"
-check N01 "map-normalise: the longest name goes first, so FooBar does not become OldBar" 0 '^x App\\Old\\FooBar y App\\Old\\Foo$' "$SHELL_BIN" -c "printf 'x App\\\\New\\\\FooBar y App\\\\New\\\\Foo\n' | bash '$KIT/tools/map-normalise.sh' '$ROOT/names.tsv'"
-check N02 "map-normalise --forward maps old names to new ones" 0 '^App\\New\\Foo$' "$SHELL_BIN" -c "printf 'App\\\\Old\\\\Foo\n' | bash '$KIT/tools/map-normalise.sh' '$ROOT/names.tsv' --forward"
+check NM01 "map-normalise: the longest name goes first, so FooBar does not become OldBar" 0 '^x App\\Old\\FooBar y App\\Old\\Foo$' "$SHELL_BIN" -c "printf 'x App\\\\New\\\\FooBar y App\\\\New\\\\Foo\n' | bash '$KIT/tools/map-normalise.sh' '$ROOT/names.tsv'"
+check NM02 "map-normalise --forward maps old names to new ones" 0 '^App\\New\\Foo$' "$SHELL_BIN" -c "printf 'App\\\\Old\\\\Foo\n' | bash '$KIT/tools/map-normalise.sh' '$ROOT/names.tsv' --forward"
 
 [ ! -f "$KIT/ci/checks.sh" ] || {
     branch k01
@@ -1388,10 +1499,15 @@ check N02 "map-normalise --forward maps old names to new ones" 0 '^App\\New\\Foo
     check K01 "ci/checks.sh with its placeholders still in it refuses to run" fail 'still holds placeholders' env CHECK_BASE=main "$SHELL_BIN" scripts/checks.sh
 }
 
+fi
+
 # Scenario files of tools/proof/scenarios.d/ run here with the helpers above (check, check_php, branch, commit, edit, build_fixture).
-# Each file builds its own scratch repositories under "$ROOT" and leaves the working directory as it found it.
+# Each file builds its own scratch repositories under "$ROOT" and leaves the working directory as it found it. A file whose head
+# says "# proof-needs: main" also uses the fixtures and helpers of this file (the gate, the move-ts project, the branches of work).
+# Under PROOF_ONLY only the files that hold a selected scenario are run.
 for scenario_file in "$HERE"/scenarios.d/*.sh; do
     [ -f "$scenario_file" ] || continue
+    [ -z "${PROOF_ONLY:-}" ] || case "$SELECTED_FILES" in *" $(basename "$scenario_file") "*) ;; *) continue ;; esac
     START_DIR=$(pwd)
     # shellcheck disable=SC1090
     . "$scenario_file"
@@ -1403,4 +1519,8 @@ echo "bash under test: $("$SHELL_BIN" -c 'echo $BASH_VERSION')"
 column -t -s '|' "$TABLE" 2> /dev/null || cat "$TABLE"
 echo
 echo "$PASSED as expected, $FAILED wrong, $SKIPPED skipped (needs php). Full output: $LOG"
+if [ -n "${PROOF_ONLY:-}" ] && [ "$((PASSED + FAILED + SKIPPED))" -eq 0 ]; then
+    echo "Proof: PROOF_ONLY=$PROOF_ONLY selected scenarios by id but none of them ran: that is no green run." >&2
+    exit 64
+fi
 [ "$FAILED" -eq 0 ]

@@ -1,3 +1,4 @@
+# proof-needs: main
 # Scenarios for ci/checks.sh and ci/prepush.sh. Sourced by ../proof.sh with its helpers in scope (check, edit, ROOT, KIT, SHELL_BIN).
 # Own scratch repositories under "$ROOT"; ids start with CX.
 
