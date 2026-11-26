@@ -1,0 +1,11 @@
+{
+  "name": "zero-debt-kit",
+  "owner": { "name": "zero-debt-kit contributors" },
+  "plugins": [
+    {
+      "name": "zero-debt",
+      "source": "./",
+      "description": "Run the zero-debt cleanup program on a Laravel repository: start, continue, review a guard or a PR, and check a kit copy with the doctor."
+    }
+  ]
+}

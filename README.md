@@ -1,5 +1,7 @@
 # zero-debt-kit-laravel
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Green CI does not mean a codebase has a shape. You can have high coverage and PHPStan at level 8 and still end up with three ways to authorize a route, four ways to write a test helper and a new pattern with every pull request. A linter checks lines, not structure. With AI agents writing a growing share of the code, the drift gets faster.
 
 This kit makes CI the quality gate for structure. It does that with two mechanisms:
@@ -219,6 +221,26 @@ Same name in every project (`tools/README.md`, "Adding a row"; `04-guards.md` C2
 - **Guarded files and the override tag.** The other scripts, `kit-config.sh`, the pipeline files of the three hosts and `.gitattributes` are guarded files: a change needs `[ratchet: script] <reason>`, and `ci/checks.sh` first runs the base's copy of the ratchet script, so a pull request cannot rewrite its own gate.
 - **The code-owners rule.** The tag is written by the author, so only a person can tell a real reason from one written to get past a guard. The files that carry the guards are covered by a code-owners rule that names a person or a team, and the host requires that review (`ci/CODEOWNERS.example`, `04-guards.md` C2 and C4 point 22, `07-process.md` section 12). The setting itself is the owner's and lives on the host, not in the repository.
 
+## Install as an agent plugin
+
+The kit is also a Claude Code plugin: the skills start and continue a run, review a guard or a pull request, and check a project's copy of the scripts. They point at the numbered files of this kit; they do not copy them.
+
+```text
+/plugin marketplace add NiekNijland/zero-debt-kit-laravel
+/plugin install zero-debt@zero-debt-kit
+```
+
+Then, in the target repository:
+
+| Skill | Use |
+| --- | --- |
+| `/zero-debt:zero-debt <TICKET>` | start a run: the step 1 questions, then the program (`00-START-PROMPT.md`) |
+| `/zero-debt:zero-debt-continue <TICKET> <hand-off folder>` | continue a run from `CONTINUE.md` |
+| `/zero-debt:zero-debt-review <branch, PR or guard>` | cold review with `09-reviewer-brief.md` |
+| `/zero-debt:zero-debt-doctor` | run `tools/doctor.sh` against a kit checkout and explain the result |
+
+The plugin files validate locally with `claude plugin validate .`; installing from the marketplace has not been tested yet. The skills are plain `SKILL.md` files, so another agent can read them from `skills/`. Without a plugin, give the agent the folder path and paste `00-START-PROMPT.md` as "How to use it" says. Plugin instructions run with your agent's privileges: pin to a release tag and read what you install (`SECURITY.md`).
+
 ## How to use it
 
 1. Give the agent this folder's path. Start a session in the target repository and paste `00-START-PROMPT.md`.
@@ -226,6 +248,8 @@ Same name in every project (`tools/README.md`, "Adding a row"; `04-guards.md` C2
 3. The agent works through steps 2 to 10 of `05-program.md` and stops for your go after steps 1, 3 and 10, or when a decision is yours. A step that changes source code ends with a runtime check on a production-like environment.
 
 Step 1 changes no tracked file. It produces four files: a project profile, a measured plan with a dashboard of every counter, a backlog and a hand-off note.
+
+More: `docs/adoption-guide.md` (who it is for, what to prepare, what the three gates ask of you), `docs/faq.md` (how it differs from Deptrac, PHPArkitect, Pest arch, Betterer and SonarQube), `CHANGELOG.md` and `UPGRADING.md` (versions and how to move a project's copy), `tools/doctor.sh` (compares a project's scripts with the kit), `CONTRIBUTING.md`, `SECURITY.md`.
 
 ## The ten steps
 
@@ -274,6 +298,10 @@ Step 1 changes no tracked file. It produces four files: a project profile, a mea
 | `templates/` | `project-profile.md`, `zero-debt-plan.md`, `backlog-and-continue.md`, `repo-docs.md` (the `AGENTS.md` set, decision record, review rubric, PR template), `pr-description-and-brief.md` (with the move map format), `tool-configs.md` (formatter and refactoring-tool configs to copy) | when creating them |
 | `tools/` | `ci-ratchets.sh`, `debt-dashboard.sh`, `debt-caps.json`, `kit-config.sh`, `ci-commit-messages.sh`, `ci-parallel.sh`, `keyed-baseline.sh`, `audit-gate.sh`, `mutation.sh`, `map-normalise.sh` and `move-ts.mjs` (what each does: `tools/README.md`), and `tools/proof/proof.sh`, which proves every script in scratch repositories. The reference project's originals of the ratchet script, the dashboard, the caps file, the commit-message check and the parallel runner are in `reference-project/scripts/` | step 1 (the scratch dashboard of 1.6, the mutation sample of 1.7) and step 2 |
 | `ci/` | `checks.sh`, the one command that the pipeline's checks step (one step per part) and a developer both run, `prepush.sh`, which runs every part side by side before a push, `CODEOWNERS.example`, and the pipeline skeletons `bitbucket-pipelines.yml`, `github-actions.yml` and `gitlab-ci.yml`; a repository that has a pipeline adds their jobs to its own file | step 2 |
+| `AGENTS.md` | instructions for an agent that maintains the kit itself | when changing the kit |
+| `.claude-plugin/`, `skills/` | the Claude Code plugin and marketplace manifests and the four skills | when installing or changing the plugin |
+| `docs/` | `adoption-guide.md`, `faq.md`, `launch-post-draft.md` | before adopting |
+| `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `VERSION`, `CHANGELOG.md`, `UPGRADING.md` | how to contribute, report a vulnerability, behave, and which version a copy is | when contributing or upgrading |
 | `reference-project/` | guards, configs and `AGENTS.md` files of the reference project, a Laravel and React application, as worked examples on an example domain (an anonymized extract, not a runnable application). Its `README.md` lists where that project falls short of the kit | when building a guard: the `README.md` first |
 
 ## Limits
