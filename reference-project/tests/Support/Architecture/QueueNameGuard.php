@@ -6,11 +6,18 @@ namespace Tests\Support\Architecture;
 
 use PhpParser\Node;
 use PhpParser\Node\Expr\Assign;
+use PhpParser\Node\Expr\BinaryOp\Coalesce;
+use PhpParser\Node\Expr\BinaryOp\Concat;
+use PhpParser\Node\Expr\Match_;
 use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Expr\NullsafeMethodCall;
 use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\StaticCall;
+use PhpParser\Node\Expr\Ternary;
+use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
+use PhpParser\Node\MatchArm;
+use PhpParser\Node\Param;
 use PhpParser\Node\Scalar\InterpolatedString;
 use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\ClassMethod;
@@ -20,7 +27,7 @@ use PhpParser\ParserFactory;
 
 final readonly class QueueNameGuard
 {
-    private const array QUEUE_SETTERS = ['onqueue', 'allonqueue'];
+    private const array QUEUE_SETTERS = ['onqueue', 'allonqueue', 'pushon', 'lateron'];
 
     private const string ONE_WAY = 'name the queue with a case of App\Modules\Observability\Enums\Queue (Queue::X), which has a Horizon worker in config/horizon.php';
 
@@ -76,6 +83,12 @@ final readonly class QueueNameGuard
             }
         }
 
+        foreach ($finder->findInstanceOf($statements, Param::class) as $parameter) {
+            if ($parameter->flags !== 0 && $parameter->var instanceof Variable && $parameter->var->name === 'queue' && self::isLiteral($parameter->default)) {
+                $violations[$parameter->getStartLine() . ' e'] = $parameter->getStartLine() . ': a promoted $queue with a queue name as text: call $this->onQueue(Queue::X) in the constructor; ' . self::ONE_WAY;
+            }
+        }
+
         foreach ($finder->findInstanceOf($statements, Assign::class) as $assign) {
             if ($assign->var instanceof PropertyFetch && $assign->var->name instanceof Identifier && $assign->var->name->toString() === 'queue' && self::isLiteral($assign->expr)) {
                 $violations[$assign->getStartLine() . ' c'] = $assign->getStartLine() . ': ->queue set to a queue name as text: ' . self::ONE_WAY;
@@ -99,8 +112,18 @@ final readonly class QueueNameGuard
         return array_values($violations);
     }
 
+    /**
+     * Text, text joined to something (`'exports-' . $tenant`) and a choice between values of which one is text
+     * (`$x ? 'a' : 'b'`, `$x ?? 'a'`, a `match` arm).
+     */
     private static function isLiteral(?Node $value): bool
     {
-        return $value instanceof String_ || $value instanceof InterpolatedString;
+        return match (true) {
+            $value instanceof String_, $value instanceof InterpolatedString => true,
+            $value instanceof Concat, $value instanceof Coalesce => self::isLiteral($value->left) || self::isLiteral($value->right),
+            $value instanceof Ternary => self::isLiteral($value->if) || self::isLiteral($value->else),
+            $value instanceof Match_ => array_any($value->arms, static fn (MatchArm $arm): bool => self::isLiteral($arm->body)),
+            default => false,
+        };
     }
 }
