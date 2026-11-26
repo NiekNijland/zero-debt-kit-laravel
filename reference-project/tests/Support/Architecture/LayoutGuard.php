@@ -8,34 +8,28 @@ use Tests\Support\RecursiveFiles;
 
 final readonly class LayoutGuard
 {
-    private const array LAYER_FOLDERS = [
-        'app' => ['Casts', 'Http', 'Models', 'Modules', 'Policies', 'Providers', 'Rules', 'Support', 'View'],
-        'app/Http' => ['Controllers', 'Middleware', 'Requests'],
-        'app/Models' => ['Landlord', 'Pivots', 'Tenant'],
-    ];
+    private const string PLACE = 'move it to a folder of the layout table, or add the folder to the table first';
 
-    private const array MODULE_FOLDERS = ['Actions', 'Commands', 'Contracts', 'Data', 'Enums', 'Events', 'Exceptions', 'Facades', 'Jobs', 'Listeners', 'Mail', 'Notifications', 'Services', 'Support', 'ValueObjects'];
+    private const string NAME = 'end the class name in %s, as the name column of the layout table says';
 
-    private const array MODULE_SUFFIXES = [
-        'Commands' => ['Command'],
-        'Data' => ['Data'],
-        'Events' => ['Event'],
-        'Exceptions' => ['Exception'],
-        'Jobs' => ['Job'],
-        'Mail' => ['Mail'],
-        'Notifications' => ['Notification'],
-        'Services' => ['Client', 'Service'],
-    ];
-
-    private const array FLAT_SUFFIXES = [
-        'app/Http/Controllers' => ['Controller'],
-        'app/Http/Requests' => ['Request'],
-        'app/Policies' => ['Policy'],
-        'app/Providers' => ['ServiceProvider', 'Provider'],
-    ];
-
-    public function __construct(private string $root)
-    {
+    /**
+     * The tables are the layout table of the guide, handed in by the thin test (the older, argument form of the
+     * module layout guard, which reads the table from the guide itself).
+     *
+     * @param array<string, list<string>> $layerFolders folders a layer may hold, by layer path relative to the root
+     * @param string $moduleRoot the folder whose children are modules
+     * @param list<string> $moduleFolders the folders a module may hold
+     * @param array<string, list<string>> $moduleSuffixes the suffixes of the names in a module folder
+     * @param array<string, list<string>> $flatSuffixes the suffixes of the names in a folder outside the modules, by path
+     */
+    public function __construct(
+        private string $root,
+        private array $layerFolders,
+        private string $moduleRoot,
+        private array $moduleFolders,
+        private array $moduleSuffixes,
+        private array $flatSuffixes,
+    ) {
     }
 
     /**
@@ -45,7 +39,7 @@ final readonly class LayoutGuard
     {
         $violations = [];
 
-        foreach (self::LAYER_FOLDERS as $layer => $folders) {
+        foreach ($this->layerFolders as $layer => $folders) {
             if (! is_dir($this->path($layer))) {
                 continue;
             }
@@ -56,15 +50,15 @@ final readonly class LayoutGuard
                         array_push($violations, ...$this->misplaced($entry));
                     }
                 } elseif (str_ends_with($entry, '.php')) {
-                    $violations[] = 'place ' . $entry;
+                    $violations[] = 'place ' . $entry . ': ' . self::PLACE;
                 }
             }
         }
 
-        foreach ($this->entries('app/Modules') as $module) {
+        foreach ($this->entries($this->moduleRoot) as $module) {
             if (! is_dir($this->path($module))) {
                 if (str_ends_with($module, '.php')) {
-                    $violations[] = 'place ' . $module;
+                    $violations[] = 'place ' . $module . ': ' . self::PLACE;
                 }
 
                 continue;
@@ -73,7 +67,7 @@ final readonly class LayoutGuard
             foreach ($this->entries($module) as $entry) {
                 if (! is_dir($this->path($entry))) {
                     if (str_ends_with($entry, '.php')) {
-                        $violations[] = 'place ' . $entry;
+                        $violations[] = 'place ' . $entry . ': ' . self::PLACE;
                     }
 
                     continue;
@@ -81,17 +75,17 @@ final readonly class LayoutGuard
 
                 $folder = basename($entry);
 
-                if (! in_array($folder, self::MODULE_FOLDERS, true)) {
+                if (! in_array($folder, $this->moduleFolders, true)) {
                     array_push($violations, ...$this->misplaced($entry));
 
                     continue;
                 }
 
-                array_push($violations, ...$this->misnamed($entry, self::MODULE_SUFFIXES[$folder] ?? []));
+                array_push($violations, ...$this->misnamed($entry, $this->moduleSuffixes[$folder] ?? []));
             }
         }
 
-        foreach (self::FLAT_SUFFIXES as $folder => $suffixes) {
+        foreach ($this->flatSuffixes as $folder => $suffixes) {
             array_push($violations, ...$this->misnamed($folder, $suffixes));
         }
 
@@ -116,7 +110,7 @@ final readonly class LayoutGuard
             $name = basename($file, '.php');
 
             if (! array_any($suffixes, static fn (string $suffix): bool => str_ends_with($name, $suffix))) {
-                $misnamed[] = 'name ' . $file;
+                $misnamed[] = 'name ' . $file . ': ' . sprintf(self::NAME, implode(' or ', $suffixes));
             }
         }
 
@@ -128,7 +122,7 @@ final readonly class LayoutGuard
      */
     private function misplaced(string $folder): array
     {
-        return array_map(static fn (string $file): string => 'place ' . $file, $this->phpFiles($folder));
+        return array_map(static fn (string $file): string => 'place ' . $file . ': ' . self::PLACE, $this->phpFiles($folder));
     }
 
     /**
@@ -152,7 +146,7 @@ final readonly class LayoutGuard
      */
     private function entries(string $folder): array
     {
-        $entries = scandir($this->path($folder));
+        $entries = is_dir($this->path($folder)) ? scandir($this->path($folder)) : false;
 
         if ($entries === false) {
             return [];

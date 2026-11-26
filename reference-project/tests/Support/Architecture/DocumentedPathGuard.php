@@ -8,14 +8,19 @@ use Tests\Support\RecursiveFiles;
 
 final readonly class DocumentedPathGuard
 {
-    private const array SOURCE_ROOTS = ['.github', '.storybook', 'app', 'bootstrap', 'config', 'database', 'docs', 'lang', 'resources', 'routes', 'scripts', 'tests'];
-
-    private const array GUIDES = ['AGENTS.md', 'DESIGN.md', 'docs/review-rubric.md'];
-
     private const string FILE = '/\.(php|tsx?|mjs|js|json|md|sh|css|neon|ya?ml)$/';
 
-    public function __construct(private string $root)
-    {
+    /**
+     * @param list<string> $sourceRoots the top folders whose files a guide may name, relative to the root
+     * @param list<string> $guides the guide files, relative to the root; every file with the nested guide name under a source root is a guide too
+     * @param string $nestedGuide the file name of a guide that sits in many folders
+     */
+    public function __construct(
+        private string $root,
+        private array $sourceRoots,
+        private array $guides,
+        private string $nestedGuide,
+    ) {
     }
 
     /**
@@ -24,11 +29,11 @@ final readonly class DocumentedPathGuard
     public function violations(): array
     {
         $files = $this->sourceFiles();
-        $guides = array_filter(self::GUIDES, fn (string $guide): bool => is_file($this->root . '/' . $guide));
+        $guides = array_filter($this->guides, fn (string $guide): bool => is_file($this->root . '/' . $guide));
         $violations = [];
 
         foreach ($files as $file) {
-            if (basename($file) === 'AGENTS.md' && ! in_array($file, $guides, true)) {
+            if (basename($file) === $this->nestedGuide && ! in_array($file, $guides, true)) {
                 $guides[] = $file;
             }
         }
@@ -37,7 +42,7 @@ final readonly class DocumentedPathGuard
 
         foreach ($guides as $guide) {
             foreach (self::pathsIn((string) file_get_contents($this->root . '/' . $guide)) as [$line, $path]) {
-                $known = in_array(explode('/', $path)[0], self::SOURCE_ROOTS, true);
+                $known = in_array(explode('/', $path)[0], $this->sourceRoots, true);
 
                 if ($known && ! file_exists($this->root . '/' . rtrim($path, '/'))) {
                     $violations[] = $guide . ':' . $line . ': `' . $path . '` does not exist: name the file or folder as it is now, or write an example with a placeholder such as <Name>';
@@ -79,7 +84,7 @@ final readonly class DocumentedPathGuard
     {
         $files = [];
 
-        foreach (self::SOURCE_ROOTS as $directory) {
+        foreach ($this->sourceRoots as $directory) {
             if (! is_dir($this->root . '/' . $directory)) {
                 continue;
             }

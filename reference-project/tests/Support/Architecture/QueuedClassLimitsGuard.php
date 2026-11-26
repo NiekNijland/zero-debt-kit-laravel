@@ -21,6 +21,7 @@ final readonly class QueuedClassLimitsGuard
         private PhpFileInspector $inspector,
         private string $root,
         private string $source,
+        private string $supervisorConfig,
     ) {
     }
 
@@ -64,7 +65,7 @@ final readonly class QueuedClassLimitsGuard
             $prefix = ($class['path'] === '' ? '' : $class['path'] . ': ') . $class['name'];
 
             if ($graph->property($class, 'timeout') === null && ! $graph->hasAttribute($class, 'Timeout')) {
-                $violations[] = $prefix . ' is queued without $timeout: declare public int $timeout = <seconds>, at most the timeout of the supervisor of its queue in config/horizon.php, so the limit of the work stands in the class';
+                $violations[] = $prefix . ' is queued without $timeout: declare public int $timeout = <seconds>, at most the timeout of the supervisor of its queue in ' . $this->supervisorConfig . ', so the limit of the work stands in the class';
             }
 
             if ($graph->property($class, 'tries') === null && ! $graph->hasMethod($class, 'retryUntil') && ! $graph->hasAttribute($class, 'Tries')) {

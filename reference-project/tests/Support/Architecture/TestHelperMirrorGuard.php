@@ -6,9 +6,17 @@ namespace Tests\Support\Architecture;
 
 final readonly class TestHelperMirrorGuard
 {
+    /**
+     * @param string $supportFolder the support folder, relative to the root
+     * @param string $testFolder the folder of the tests, whose subfolders the support subfolders mirror
+     * @param string $namespace the namespace of the support folder
+     */
     public function __construct(
         private PhpFileInspector $inspector,
         private string $root,
+        private string $supportFolder,
+        private string $testFolder,
+        private string $namespace,
     ) {
     }
 
@@ -19,16 +27,16 @@ final readonly class TestHelperMirrorGuard
     {
         $violations = [];
 
-        foreach (self::paths($this->root . '/tests/Support/*', GLOB_ONLYDIR) as $tree) {
-            if (! is_dir($this->root . '/tests/' . basename($tree))) {
+        foreach (self::paths($this->root . '/' . $this->supportFolder . '/*', GLOB_ONLYDIR) as $tree) {
+            if (! is_dir($this->root . '/' . $this->testFolder . '/' . basename($tree))) {
                 continue;
             }
 
             foreach ($this->inspector->phpFiles($tree) as $file) {
-                $violation = $this->violationOf(substr($file, strlen($this->root . '/tests/Support/')));
+                $violation = $this->violationOf(substr($file, strlen($this->root . '/' . $this->supportFolder . '/')));
 
                 if ($violation !== null) {
-                    $violations[] = 'tests/Support/' . substr($file, strlen($this->root . '/tests/Support/')) . ': ' . $violation;
+                    $violations[] = $this->supportFolder . '/' . substr($file, strlen($this->root . '/' . $this->supportFolder . '/')) . ': ' . $violation;
                 }
             }
         }
@@ -38,17 +46,17 @@ final readonly class TestHelperMirrorGuard
 
     private function violationOf(string $path): ?string
     {
-        $class = 'Tests\\Support\\' . str_replace('/', '\\', substr($path, 0, -4));
+        $class = $this->namespace . '\\' . str_replace('/', '\\', substr($path, 0, -4));
 
         if (preg_match('/^(.+)(Helpers|Scenario)\.php$/', $path, $parts) !== 1) {
             return null;
         }
 
-        if (! array_key_exists($class, $this->inspector->declaredTypes($this->root . '/tests/Support/' . $path))) {
+        if (! array_key_exists($class, $this->inspector->declaredTypes($this->root . '/' . $this->supportFolder . '/' . $path))) {
             return 'the file does not declare ' . $class . ': the class and its namespace follow the path';
         }
 
-        if (is_file($this->root . '/tests/' . $parts[1] . 'Test.php')) {
+        if (is_file($this->root . '/' . $this->testFolder . '/' . $parts[1] . 'Test.php')) {
             return null;
         }
 
@@ -56,14 +64,14 @@ final readonly class TestHelperMirrorGuard
             return null;
         }
 
-        return 'there is no tests/' . $parts[1] . 'Test.php: the helpers of one test mirror its path and carry its name ('
-            . basename($parts[1]) . 'Test.php with ' . basename($parts[1]) . 'Helpers.php), a scenario sits next to the helpers that build it, and a class that several tests share is a themed class directly in tests/Support';
+        return 'there is no ' . $this->testFolder . '/' . $parts[1] . 'Test.php: the helpers of one test mirror its path and carry its name ('
+            . basename($parts[1]) . 'Test.php with ' . basename($parts[1]) . 'Helpers.php), a scenario sits next to the helpers that build it, and a class that several tests share is a themed class directly in ' . $this->supportFolder;
     }
 
     private function returnedByNeighbor(string $path, string $class): bool
     {
-        foreach (self::paths($this->root . '/tests/Support/' . dirname($path) . '/*Helpers.php') as $neighbor) {
-            $mirrored = $this->root . '/tests/' . dirname($path) . '/' . basename($neighbor, 'Helpers.php') . 'Test.php';
+        foreach (self::paths($this->root . '/' . $this->supportFolder . '/' . dirname($path) . '/*Helpers.php') as $neighbor) {
+            $mirrored = $this->root . '/' . $this->testFolder . '/' . dirname($path) . '/' . basename($neighbor, 'Helpers.php') . 'Test.php';
 
             if (is_file($mirrored) && in_array($class, $this->inspector->referencedNames($neighbor), true)) {
                 return true;

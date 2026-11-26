@@ -8,13 +8,15 @@ use Tests\Support\RecursiveFiles;
 
 final class TestClassGuard
 {
-    public const array SUITES = ['tests/Unit', 'tests/Feature', 'tests/Integration'];
-
     private const string DECLARATION = '/^\h*(#\[[^\n]*\]\h*)*(\w+\h+)*(class|interface|trait|enum)\h+\w/mi';
 
+    /**
+     * @param list<string> $suites the suite folders, relative to the root; a suite that does not exist is skipped
+     */
     public function __construct(
         private readonly PhpFileInspector $inspector,
         private readonly string $root,
+        private readonly array $suites,
     ) {
     }
 
@@ -25,7 +27,7 @@ final class TestClassGuard
     {
         $violations = [];
 
-        foreach (self::SUITES as $suite) {
+        foreach ($this->suites as $suite) {
             if (! is_dir($this->root . '/' . $suite)) {
                 continue;
             }

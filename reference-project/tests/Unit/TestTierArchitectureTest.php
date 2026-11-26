@@ -5,9 +5,22 @@ declare(strict_types=1);
 use Tests\Support\Architecture\PhpFileInspector;
 use Tests\Support\Architecture\TestClassGuard;
 use Tests\Support\Architecture\TestHelperFunctionGuard;
-use Tests\Support\Unit\TestTierArchitectureHelpers;
+use Tests\Support\Architecture\TestTierGuard;
+use Tests\Support\SourceSandbox;
 
 uses()->group('arch');
+
+// The folders and layers of this project; the detector holds none of them.
+$tier = static fn (string $root): TestTierGuard => new TestTierGuard(
+    new PhpFileInspector(),
+    $root,
+    'tests',
+    'tests/Unit',
+    'tests/Pest.php',
+    ['app/Support', 'app/Modules/*/Contracts', 'app/Modules/*/Data', 'app/Modules/*/Enums', 'app/Modules/*/Exceptions', 'app/Modules/*/ValueObjects'],
+    ['app/Modules/*/Data'],
+);
+$suites = ['tests/Unit', 'tests/Feature', 'tests/Integration'];
 
 dataset('booting unit test sources', [
     'plain import' => ["<?php\nuse Tests\\FeatureTestCase;\nuses(FeatureTestCase::class);\n"],
@@ -18,18 +31,18 @@ dataset('booting unit test sources', [
     'pest extend call' => ["<?php\npest()->extend(\\Tests\\FeatureTestCase::class);\n"],
 ]);
 
-it('detects a booting base in every way a unit test can name it', function (string $source): void {
-    $root = TestTierArchitectureHelpers::tierSandbox(['tests/Unit/FooTest.php' => $source, 'tests/Pest.php' => "<?php\n"]);
+it('detects a booting base in every way a unit test can name it', function (string $source) use ($tier): void {
+    $root = SourceSandbox::create(['tests/Unit/FooTest.php' => $source, 'tests/Pest.php' => "<?php\n"]);
 
     try {
-        expect(array_keys(TestTierArchitectureHelpers::tierGuardFor($root)->unitTestViolations()))->toBe(['tests/Unit/FooTest.php']);
+        expect(array_keys($tier($root)->unitTestViolations()))->toBe(['tests/Unit/FooTest.php']);
     } finally {
-        TestTierArchitectureHelpers::tierRemove($root);
+        SourceSandbox::remove($root);
     }
 })->with('booting unit test sources');
 
-it('detects a booting base reached through a support trait', function (): void {
-    $root = TestTierArchitectureHelpers::tierSandbox([
+it('detects a booting base reached through a support trait', function () use ($tier): void {
+    $root = SourceSandbox::create([
         'tests/Concerns/Indirect.php' => "<?php\nnamespace Tests\\Concerns;\nuse Illuminate\\Foundation\\Testing\\LazilyRefreshDatabase;\ntrait Indirect { use LazilyRefreshDatabase; }\n",
         'tests/Support/Deeper.php' => "<?php\nnamespace Tests\\Support;\nuse Tests\\Concerns\\Indirect;\ntrait Deeper { use Indirect; }\n",
         'tests/Unit/FooTest.php' => "<?php\nuses(Tests\\Support\\Deeper::class);\n",
@@ -37,22 +50,22 @@ it('detects a booting base reached through a support trait', function (): void {
     ]);
 
     try {
-        expect(TestTierArchitectureHelpers::tierGuardFor($root)->unitTestViolations())->toHaveKey('tests/Unit/FooTest.php');
+        expect($tier($root)->unitTestViolations())->toHaveKey('tests/Unit/FooTest.php');
     } finally {
-        TestTierArchitectureHelpers::tierRemove($root);
+        SourceSandbox::remove($root);
     }
 });
 
-it('detects a booting base bound to the unit directory in Pest.php', function (): void {
-    $root = TestTierArchitectureHelpers::tierSandbox([
+it('detects a booting base bound to the unit directory in Pest.php', function () use ($tier): void {
+    $root = SourceSandbox::create([
         'tests/Pest.php' => "<?php\npest()->extend(Tests\\FeatureTestCase::class)->in('Feature', 'Unit');\n",
         'tests/Unit/FooTest.php' => "<?php\nit('works', fn () => expect(true)->toBeTrue());\n",
     ]);
 
     try {
-        expect(TestTierArchitectureHelpers::tierGuardFor($root)->unitTestViolations())->toHaveKey('tests/Pest.php');
+        expect($tier($root)->unitTestViolations())->toHaveKey('tests/Pest.php');
     } finally {
-        TestTierArchitectureHelpers::tierRemove($root);
+        SourceSandbox::remove($root);
     }
 });
 
@@ -66,59 +79,59 @@ dataset('booting Pest bindings', [
     'binding in another file' => ["<?php\npest()->extend(Tests\\FeatureTestCase::class)->in('../Unit');\n", 'tests/Feature/BindingTest.php'],
 ]);
 
-it('detects a booting base bound to the unit directory in every spelling', function (string $source, string $path): void {
-    $root = TestTierArchitectureHelpers::tierSandbox([$path => $source, 'tests/Unit/FooTest.php' => "<?php\nit('works', fn () => expect(true)->toBeTrue());\n"]);
+it('detects a booting base bound to the unit directory in every spelling', function (string $source, string $path) use ($tier): void {
+    $root = SourceSandbox::create([$path => $source, 'tests/Unit/FooTest.php' => "<?php\nit('works', fn () => expect(true)->toBeTrue());\n"]);
 
     try {
-        expect(TestTierArchitectureHelpers::tierGuardFor($root)->unitTestViolations())->toHaveKey($path);
+        expect($tier($root)->unitTestViolations())->toHaveKey($path);
     } finally {
-        TestTierArchitectureHelpers::tierRemove($root);
+        SourceSandbox::remove($root);
     }
 })->with('booting Pest bindings');
 
-it('does not flag a booting base bound to another directory', function (): void {
-    $root = TestTierArchitectureHelpers::tierSandbox([
+it('does not flag a booting base bound to another directory', function () use ($tier): void {
+    $root = SourceSandbox::create([
         'tests/Pest.php' => "<?php\npest()->extend(Tests\\FeatureTestCase::class)->in('Feature', 'Integration');\n",
         'tests/Unit/FooTest.php' => "<?php\nit('works', fn () => expect(true)->toBeTrue());\n",
     ]);
 
     try {
-        expect(TestTierArchitectureHelpers::tierGuardFor($root)->unitTestViolations())->toBe([]);
+        expect($tier($root)->unitTestViolations())->toBe([]);
     } finally {
-        TestTierArchitectureHelpers::tierRemove($root);
+        SourceSandbox::remove($root);
     }
 });
 
-it('detects a booting trait that lives outside the support directories', function (): void {
-    $root = TestTierArchitectureHelpers::tierSandbox([
+it('detects a booting trait that lives outside the support directories', function () use ($tier): void {
+    $root = SourceSandbox::create([
         'tests/Feature/Helpers/Booted.php' => "<?php\nnamespace Tests\\Feature\\Helpers;\nuse Illuminate\\Foundation\\Testing\\RefreshDatabase;\ntrait Booted { use RefreshDatabase; }\n",
         'tests/Unit/FooTest.php' => "<?php\nuses(Tests\\Feature\\Helpers\\Booted::class);\n",
         'tests/Pest.php' => "<?php\n",
     ]);
 
     try {
-        expect(TestTierArchitectureHelpers::tierGuardFor($root)->unitTestViolations())->toHaveKey('tests/Unit/FooTest.php');
+        expect($tier($root)->unitTestViolations())->toHaveKey('tests/Unit/FooTest.php');
     } finally {
-        TestTierArchitectureHelpers::tierRemove($root);
+        SourceSandbox::remove($root);
     }
 });
 
-it('accepts the pure and bare container tiers in unit tests', function (): void {
-    $root = TestTierArchitectureHelpers::tierSandbox([
+it('accepts the pure and bare container tiers in unit tests', function () use ($tier): void {
+    $root = SourceSandbox::create([
         'tests/Concerns/BootsBareContainer.php' => "<?php\nnamespace Tests\\Concerns;\nuse Illuminate\\Foundation\\Application;\ntrait BootsBareContainer {}\n",
         'tests/Pest.php' => "<?php\npest()->extend(Tests\\PureTestCase::class)->in('Unit');\n",
         'tests/Unit/FooTest.php' => "<?php\nuses(Tests\\Concerns\\BootsBareContainer::class);\n",
     ]);
 
     try {
-        expect(TestTierArchitectureHelpers::tierGuardFor($root)->unitTestViolations())->toBe([]);
+        expect($tier($root)->unitTestViolations())->toBe([]);
     } finally {
-        TestTierArchitectureHelpers::tierRemove($root);
+        SourceSandbox::remove($root);
     }
 });
 
-it('keeps every unit test off a booting base class', function (): void {
-    expect(TestTierArchitectureHelpers::tierGuardFor(dirname(__DIR__, 2))->unitTestViolations())->toBe([]);
+it('keeps every unit test off a booting base class', function () use ($tier): void {
+    expect($tier(dirname(__DIR__, 2))->unitTestViolations())->toBe([]);
 });
 
 dataset('database layer sources', [
@@ -131,13 +144,13 @@ dataset('database layer sources', [
     'eloquent builder' => ["<?php\nnamespace App\\Modules\\Orders\\Exceptions;\nuse Illuminate\\Database\\Eloquent\\Builder;\nfinal class A { public function f(Builder \$q): void {} }\n"],
 ]);
 
-it('detects database layer references in every way a pure layer can name them', function (string $source): void {
-    $root = TestTierArchitectureHelpers::tierSandbox(['app/Modules/Orders/Exceptions/A.php' => $source]);
+it('detects database layer references in every way a pure layer can name them', function (string $source) use ($tier): void {
+    $root = SourceSandbox::create(['app/Modules/Orders/Exceptions/A.php' => $source]);
 
     try {
-        expect(array_keys(TestTierArchitectureHelpers::tierGuardFor($root)->pureLayerViolations()))->toBe(['app/Modules/Orders/Exceptions/A.php']);
+        expect(array_keys($tier($root)->pureLayerViolations()))->toBe(['app/Modules/Orders/Exceptions/A.php']);
     } finally {
-        TestTierArchitectureHelpers::tierRemove($root);
+        SourceSandbox::remove($root);
     }
 })->with('database layer sources');
 
@@ -147,13 +160,13 @@ dataset('Data sources that may name a model', [
     'a private static from factory' => ["<?php\nnamespace App\\Modules\\Orders\\Data;\nuse App\\Models\\Tenant\\User;\nfinal class A { private static function fromTarget(User \$user): self { return new self(); } }\n"],
 ]);
 
-it('lets a Data class name a model inside its static from factories', function (string $source): void {
-    $root = TestTierArchitectureHelpers::tierSandbox(['app/Modules/Orders/Data/A.php' => $source]);
+it('lets a Data class name a model inside its static from factories', function (string $source) use ($tier): void {
+    $root = SourceSandbox::create(['app/Modules/Orders/Data/A.php' => $source]);
 
     try {
-        expect(TestTierArchitectureHelpers::tierGuardFor($root)->pureLayerViolations())->toBe([]);
+        expect($tier($root)->pureLayerViolations())->toBe([]);
     } finally {
-        TestTierArchitectureHelpers::tierRemove($root);
+        SourceSandbox::remove($root);
     }
 })->with('Data sources that may name a model');
 
@@ -166,30 +179,30 @@ dataset('Data sources that may not name a model', [
     'the database facade in a from factory' => ["<?php\nnamespace App\\Modules\\Orders\\Data;\nuse Illuminate\\Support\\Facades\\DB;\nfinal class A { public static function fromId(int \$id): self { DB::table('users')->find(\$id); return new self(); } }\n"],
 ]);
 
-it('keeps every other part of a Data class off the models', function (string $source): void {
-    $root = TestTierArchitectureHelpers::tierSandbox(['app/Modules/Orders/Data/A.php' => $source]);
+it('keeps every other part of a Data class off the models', function (string $source) use ($tier): void {
+    $root = SourceSandbox::create(['app/Modules/Orders/Data/A.php' => $source]);
 
     try {
-        expect(array_keys(TestTierArchitectureHelpers::tierGuardFor($root)->pureLayerViolations()))->toBe(['app/Modules/Orders/Data/A.php']);
+        expect(array_keys($tier($root)->pureLayerViolations()))->toBe(['app/Modules/Orders/Data/A.php']);
     } finally {
-        TestTierArchitectureHelpers::tierRemove($root);
+        SourceSandbox::remove($root);
     }
 })->with('Data sources that may not name a model');
 
-it('ignores pure layer files that never reach the database layer', function (): void {
-    $root = TestTierArchitectureHelpers::tierSandbox(['app/Modules/Orders/Enums/A.php' => "<?php\nnamespace App\\Modules\\Orders\\Enums;\nuse Illuminate\\Support\\Collection;\nenum A: string { case X = 'x'; }\n"]);
+it('ignores pure layer files that never reach the database layer', function () use ($tier): void {
+    $root = SourceSandbox::create(['app/Modules/Orders/Enums/A.php' => "<?php\nnamespace App\\Modules\\Orders\\Enums;\nuse Illuminate\\Support\\Collection;\nenum A: string { case X = 'x'; }\n"]);
 
     try {
-        expect(TestTierArchitectureHelpers::tierGuardFor($root)->pureLayerViolations())->toBe([]);
+        expect($tier($root)->pureLayerViolations())->toBe([]);
     } finally {
-        TestTierArchitectureHelpers::tierRemove($root);
+        SourceSandbox::remove($root);
     }
 });
 
-it('keeps every pure layer off the database layer', function (): void {
+it('keeps every pure layer off the database layer', function () use ($tier): void {
     $root = dirname(__DIR__, 2);
 
-    expect(TestTierArchitectureHelpers::tierGuardFor($root)->pureLayerViolations())->toBe([])
+    expect($tier($root)->pureLayerViolations())->toBe([])
         ->and(file_exists($root . '/tests/Support/Architecture/pure-layer-allowlist.php'))->toBeFalse();
 });
 
@@ -204,13 +217,13 @@ dataset('classes declared in a test file', [
     'second class next to the test case' => ["<?php\nnamespace Tests\\Unit;\nfinal class FooTest extends \\PHPUnit\\Framework\\TestCase {}\nfinal class Extra {}\n", ['Tests\\Unit\\Extra']],
 ]);
 
-it('detects every class a test file declares besides its own test case', function (string $source, array $types): void {
-    $root = TestTierArchitectureHelpers::tierSandbox(['tests/Feature/FooTest.php' => $source]);
+it('detects every class a test file declares besides its own test case', function (string $source, array $types) use ($suites): void {
+    $root = SourceSandbox::create(['tests/Feature/FooTest.php' => $source]);
 
     try {
-        expect((new TestClassGuard(new PhpFileInspector(), $root))->violations())->toBe(['tests/Feature/FooTest.php' => $types]);
+        expect((new TestClassGuard(new PhpFileInspector(), $root, $suites))->violations())->toBe(['tests/Feature/FooTest.php' => $types]);
     } finally {
-        TestTierArchitectureHelpers::tierRemove($root);
+        SourceSandbox::remove($root);
     }
 })->with('classes declared in a test file');
 
@@ -225,18 +238,18 @@ dataset('files the test class guard allows', [
     'fixture next to a test' => ['tests/Integration/Checkout/fixtures/FakeJob.php', "<?php\nnamespace Tests\\Integration\\Checkout\\fixtures;\nclass FakeJob {}\n"],
 ]);
 
-it('allows anonymous classes, test cases named after their file and classes outside test files', function (string $path, string $source): void {
-    $root = TestTierArchitectureHelpers::tierSandbox([$path => $source]);
+it('allows anonymous classes, test cases named after their file and classes outside test files', function (string $path, string $source) use ($suites): void {
+    $root = SourceSandbox::create([$path => $source]);
 
     try {
-        expect((new TestClassGuard(new PhpFileInspector(), $root))->violations())->toBe([]);
+        expect((new TestClassGuard(new PhpFileInspector(), $root, $suites))->violations())->toBe([]);
     } finally {
-        TestTierArchitectureHelpers::tierRemove($root);
+        SourceSandbox::remove($root);
     }
 })->with('files the test class guard allows');
 
-it('keeps every class out of the test files', function (): void {
-    expect((new TestClassGuard(new PhpFileInspector(), dirname(__DIR__, 2)))->violations())->toBe([]);
+it('keeps every class out of the test files', function () use ($suites): void {
+    expect((new TestClassGuard(new PhpFileInspector(), dirname(__DIR__, 2), $suites))->violations())->toBe([]);
 });
 
 dataset('functions declared in a test file', [
@@ -253,12 +266,12 @@ dataset('functions declared in a test file', [
 ]);
 
 it('detects every named function a test file declares', function (string $source, array $functions): void {
-    $root = TestTierArchitectureHelpers::tierSandbox(['Feature/FooTest.php' => $source]);
+    $root = SourceSandbox::create(['Feature/FooTest.php' => $source]);
 
     try {
         expect((new TestHelperFunctionGuard($root))->violations())->toBe(['Feature/FooTest.php' => $functions]);
     } finally {
-        TestTierArchitectureHelpers::tierRemove($root);
+        SourceSandbox::remove($root);
     }
 })->with('functions declared in a test file');
 
@@ -278,15 +291,29 @@ dataset('files the test helper function guard allows', [
 ]);
 
 it('allows methods, closures and function-shaped text in test files', function (string $source): void {
-    $root = TestTierArchitectureHelpers::tierSandbox(['Feature/FooTest.php' => $source]);
+    $root = SourceSandbox::create(['Feature/FooTest.php' => $source]);
 
     try {
         expect((new TestHelperFunctionGuard($root))->violations())->toBe([]);
     } finally {
-        TestTierArchitectureHelpers::tierRemove($root);
+        SourceSandbox::remove($root);
     }
 })->with('files the test helper function guard allows');
 
 it('keeps every function out of the test files', function (): void {
     expect((new TestHelperFunctionGuard(dirname(__DIR__)))->violations())->toBe([]);
+});
+
+it('names the files relative to the root when the checkout sits under a dot directory', function () use ($tier, $suites): void {
+    $root = SourceSandbox::create([
+        'tests/Unit/FooTest.php' => "<?php\nuse Tests\\FeatureTestCase;\nuses(FeatureTestCase::class);\n",
+        'tests/Feature/BarTest.php' => "<?php\nfinal class Clock {}\n",
+    ], prefix: '.checkout-');
+
+    try {
+        expect(array_keys($tier($root)->unitTestViolations()))->toBe(['tests/Unit/FooTest.php'])
+            ->and((new TestClassGuard(new PhpFileInspector(), $root, $suites))->violations())->toBe(['tests/Feature/BarTest.php' => ['Clock']]);
+    } finally {
+        SourceSandbox::remove($root);
+    }
 });

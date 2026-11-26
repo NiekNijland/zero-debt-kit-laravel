@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Support\Architecture;
 
-use App\Modules\Copy\Support\CopyFiles;
 use Illuminate\Support\Arr;
 use Tests\Support\RecursiveFiles;
 
-final class CopyWordingGuard
+final readonly class CopyWordingGuard
 {
     private const array REPLACEMENTS = [
         'cart' => '"basket"',
@@ -16,13 +15,24 @@ final class CopyWordingGuard
     ];
 
     /**
+     * @param list<array<string, array<string, string>>> $translations the copy the application holds in code, by locale and key
+     * @param string $langFolder the folder of the language files, relative to the root
+     */
+    public function __construct(
+        private string $root,
+        private array $translations,
+        private string $langFolder,
+    ) {
+    }
+
+    /**
      * @return list<string>
      */
-    public static function violations(): array
+    public function violations(): array
     {
         $violations = [];
 
-        foreach ([CopyFiles::system(), CopyFiles::framework()] as $translations) {
+        foreach ($this->translations as $translations) {
             foreach ($translations as $locale => $texts) {
                 foreach ($texts as $key => $text) {
                     foreach (self::bannedWords($text) as $word) {
@@ -32,14 +42,14 @@ final class CopyWordingGuard
             }
         }
 
-        foreach (RecursiveFiles::in(dirname(__DIR__, 3) . '/lang') as $file) {
+        foreach (RecursiveFiles::in($this->root . '/' . $this->langFolder) as $file) {
             if (! $file->isFile() || $file->getExtension() !== 'php') {
                 continue;
             }
 
             foreach (Arr::dot(Arr::wrap(require $file->getPathname())) as $line => $copy) {
                 foreach (is_string($copy) ? self::bannedWords($copy) : [] as $banned) {
-                    $violations[] = 'lang/' . basename($file->getPath()) . '/' . $file->getBasename('.php') . ' ' . $line . ': ' . $banned;
+                    $violations[] = $this->langFolder . '/' . basename($file->getPath()) . '/' . $file->getBasename('.php') . ' ' . $line . ': ' . $banned;
                 }
             }
         }

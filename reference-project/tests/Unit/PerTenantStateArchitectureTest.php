@@ -21,7 +21,7 @@ it('detects config that is written for the current tenant outside a switch task'
 
     expect($violations)->toHaveCount(1)
         ->and($violations[0])->toContain($reason)
-        ->and($violations[0])->toContain('SwitchTenantTask');
+        ->and($violations[0])->toContain('SwitchTenantTask', 'config/multitenancy.php');
 })->with('config writes in the wrong place');
 
 it('accepts a switch task, a provider that sets config without the tenant and every config read', function (): void {

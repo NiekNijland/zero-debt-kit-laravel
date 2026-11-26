@@ -27,12 +27,13 @@ use PhpParser\ParserFactory;
 
 final readonly class RateLimiterGuard
 {
-    private const string NUMBER_IN_CONFIG = "the number of a limit lives in config/rate_limiting.php: Limit::perMinute(Config::integer('rate_limiting.<name>_per_minute'))->by(\$key), and the window is the factory (perMinute, perHour, perDay)";
+    private const string NUMBER_IN_CONFIG = "the number of a limit lives in the limits config file (%s): Limit::perMinute(Config::integer('rate_limiting.<name>_per_minute'))->by(\$key), and the window is the factory (perMinute, perHour, perDay)";
 
     public function __construct(
         private PhpFileInspector $inspector,
         private string $root,
         private string $source,
+        private string $limitsConfig,
     ) {
     }
 
@@ -70,7 +71,7 @@ final readonly class RateLimiterGuard
                 || ($node instanceof ClassConstFetch && $node->name instanceof Identifier && $node->name->toLowerString() !== 'class'));
 
             if ($number instanceof Node) {
-                $violations[] = $call->getStartLine() . ': a limit with a number or a constant in the code: ' . self::NUMBER_IN_CONFIG;
+                $violations[] = $call->getStartLine() . ': a limit with a number or a constant in the code: ' . sprintf(self::NUMBER_IN_CONFIG, $this->limitsConfig);
             }
         }
 
@@ -107,7 +108,7 @@ final readonly class RateLimiterGuard
 
         foreach ($finder->findInstanceOf($statements, String_::class) as $text) {
             if (preg_match('/^throttle:\d/', $text->value) === 1) {
-                $violations[] = $text->getStartLine() . ': a throttle with numbers in the route ("' . $text->value . '"): ' . self::NUMBER_IN_CONFIG . '; the route takes the limiter with throttle:<name>';
+                $violations[] = $text->getStartLine() . ': a throttle with numbers in the route ("' . $text->value . '"): ' . sprintf(self::NUMBER_IN_CONFIG, $this->limitsConfig) . '; the route takes the limiter with throttle:<name>';
             }
         }
 

@@ -27,14 +27,17 @@ final readonly class BroadcastChannelGuard
 {
     private const array CHANNEL_CLASSES = [Channel::class, PrivateChannel::class, PresenceChannel::class, EncryptedPrivateChannel::class];
 
-    private const string REGISTRY = 'routes/channels.php';
-
-    private const string TESTS = 'tests/Feature/Routing';
-
+    /**
+     * @param string $source the folder with the code that opens channels, relative to the root
+     * @param string $registry the file that registers the channels, relative to the root
+     * @param string $testFolder the folder of the channel tests, relative to the root
+     */
     public function __construct(
         private PhpFileInspector $inspector,
         private string $root,
         private string $source,
+        private string $registry,
+        private string $testFolder,
     ) {
     }
 
@@ -51,18 +54,18 @@ final readonly class BroadcastChannelGuard
                 $where = substr($file, strlen($this->root) + 1) . ':' . $line;
 
                 if ($prefix === null) {
-                    $violations[] = $where . ': a broadcast channel whose name does not start with text: start it with the prefix of a channel in ' . self::REGISTRY . ", as in new PrivateChannel('warehouse.' . \$warehouse->getRouteKey())";
+                    $violations[] = $where . ': a broadcast channel whose name does not start with text: start it with the prefix of a channel in ' . $this->registry . ", as in new PrivateChannel('warehouse.' . \$warehouse->getRouteKey())";
                 } elseif (! in_array($prefix, $registered, true)) {
-                    $violations[] = $where . ': the broadcast channel ' . $prefix . ' is not registered: add Broadcast::channel(\'' . $prefix . '.{model}\', ...) with its authorization to ' . self::REGISTRY;
+                    $violations[] = $where . ': the broadcast channel ' . $prefix . ' is not registered: add Broadcast::channel(\'' . $prefix . '.{model}\', ...) with its authorization to ' . $this->registry;
                 }
             }
         }
 
         foreach ($registered as $prefix) {
-            $test = self::TESTS . '/' . Str::studly($prefix) . 'ChannelTest.php';
+            $test = $this->testFolder . '/' . Str::studly($prefix) . 'ChannelTest.php';
 
             if (! is_file($this->root . '/' . $test)) {
-                $violations[] = self::REGISTRY . ': the channel ' . $prefix . ' has no authorization test: add ' . $test . ' that joins it as the owner and is refused as someone else';
+                $violations[] = $this->registry . ': the channel ' . $prefix . ' has no authorization test: add ' . $test . ' that joins it as the owner and is refused as someone else';
             }
         }
 
@@ -74,7 +77,7 @@ final readonly class BroadcastChannelGuard
      */
     public function registered(): array
     {
-        $file = $this->root . '/' . self::REGISTRY;
+        $file = $this->root . '/' . $this->registry;
 
         return is_file($file) ? self::registeredIn((string) file_get_contents($file)) : [];
     }

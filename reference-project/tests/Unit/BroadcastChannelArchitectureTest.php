@@ -36,7 +36,7 @@ it('detects a broadcast channel that is not registered or not tested', function 
     $root = SourceSandbox::create(['app/.gitkeep' => '', ...Narrow::stringMap($files)]);
 
     try {
-        $violations = new BroadcastChannelGuard(new PhpFileInspector(), $root, 'app')->violations();
+        $violations = new BroadcastChannelGuard(new PhpFileInspector(), $root, 'app', 'routes/channels.php', 'tests/Feature/Routing')->violations();
 
         expect($violations)->toHaveCount(1)
             ->and($violations[0])->toContain($reason)
@@ -54,14 +54,27 @@ it('accepts a registered channel with its test and a class that is only named Ch
     ]);
 
     try {
-        expect(new BroadcastChannelGuard(new PhpFileInspector(), $root, 'app')->violations())->toBe([]);
+        expect(new BroadcastChannelGuard(new PhpFileInspector(), $root, 'app', 'routes/channels.php', 'tests/Feature/Routing')->violations())->toBe([]);
     } finally {
         SourceSandbox::remove($root);
     }
 });
 
+it('names the file relative to the root when the checkout sits under a dot directory', function (): void {
+    $root = SourceSandbox::create(['app/Events/DoneEvent.php' => "<?php\nnamespace App\\Events;\nuse Illuminate\\Broadcasting\\PrivateChannel;\nnew PrivateChannel('invoice.' . \$key);\n"], prefix: '.checkout-');
+
+    try {
+        $violations = new BroadcastChannelGuard(new PhpFileInspector(), $root, 'app', 'routes/channels.php', 'tests/Feature/Routing')->violations();
+    } finally {
+        SourceSandbox::remove($root);
+    }
+
+    expect($violations)->toHaveCount(1)
+        ->and($violations[0])->toStartWith('app/Events/DoneEvent.php:4: the broadcast channel invoice is not registered');
+});
+
 it('registers and tests every broadcast channel the application sends on', function (): void {
-    $guard = new BroadcastChannelGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app');
+    $guard = new BroadcastChannelGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', 'routes/channels.php', 'tests/Feature/Routing');
 
     expect($guard->registered())->not->toBe([])
         ->and($guard->violations())->toBe([]);
