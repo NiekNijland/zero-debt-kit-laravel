@@ -1,0 +1,9 @@
+{
+  "name": "zero-debt",
+  "description": "A program an agent runs in a Laravel repository: one allowed way per task, a guard in CI for every rule, and every debt counter burned down to zero.",
+  "author": { "name": "zero-debt-kit contributors" },
+  "homepage": "https://github.com/NiekNijland/zero-debt-kit-laravel",
+  "repository": "https://github.com/NiekNijland/zero-debt-kit-laravel",
+  "license": "MIT",
+  "keywords": ["laravel", "architecture-tests", "ratchet", "technical-debt", "ci", "agents"]
+}
