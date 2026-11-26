@@ -51,7 +51,7 @@ chmod +x "$PT_MU/vendor/bin/infection"
 printf '{"require-dev": {"infection/infection": "^0.35"}}\n' > "$PT_MU/composer.json"
 check PT10 "item 15: infection without allow-plugins for infection/extension-installer stops with the fix" fail 'composer config allow-plugins\.infection/extension-installer true.*never pipe' "$SHELL_BIN" -c "cd '$PT_MU' && bash scripts/mutation.sh"
 printf '{"require-dev": {"infection/infection": "^0.35"}, "config": {"allow-plugins": {"infection/extension-installer": true}}}\n' > "$PT_MU/composer.json"
-check PT11 "item 15: with the plugin allowed the run reaches infection (control)" 0 '^infection --threads=max --min-msi=70$' "$SHELL_BIN" -c "cd '$PT_MU' && bash scripts/mutation.sh"
+check PT11 "item 15: with the plugin allowed the run reaches infection (control)" 0 '^infection --threads=4 --min-msi=70$' "$SHELL_BIN" -c "cd '$PT_MU' && bash scripts/mutation.sh"
 
 # ---------------------------------------------------------------- item 16: a repository younger than the docs age limit
 branch pt-young
