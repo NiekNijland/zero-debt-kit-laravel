@@ -86,6 +86,7 @@ The verification policy is in the project profile; the owner set it. Follow it e
 
 Only when your brief names the guard. The kit's rules for writing a guard and the blind-side list are pasted in your brief. Your guard passes the project's analyser, refactoring tool and formatter before you report, like any file.
 
+- Depend on the shared source reader (`PhpSource`, `PhpFileInspector`, `PhpCallReader`, `ClassGraph`, `CountedList`) that the first commit of step 3 landed. Never write a second parser, call reader, class reader or list reader; when a question is missing, add a method to the one class and say so in your report. The tests you add use the spelling your brief names, not the one the old tests have.
 - Before the detector: list every spelling of the construct (the standing blind-side list of `04-guards.md` C1 is pasted in your brief) and write a failing example for each. When the guard is done, review it yourself against that list, spelling by spelling, and report which you tried: a cold reviewer will. Then the accepted examples, near misses included. Then the case over the real tree.
 - The sentence you add to the guides says what the guard fails on, taken from its failing examples. What it cannot decide you write as "review checks that, the guard does not", and you add it to the review-only column of the rubric.
 - A rule the tree breaks in many places, where each place needs its own answer, is a decision list: build the guard for the part every site already meets, and report the rest with the count and the sites.
