@@ -41,8 +41,8 @@ final readonly class ModuleOverlapGuard
                     continue;
                 }
 
-                $stems = array_unique([$other, str_ends_with($other, 's') ? substr($other, 0, -1) : $other]);
-                $plurals = [$other . 's', str_ends_with($other, 'y') ? substr($other, 0, -1) . 'ies' : $other . 's'];
+                $stems = array_unique([$other, str_ends_with($other, 's') ? mb_substr($other, 0, -1) : $other]);
+                $plurals = [$other . 's', str_ends_with($other, 'y') ? mb_substr($other, 0, -1) . 'ies' : $other . 's'];
                 $prefixed = array_filter($stems, static fn (string $stem): bool => preg_match('/^' . preg_quote($stem, '/') . '[A-Z]/', $module) === 1);
 
                 if ($prefixed !== [] || in_array($module, $plurals, true)) {

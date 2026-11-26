@@ -13,7 +13,7 @@ final class DatabaseEngine
 {
     public static function of(string $image): string
     {
-        $name = strtolower((string) preg_replace('/[:@].*$/', '', basename($image)));
+        $name = mb_strtolower((string) preg_replace('/[:@].*$/', '', basename($image)));
 
         return match (true) {
             str_contains($name, 'mariadb') => 'mariadb',

@@ -13,7 +13,8 @@ parameters:
 
     paths:
         - app
-        - bootstrap
+        - bootstrap/app.php
+        - bootstrap/providers.php
         - config
         - database
         - public

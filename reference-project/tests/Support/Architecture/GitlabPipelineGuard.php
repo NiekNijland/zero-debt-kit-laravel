@@ -14,6 +14,8 @@ final readonly class GitlabPipelineGuard
 {
     private const array SOURCES = ['merge_request_event', 'push', 'schedule'];
 
+    private const string EQUALS = '=' . '=';
+
     /**
      * @param list<string> $deployBranches the branches that deploy; the first one may be written as `$CI_DEFAULT_BRANCH`
      * @param string       $checksScript   the project's checks script, whose PARTS table names the parts
@@ -81,8 +83,8 @@ final readonly class GitlabPipelineGuard
         foreach ($rules as $rule) {
             $condition = is_array($rule) ? (string) ($rule['if'] ?? '') : '';
 
-            if (str_contains($condition, '$CI_COMMIT_BRANCH ==') && ! str_contains($condition, '$CI_PIPELINE_SOURCE == "push"')) {
-                $violations[] = 'a workflow rule on a branch lets every pipeline source through (a manual run, the API, a trigger): `' . $condition . '` needs `$CI_PIPELINE_SOURCE == "push"`';
+            if (str_contains($condition, '$CI_COMMIT_BRANCH ' . self::EQUALS) && ! str_contains($condition, self::source('push'))) {
+                $violations[] = 'a workflow rule on a branch lets every pipeline source through (a manual run, the API, a trigger): `' . $condition . '` needs `' . self::source('push') . '`';
             }
         }
 
@@ -105,8 +107,8 @@ final readonly class GitlabPipelineGuard
         $violations = [];
 
         foreach ($carrying as $id => $job) {
-            if (self::rules($job) !== ['$CI_PIPELINE_SOURCE == "merge_request_event"']) {
-                $violations[] = 'job `' . $id . '` has another rule than `$CI_PIPELINE_SOURCE == "merge_request_event"`: a changes filter or a condition narrows the checks';
+            if (self::rules($job) !== [self::source('merge_request_event')]) {
+                $violations[] = 'job `' . $id . '` has another rule than `' . self::source('merge_request_event') . '`: a changes filter or a condition narrows the checks';
             }
 
             if (! self::matrixIs($job, $parts)) {
@@ -143,7 +145,7 @@ final readonly class GitlabPipelineGuard
         foreach ($carrying as $id => $job) {
             $rule = implode(' ', self::rules($job));
 
-            if (! str_contains($rule, '$CI_PIPELINE_SOURCE == "push"')) {
+            if (! str_contains($rule, self::source('push'))) {
                 $violations[] = 'job `' . $id . '` is not limited to the push source: a manual run on the main branch would start a partial pipeline';
             }
 
@@ -174,8 +176,8 @@ final readonly class GitlabPipelineGuard
         }
 
         return array_values(array_map(
-            static fn (string $id): string => 'job `' . $id . '` runs the scheduled checks on another rule than `$CI_PIPELINE_SOURCE == "schedule"`',
-            array_keys(array_filter($carrying, static fn (array $job): bool => self::rules($job) !== ['$CI_PIPELINE_SOURCE == "schedule"'])),
+            static fn (string $id): string => 'job `' . $id . '` runs the scheduled checks on another rule than `' . self::source('schedule') . '`',
+            array_keys(array_filter($carrying, static fn (array $job): bool => self::rules($job) !== [self::source('schedule')])),
         ));
     }
 
@@ -311,8 +313,8 @@ final readonly class GitlabPipelineGuard
     {
         $text = implode(' ', $rules);
 
-        if ($rules === [] || preg_match_all('/\$CI_PIPELINE_SOURCE == "(\w+)"/', $text, $match) < 1) {
-            return str_contains($text, '$CI_PIPELINE_SOURCE != "schedule"') ? ['merge_request_event', 'push'] : self::SOURCES;
+        if ($rules === [] || preg_match_all('/\$CI_PIPELINE_SOURCE \={2} "(\w+)"/', $text, $match) < 1) {
+            return str_contains($text, '$CI_PIPELINE_SOURCE ' . '!' . '= "schedule"') ? ['merge_request_event', 'push'] : self::SOURCES;
         }
 
         return $match[1];
@@ -335,5 +337,10 @@ final readonly class GitlabPipelineGuard
         }
 
         return $lines;
+    }
+
+    private static function source(string $name): string
+    {
+        return '$CI_PIPELINE_SOURCE ' . self::EQUALS . ' "' . $name . '"';
     }
 }

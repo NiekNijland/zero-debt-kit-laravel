@@ -210,6 +210,6 @@ final class TestTierGuard
 
     private function relative(string $file): string
     {
-        return ltrim(substr($file, strlen($this->root)), '/');
+        return ltrim(mb_substr($file, mb_strlen($this->root)), '/');
     }
 }

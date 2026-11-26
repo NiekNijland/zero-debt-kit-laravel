@@ -63,7 +63,7 @@ final readonly class JsonEndpointGuard
             }
 
             foreach ($lines as $line) {
-                $violations[] = substr($path, strlen($this->root) + 1) . ': line ' . $line . ': a JSON answer that is not a Data object: return a Data object and let the framework write the response';
+                $violations[] = mb_substr($path, mb_strlen($this->root) + 1) . ': line ' . $line . ': a JSON answer that is not a Data object: return a Data object and let the framework write the response';
             }
 
             if ($returns instanceof ReflectionNamedType && $returns->getName() === 'array') {
@@ -83,7 +83,7 @@ final readonly class JsonEndpointGuard
             PhpToken::tokenize($source),
             static fn (PhpToken $token): bool => ! $token->is([T_WHITESPACE, T_COMMENT, T_DOC_COMMENT]),
         ));
-        $name = static fn (?PhpToken $token): string => $token?->is([T_STRING, T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED]) === true ? strtolower(basename(str_replace('\\', '/', $token->text))) : '';
+        $name = static fn (?PhpToken $token): string => $token?->is([T_STRING, T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED]) === true ? mb_strtolower(basename(str_replace('\\', '/', $token->text))) : '';
         $lines = [];
 
         foreach ($tokens as $index => $token) {

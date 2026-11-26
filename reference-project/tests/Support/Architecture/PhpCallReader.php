@@ -48,7 +48,7 @@ final class PhpCallReader
 
                 $class = $call->class->toString();
                 $owner = $owners[spl_object_id($call)] ?? null;
-                $relative = strtolower($class);
+                $relative = mb_strtolower($class);
 
                 if (in_array($relative, ['self', 'static'], true)) {
                     $class = $owner?->namespacedName?->toString() ?? '';
@@ -75,11 +75,11 @@ final class PhpCallReader
 
         foreach (PhpSource::statements($file) as $statement) {
             foreach ($finder->findInstanceOf($statement, StaticCall::class) as $call) {
-                if (! $call->class instanceof Name || strtolower($call->class->getLast()) !== 'route' || ! $call->name instanceof Identifier) {
+                if (! $call->class instanceof Name || mb_strtolower($call->class->getLast()) !== 'route' || ! $call->name instanceof Identifier) {
                     continue;
                 }
 
-                $verb = strtolower($call->name->toString());
+                $verb = mb_strtolower($call->name->toString());
 
                 if (! in_array($verb, ['post', 'put', 'patch', 'delete', 'match', 'any'], true)) {
                     continue;
@@ -88,7 +88,7 @@ final class PhpCallReader
                 $first = $call->getArgs()[0]->value ?? null;
 
                 if ($verb === 'match' && $first instanceof Array_) {
-                    $verbs = array_map(static fn (Node\ArrayItem $item): string => $item->value instanceof String_ ? strtolower($item->value->value) : '', $first->items);
+                    $verbs = array_map(static fn (Node\ArrayItem $item): string => $item->value instanceof String_ ? mb_strtolower($item->value->value) : '', $first->items);
 
                     if (array_diff($verbs, ['get', 'head']) === []) {
                         continue;
@@ -98,7 +98,7 @@ final class PhpCallReader
                 foreach ($call->getArgs() as $argument) {
                     $value = $argument->value;
 
-                    if ($value instanceof ClassConstFetch && $value->class instanceof Name && $value->name instanceof Identifier && strtolower($value->name->toString()) === 'class') {
+                    if ($value instanceof ClassConstFetch && $value->class instanceof Name && $value->name instanceof Identifier && mb_strtolower($value->name->toString()) === 'class') {
                         $found[] = ['controller' => $value->class->toString(), 'verb' => $verb, 'line' => $call->getStartLine()];
                     }
                 }

@@ -15,12 +15,6 @@ use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\NodeFinder;
 
-/**
- * A table or a statement reached without a model: through the `DB` facade, through an injected connection or database manager
- * (`TypedReceivers`: a parameter or property typed with one of them, and `app('db')`), also after `->connection()`. A guard with
- * one allowed file: the file is an argument, so the allowance is counted where the test passes it. Blind spots, named: an
- * untyped receiver and a getter such as `$this->getConnection()`.
- */
 final readonly class RawTableGuard
 {
     private const array RAW_METHODS = ['table', 'select', 'selectone', 'selectresultsets', 'scalar', 'statement', 'unprepared', 'raw', 'insert', 'update', 'delete', 'affectingstatement', 'cursor'];
@@ -60,7 +54,7 @@ final readonly class RawTableGuard
 
         foreach ($this->directories as $directory) {
             foreach ($this->inspector->phpFiles($this->root . '/' . $directory, mayBeAbsent: true) as $file) {
-                $relative = substr($file, strlen($this->root) + 1);
+                $relative = mb_substr($file, mb_strlen($this->root) + 1);
 
                 if (in_array($relative, $this->allowedFiles, true)) {
                     continue;
@@ -101,9 +95,6 @@ final readonly class RawTableGuard
         return $lines;
     }
 
-    /**
-     * The receiver of the call is the facade, an injected connection or manager, or the connection that one of them returns.
-     */
     private static function reachesDatabase(StaticCall|MethodCall|NullsafeMethodCall $call, TypedReceivers $connections): bool
     {
         if ($call instanceof StaticCall) {

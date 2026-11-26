@@ -31,7 +31,7 @@ final readonly class LikeSearchGuard
 
         foreach ($this->inspector->phpFiles($this->root . '/' . $this->source) as $file) {
             foreach ($this->inSource((string) file_get_contents($file)) as $violation) {
-                $violations[] = substr($file, strlen($this->root) + 1) . ':' . $violation;
+                $violations[] = mb_substr($file, mb_strlen($this->root) + 1) . ':' . $violation;
             }
         }
 
@@ -47,7 +47,7 @@ final readonly class LikeSearchGuard
 
         foreach ($this->inspector->calls($source) as $call) {
             $arguments = array_values(array_filter($call['arguments'], static fn (string $argument): bool => preg_match(self::CLOSURE, $argument) !== 1));
-            $insensitive = in_array(strtolower($call['name']), self::LIKE_METHODS, true) || preg_match(self::CASE_INSENSITIVE, implode(', ', $arguments)) === 1;
+            $insensitive = in_array(mb_strtolower($call['name']), self::LIKE_METHODS, true) || preg_match(self::CASE_INSENSITIVE, implode(', ', $arguments)) === 1;
 
             if (! $insensitive) {
                 continue;

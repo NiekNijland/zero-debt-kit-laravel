@@ -17,10 +17,11 @@ final class CiHostVariants
 
     /**
      * @param list<string> $hardened other workflow files the owner has the guard read
+     * @param list<string> $auxiliary other workflow files that run the checks script on purpose
      */
-    public static function githubGuard(string $databaseImage = 'postgres:17', bool $frontend = true, array $hardened = []): GithubWorkflowGuard
+    public static function githubGuard(string $databaseImage = 'postgres:17', bool $frontend = true, array $hardened = [], string $backendTestScript = '', array $auxiliary = []): GithubWorkflowGuard
     {
-        return new GithubWorkflowGuard('', '', 'kit-checks.yml', ['main', 'develop'], 'composer test:unit', $databaseImage, $frontend, 'playwright', hardenedWorkflows: $hardened);
+        return new GithubWorkflowGuard('', '', 'kit-checks.yml', ['main', 'develop'], 'composer test:unit', $databaseImage, $frontend, 'playwright', hardenedWorkflows: $hardened, backendTestScript: $backendTestScript, auxiliaryWorkflows: $auxiliary);
     }
 
     /**
@@ -129,6 +130,30 @@ final class CiHostVariants
             default => self::githubRunnerGuard(),
         };
     }
+
+    /**
+     * The runner form with the owner exceptions of a project that fetches its application under test and ends the Composer script
+     * of the backend test command with the coverage line: the smoke job reaches the application on 127.0.0.1 through a variable of
+     * its env, and the coverage line is no line of the job.
+     */
+    public static function githubWorkflowOnRunner(): string
+    {
+        $source = str_replace("      - run: bash scripts/checks.sh --coverage coverage/clover.xml\n", '', CiHostExamples::githubRunnerWorkflow());
+
+        return CiExamples::changeAfter(
+            CiExamples::changeAfter($source, "\n  smoke:\n", '      DB_HOST: 127.0.0.1', "      DB_HOST: 127.0.0.1\n      SMOKE_BASE_URL: http://127.0.0.1:8000"),
+            "\n  smoke:\n",
+            "      - run: npx playwright test\n",
+            "      - run: curl -sS --retry 30 --retry-connrefused -o /dev/null \"\$SMOKE_BASE_URL/\"\n      - run: npx playwright test\n",
+        );
+    }
+
+    public static function canaryWorkflow(): string
+    {
+        return "name: Canary\non:\n  schedule:\n    - cron: '41 4 * * *'\n  workflow_dispatch:\npermissions:\n  contents: read\njobs:\n  canary:\n    runs-on: ubuntu-24.04\n    timeout-minutes: 30\n    steps:\n      - uses: actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # v7.0.1\n        with:\n          fetch-depth: 0\n      - run: composer install\n      - run: bash scripts/checks.sh --main --part static\n";
+    }
+
+    public const string RUNNER_TEST_SCRIPT = "php -d memory_limit=-1 vendor/bin/pest --coverage-clover=coverage/clover.xml\nbash scripts/checks.sh --coverage coverage/clover.xml";
 
     public static function deployWorkflow(): string
     {

@@ -42,7 +42,7 @@ final readonly class TestAssertionGuard
         foreach ($present as $folder) {
             foreach ($this->inspector->phpFiles($this->root . '/' . $folder) as $file) {
                 if (str_ends_with($file, 'Test.php') && ! $this->asserts((string) file_get_contents($file))) {
-                    $violations[] = substr($file, strlen($this->root) + 1) . ' asserts nothing: add an expect() on the outcome, a Mockery expectation with a count, or ->throwsNoExceptions() when there is truly nothing else to check';
+                    $violations[] = mb_substr($file, mb_strlen($this->root) + 1) . ' asserts nothing: add an expect() on the outcome, a Mockery expectation with a count, or ->throwsNoExceptions() when there is truly nothing else to check';
                 }
             }
         }

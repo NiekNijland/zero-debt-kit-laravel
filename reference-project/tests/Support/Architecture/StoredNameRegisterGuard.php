@@ -65,7 +65,7 @@ final readonly class StoredNameRegisterGuard
 
         [$kinds, $unreadable] = $this->kinds();
         $lines = $this->lines($this->aliases);
-        $pairs = array_column(array_map(static fn (string $line): array => explode("\t", $line, 2), array_filter($lines, static fn (string $line): bool => substr_count($line, "\t") === 1)), 1, 0);
+        $pairs = array_column(array_map(static fn (string $line): array => explode("\t", $line, 2), array_filter($lines, static fn (string $line): bool => mb_substr_count($line, "\t") === 1)), 1, 0);
         array_push($findings, ...$unreadable, ...$this->aliasFindings($lines, $kinds));
 
         foreach ($kinds as $kind => $found) {
@@ -102,7 +102,7 @@ final readonly class StoredNameRegisterGuard
             try {
                 $statements = PhpSource::statements($file);
             } catch (Error $error) {
-                $unreadable[] = 'unreadable ' . substr($file, strlen($this->root) + 1) . ': ' . $error->getMessage();
+                $unreadable[] = 'unreadable ' . mb_substr($file, mb_strlen($this->root) + 1) . ': ' . $error->getMessage();
 
                 continue;
             }

@@ -21,12 +21,6 @@ use PhpParser\NodeVisitor;
 use PhpParser\NodeVisitorAbstract;
 use Psr\Log\LoggerInterface;
 
-/**
- * A log call that handles a caught exception, and a tenant id written into a log context by hand. A log call is read on the
- * Log facade, on `logger()` and on an injected logger (`TypedReceivers`: a parameter or property typed with the logger
- * contract or class). Blind spots, named: an untyped logger receiver, and a closure in a catch block that never mentions the
- * caught variable (it is read as a callback the catch only stores).
- */
 final readonly class ReportNotLogGuard
 {
     private const array LOG_FACADES = ['Log', 'Illuminate\Support\Facades\Log'];
@@ -77,7 +71,7 @@ final readonly class ReportNotLogGuard
 
         foreach ($this->inspector->phpFiles($this->root . '/' . $this->folder) as $file) {
             foreach ($this->inSource((string) file_get_contents($file)) as $message) {
-                $violations[] = substr($file, strlen($this->root) + 1) . ': ' . $message;
+                $violations[] = mb_substr($file, mb_strlen($this->root) + 1) . ': ' . $message;
             }
         }
 
@@ -134,10 +128,6 @@ final readonly class ReportNotLogGuard
     }
 
     /**
-     * The calls in a catch block. A closure or arrow function in it is read only when it mentions the caught variable (it
-     * handles the exception later, `fn () => Log::error($e->getMessage())`); one that never does is a callback the catch only
-     * stores.
-     *
      * @return list<StaticCall|MethodCall|NullsafeMethodCall|FuncCall>
      */
     private static function callsOfTheCatch(Catch_ $catch): array
@@ -178,10 +168,6 @@ final readonly class ReportNotLogGuard
         return $visitor->calls;
     }
 
-    /**
-     * The lower-case level a log call writes at: `Log::error()`, `Log::channel('x')->error()`, `logger()->error()`, an injected
-     * logger's `->error()` and `Log::log('error', ...)`; null when the call is not a log call or names no level.
-     */
     private static function level(StaticCall|MethodCall|NullsafeMethodCall|FuncCall $call, TypedReceivers $loggers): ?string
     {
         if ($call instanceof FuncCall || ! $call->name instanceof Identifier || ! self::onLog($call, $loggers)) {
@@ -199,10 +185,6 @@ final readonly class ReportNotLogGuard
         return $first instanceof String_ ? mb_strtolower($first->value) : null;
     }
 
-    /**
-     * Whether the call is made on the Log facade, on `logger()` or on an injected logger, however long the chain
-     * (`Log::channel('x')->withContext([...])->error()`). `logger('message', [...])` with arguments is a log call itself.
-     */
     private static function onLog(StaticCall|MethodCall|NullsafeMethodCall|FuncCall $call, TypedReceivers $loggers): bool
     {
         if ($call instanceof FuncCall) {

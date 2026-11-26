@@ -34,7 +34,7 @@ final readonly class TestLocationGuard
         $folders = [];
 
         foreach ($this->inspector->phpFiles($this->root . '/' . $this->appFolder) as $file) {
-            $relative = substr($file, strlen($appRoot));
+            $relative = mb_substr($file, mb_strlen($appRoot));
             $folder = dirname($relative) === '.' ? '' : dirname($relative);
             $classes[basename($relative, '.php')][$folder] = true;
 
@@ -53,7 +53,7 @@ final readonly class TestLocationGuard
                     continue;
                 }
 
-                $relative = substr($file, strlen($tierRoot));
+                $relative = mb_substr($file, mb_strlen($tierRoot));
                 $folder = dirname($relative) === '.' ? '' : dirname($relative);
                 $name = basename($relative, 'Test.php');
                 $path = $this->testFolder . '/' . $tier . '/' . $relative;

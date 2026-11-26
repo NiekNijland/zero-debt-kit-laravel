@@ -97,7 +97,7 @@ final readonly class ConcurrentIndexGuard
             return $first instanceof String_ ? $first->value : null;
         };
         $sqlTable = static fn (string $pattern, string $sql): ?string => preg_match($pattern, $sql, $match) === 1
-            ? trim((string) strrchr('.' . $match[1], '.'), '."')
+            ? trim((string) mb_strrchr('.' . $match[1], '.'), '."')
             : null;
 
         $sql = self::sqlStrings($finder, $statements);

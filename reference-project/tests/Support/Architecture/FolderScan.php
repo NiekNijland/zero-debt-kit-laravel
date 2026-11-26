@@ -21,7 +21,7 @@ final class FolderScan
 
         foreach ($folders as $folder) {
             foreach ($inspector->phpFiles($root . '/' . $folder) as $file) {
-                $path = substr($file, strlen($root) + 1);
+                $path = mb_substr($file, mb_strlen($root) + 1);
 
                 foreach ($check($path, (string) file_get_contents($file)) as $message) {
                     $violations[] = $path . ': ' . $message;

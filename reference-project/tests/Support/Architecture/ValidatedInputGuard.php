@@ -45,7 +45,7 @@ final readonly class ValidatedInputGuard
 
         foreach ($this->inspector->phpFiles($this->root . '/' . $this->folder) as $file) {
             foreach (self::rawReadLines($this->inspector->callsIn($file)) as $line) {
-                $violations[] = substr($file, strlen($this->root) + 1) . ':line ' . $line . ': ' . self::MESSAGE;
+                $violations[] = mb_substr($file, mb_strlen($this->root) + 1) . ':line ' . $line . ': ' . self::MESSAGE;
             }
         }
 

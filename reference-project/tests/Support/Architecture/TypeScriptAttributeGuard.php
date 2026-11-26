@@ -33,7 +33,7 @@ final readonly class TypeScriptAttributeGuard
             $attributed += $this->attributeCount($source);
 
             foreach ($this->inSource($source) as $message) {
-                $violations[] = substr($file, strlen($this->root) + 1) . ': ' . $message;
+                $violations[] = mb_substr($file, mb_strlen($this->root) + 1) . ': ' . $message;
             }
         }
 
