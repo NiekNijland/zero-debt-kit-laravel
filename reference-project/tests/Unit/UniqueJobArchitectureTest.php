@@ -13,7 +13,7 @@ dataset('unique jobs without their own key', [
 ]);
 
 it('detects a unique job that does not declare uniqueId()', function (string $source, string $reason): void {
-    $violations = new UniqueJobGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source);
+    $violations = new UniqueJobGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source);
 
     expect($violations)->toHaveCount(1)
         ->and($violations[0])->toContain($reason)
@@ -31,9 +31,9 @@ it('accepts a unique job with uniqueId(), a job that is not unique and a class n
         final class OtherJob implements \App\Contracts\ShouldBeUnique {}
         PHP;
 
-    expect(new UniqueJobGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source))->toBe([]);
+    expect(new UniqueJobGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source))->toBe([]);
 });
 
 it('gives every unique job in app its own uniqueId()', function (): void {
-    expect(new UniqueJobGuard(new PhpFileInspector(), dirname(__DIR__, 2))->violations())->toBe([]);
+    expect(new UniqueJobGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->violations())->toBe([]);
 });

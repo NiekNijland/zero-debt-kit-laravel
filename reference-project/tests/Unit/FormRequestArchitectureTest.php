@@ -14,7 +14,7 @@ dataset('form requests out of line', [
 ]);
 
 it('detects a form request that authorizes everyone or writes its rules as a string', function (string $source, string $reason): void {
-    $violations = new FormRequestGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source);
+    $violations = new FormRequestGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app/Http/Requests')->inSource($source);
 
     expect($violations)->toHaveCount(1)
         ->and($violations[0])->toContain($reason);
@@ -43,9 +43,9 @@ it('accepts rules as arrays, a check that depends on the input and an override t
         }
         PHP;
 
-    expect(new FormRequestGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source))->toBe([]);
+    expect(new FormRequestGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app/Http/Requests')->inSource($source))->toBe([]);
 });
 
 it('keeps every form request in app to array rules and to an authorize() that checks something', function (): void {
-    expect(new FormRequestGuard(new PhpFileInspector(), dirname(__DIR__, 2))->violations())->toBe([]);
+    expect(new FormRequestGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app/Http/Requests')->violations())->toBe([]);
 });

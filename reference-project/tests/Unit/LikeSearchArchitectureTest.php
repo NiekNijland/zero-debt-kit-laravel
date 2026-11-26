@@ -17,7 +17,7 @@ dataset('case-insensitive searches with a pattern built by hand', [
 ]);
 
 it('detects a case-insensitive LIKE that does not go through App\Support\Like', function (string $source): void {
-    $violations = new LikeSearchGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source);
+    $violations = new LikeSearchGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source);
 
     expect($violations)->toHaveCount(1)
         ->and($violations[0])->toContain('whereLike($column, Like::contains($term))');
@@ -36,9 +36,9 @@ it('accepts the helper, the prefix search over an expression index, a fixed patt
         $query->where('note', 'I would like this')->where('id', $id);
         PHP;
 
-    expect(new LikeSearchGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source))->toBe([]);
+    expect(new LikeSearchGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source))->toBe([]);
 });
 
 it('sends every case-insensitive search in app through App\Support\Like', function (): void {
-    expect(new LikeSearchGuard(new PhpFileInspector(), dirname(__DIR__, 2))->violations())->toBe([]);
+    expect(new LikeSearchGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->violations())->toBe([]);
 });

@@ -34,7 +34,7 @@ it('detects a broadcast channel that is not registered or not tested', function 
     $root = SourceSandbox::create(Narrow::stringMap($files));
 
     try {
-        $violations = new BroadcastChannelGuard(new PhpFileInspector(), $root)->violations();
+        $violations = new BroadcastChannelGuard(new PhpFileInspector(), $root, 'app')->violations();
 
         expect($violations)->toHaveCount(1)
             ->and($violations[0])->toContain($reason)
@@ -52,14 +52,14 @@ it('accepts a registered channel with its test and a class that is only named Ch
     ]);
 
     try {
-        expect(new BroadcastChannelGuard(new PhpFileInspector(), $root)->violations())->toBe([]);
+        expect(new BroadcastChannelGuard(new PhpFileInspector(), $root, 'app')->violations())->toBe([]);
     } finally {
         SourceSandbox::remove($root);
     }
 });
 
 it('registers and tests every broadcast channel the application sends on', function (): void {
-    $guard = new BroadcastChannelGuard(new PhpFileInspector(), dirname(__DIR__, 2));
+    $guard = new BroadcastChannelGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app');
 
     expect($guard->registered())->not->toBe([])
         ->and($guard->violations())->toBe([]);

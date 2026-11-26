@@ -20,6 +20,7 @@ final readonly class UniqueJobGuard
     public function __construct(
         private PhpFileInspector $inspector,
         private string $root,
+        private string $source,
     ) {
     }
 
@@ -30,7 +31,7 @@ final readonly class UniqueJobGuard
     {
         $violations = [];
 
-        foreach ($this->inspector->phpFiles($this->root . '/app') as $file) {
+        foreach ($this->inspector->phpFiles($this->root . '/' . $this->source) as $file) {
             foreach ($this->inSource((string) file_get_contents($file)) as $violation) {
                 $violations[] = substr($file, strlen($this->root) + 1) . ': ' . $violation;
             }

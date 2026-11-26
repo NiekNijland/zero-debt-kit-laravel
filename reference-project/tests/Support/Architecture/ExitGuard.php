@@ -29,7 +29,7 @@ final readonly class ExitGuard
         $violations = [];
 
         foreach (self::TREES as $tree) {
-            foreach ($this->inspector->phpFiles($this->root . '/' . $tree) as $file) {
+            foreach ($this->inspector->phpFiles($this->root . '/' . $tree, mayBeAbsent: true) as $file) {
                 foreach ($this->inSource((string) file_get_contents($file)) as $violation) {
                     $violations[] = substr($file, strlen($this->root) + 1) . ':' . $violation;
                 }

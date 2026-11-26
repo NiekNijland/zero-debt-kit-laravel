@@ -17,7 +17,7 @@ dataset('queued classes without their limits', [
 ]);
 
 it('detects a queued class that does not declare its timeout or its tries', function (string $source, array $reasons): void {
-    $violations = new QueuedClassLimitsGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source);
+    $violations = new QueuedClassLimitsGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source);
 
     expect($violations)->toHaveCount(count($reasons));
 
@@ -39,9 +39,9 @@ it('accepts a queued class with both, a listener queued after the commit with bo
         final class OtherJob implements \App\Contracts\ShouldQueue {}
         PHP;
 
-    expect(new QueuedClassLimitsGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source))->toBe([]);
+    expect(new QueuedClassLimitsGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source))->toBe([]);
 });
 
 it('gives every queued class in app its own timeout and tries', function (): void {
-    expect(new QueuedClassLimitsGuard(new PhpFileInspector(), dirname(__DIR__, 2))->violations())->toBe([]);
+    expect(new QueuedClassLimitsGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->violations())->toBe([]);
 });

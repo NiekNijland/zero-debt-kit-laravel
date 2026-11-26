@@ -15,7 +15,7 @@ dataset('transactions handled by hand', [
 ]);
 
 it('detects a transaction that is opened, committed or rolled back by hand', function (string $source, string $reasons): void {
-    $violations = new ManualTransactionGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source);
+    $violations = new ManualTransactionGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source);
 
     expect($violations)->toHaveCount(count(explode(',', $reasons)));
 
@@ -41,9 +41,9 @@ it('accepts DB::transaction, a dry run that always rolls back and a commit that 
         }
         PHP;
 
-    expect(new ManualTransactionGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source))->toBe([]);
+    expect(new ManualTransactionGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source))->toBe([]);
 });
 
 it('opens every transaction in app through DB::transaction', function (): void {
-    expect(new ManualTransactionGuard(new PhpFileInspector(), dirname(__DIR__, 2))->violations())->toBe([]);
+    expect(new ManualTransactionGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->violations())->toBe([]);
 });

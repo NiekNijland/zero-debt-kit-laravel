@@ -12,6 +12,7 @@ final readonly class RegistryGuard
     public function __construct(
         private PhpFileInspector $inspector,
         private string $root,
+        private string $source,
     ) {
     }
 
@@ -60,7 +61,7 @@ final readonly class RegistryGuard
     {
         $implementers = [];
 
-        foreach ($this->inspector->phpFiles($this->root . '/app') as $file) {
+        foreach ($this->inspector->phpFiles($this->root . '/' . $this->source) as $file) {
             foreach ($this->inspector->declaredTypes($file) as $class => $related) {
                 if (in_array(ShippingMethod::class, $related, true) && class_exists($class) && is_subclass_of($class, ShippingMethod::class)) {
                     $implementers[] = $class;

@@ -27,7 +27,7 @@ dataset('flashes that are not one translated line', [
 ]);
 
 it('detects a flash that is not a known type with one translated line', function (string $source, string $reason): void {
-    $violations = new FlashMessageGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source);
+    $violations = new FlashMessageGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source);
 
     expect($violations)->toHaveCount(1)
         ->and($violations[0])->toContain($reason)
@@ -57,9 +57,9 @@ it('accepts a translate call, a choice between translate calls and a helper that
         $toast->flashed();
         PHP;
 
-    expect(new FlashMessageGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source))->toBe([]);
+    expect(new FlashMessageGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source))->toBe([]);
 });
 
 it('flashes one translated line of a known type everywhere in app', function (): void {
-    expect(new FlashMessageGuard(new PhpFileInspector(), dirname(__DIR__, 2))->violations())->toBe([]);
+    expect(new FlashMessageGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->violations())->toBe([]);
 });

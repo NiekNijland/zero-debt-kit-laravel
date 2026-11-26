@@ -26,7 +26,7 @@ final readonly class InertiaPageGuard
         $violations = [];
 
         foreach (self::SOURCES as $directory) {
-            foreach ($this->inspector->phpFiles($this->root . '/' . $directory) as $file) {
+            foreach ($this->inspector->phpFiles($this->root . '/' . $directory, mayBeAbsent: true) as $file) {
                 foreach ($this->inSource((string) file_get_contents($file)) as $violation) {
                     $violations[] = substr($file, strlen($this->root) + 1) . ':' . $violation;
                 }

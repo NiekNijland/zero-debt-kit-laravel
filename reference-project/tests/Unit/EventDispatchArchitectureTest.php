@@ -14,7 +14,7 @@ dataset('events of the application handed to the dispatcher', [
 ]);
 
 it('detects an event of the application that is built for the dispatcher', function (string $source, string $written): void {
-    $violations = new EventDispatchGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source);
+    $violations = new EventDispatchGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source);
 
     expect($violations)->toHaveCount(1)
         ->and($violations[0])->toContain($written)
@@ -37,9 +37,9 @@ it('accepts the static form, an event built earlier, an event of a vendor and a 
         $this->analytics->event(new \App\ValueObjects\Purchase());
         PHP;
 
-    expect(new EventDispatchGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source))->toBe([]);
+    expect(new EventDispatchGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source))->toBe([]);
 });
 
 it('dispatches every event of the application in app through its own dispatch()', function (): void {
-    expect(new EventDispatchGuard(new PhpFileInspector(), dirname(__DIR__, 2))->violations())->toBe([]);
+    expect(new EventDispatchGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->violations())->toBe([]);
 });

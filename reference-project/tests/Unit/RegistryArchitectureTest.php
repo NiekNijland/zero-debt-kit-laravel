@@ -27,5 +27,5 @@ it('accepts a registry that names every implementer once', function (): void {
 });
 
 it('lists every shipping method of app in ShippingMethods::ALL, and nothing else', function (): void {
-    expect(new RegistryGuard(new PhpFileInspector(), dirname(__DIR__, 2))->violations())->toBe([]);
+    expect(new RegistryGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->violations())->toBe([]);
 });

@@ -20,7 +20,7 @@ dataset('limiters that leave the one way', [
 ]);
 
 it('detects a limit with a number in the code, a limiter outside the provider and a name that is not snake_case', function (string $source, string $reason): void {
-    $violations = new RateLimiterGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source);
+    $violations = new RateLimiterGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source);
 
     expect($violations)->toHaveCount(1)
         ->and($violations[0])->toContain($reason);
@@ -56,9 +56,9 @@ it('accepts limits that read config, a limit copied from another and a limiter n
         StockLimit::perMinute(5);
         PHP;
 
-    expect(new RateLimiterGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source))->toBe([]);
+    expect(new RateLimiterGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source))->toBe([]);
 });
 
 it('keeps every limiter in the rate limit provider, named in snake_case, with its number in config', function (): void {
-    expect(new RateLimiterGuard(new PhpFileInspector(), dirname(__DIR__, 2))->violations())->toBe([]);
+    expect(new RateLimiterGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->violations())->toBe([]);
 });

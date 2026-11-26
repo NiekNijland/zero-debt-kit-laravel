@@ -102,7 +102,7 @@ final class NoInlineVarCastArchitectureHelpers
         $counts = [];
 
         foreach (self::DIRECTORIES as $directory) {
-            foreach ($inspector->phpFiles($root . '/' . $directory) as $file) {
+            foreach ($inspector->phpFiles($root . '/' . $directory, mayBeAbsent: true) as $file) {
                 $count = count(self::inlineVarLines((string) file_get_contents($file)));
 
                 if ($count > 0) {

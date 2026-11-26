@@ -44,7 +44,7 @@ final class TestFolderMirrorsAppArchitectureHelpers
         $violations = [];
 
         foreach (['Unit', 'Feature', 'Integration'] as $tier) {
-            foreach ($inspector->phpFiles($root . '/tests/' . $tier) as $file) {
+            foreach ($inspector->phpFiles($root . '/tests/' . $tier, mayBeAbsent: true) as $file) {
                 if (! str_ends_with($file, 'Test.php')) {
                     continue;
                 }

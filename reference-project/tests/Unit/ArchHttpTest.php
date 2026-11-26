@@ -200,7 +200,7 @@ test('the Inertia response is imported as InertiaResponse', function (): void {
 });
 
 it('detects a route parameter that is not camelCase', function (string $source, string $reason): void {
-    $violations = new RouteParameterGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source);
+    $violations = new RouteParameterGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'routes')->inSource($source);
 
     expect($violations)->toHaveCount(1)
         ->and($violations[0])->toContain($reason);
@@ -212,7 +212,7 @@ it('detects a route parameter that is not camelCase', function (string $source, 
 ]);
 
 it('names every route parameter in camelCase', function (): void {
-    $guard = new RouteParameterGuard(new PhpFileInspector(), dirname(__DIR__, 2));
+    $guard = new RouteParameterGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'routes');
     $accepted = "<?php\nRoute::get('/orders/{order}/lines/{line:uuid}/{variantId?}', Order\\ShowController::class)->where('line', '[a-z]{2,8}');\nRoute::get('shipments/track/{code}', Shipments\\ShowController::class);\n";
 
     expect($guard->inSource($accepted))->toBe([])

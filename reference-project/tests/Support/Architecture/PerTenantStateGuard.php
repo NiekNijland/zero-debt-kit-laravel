@@ -34,6 +34,7 @@ final readonly class PerTenantStateGuard
     public function __construct(
         private PhpFileInspector $inspector,
         private string $root,
+        private string $source,
     ) {
     }
 
@@ -44,7 +45,7 @@ final readonly class PerTenantStateGuard
     {
         $violations = [];
 
-        foreach ($this->inspector->phpFiles($this->root . '/app') as $file) {
+        foreach ($this->inspector->phpFiles($this->root . '/' . $this->source) as $file) {
             foreach ($this->inSource((string) file_get_contents($file)) as $violation) {
                 $violations[] = substr($file, strlen($this->root) + 1) . ':' . $violation;
             }
@@ -61,7 +62,7 @@ final readonly class PerTenantStateGuard
         $listed = $this->inspector->referencedNames($this->root . '/config/multitenancy.php');
         $unlisted = [];
 
-        foreach ($this->inspector->phpFiles($this->root . '/app') as $file) {
+        foreach ($this->inspector->phpFiles($this->root . '/' . $this->source) as $file) {
             foreach ($this->inspector->declaredTypes($file) as $class => $related) {
                 if (in_array(SwitchTenantTask::class, $related, true) && is_subclass_of($class, SwitchTenantTask::class) && ! in_array($class, $listed, true)) {
                     $unlisted[] = $class . ' is not in switch_tenant_tasks of config/multitenancy.php, so it never runs: add it there';

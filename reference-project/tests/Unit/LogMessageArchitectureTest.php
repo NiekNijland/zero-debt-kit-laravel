@@ -24,7 +24,7 @@ dataset('log lines built from the message of an exception', [
 ]);
 
 it('detects a log line whose message or context is built from getMessage()', function (string $source): void {
-    $violations = new LogMessageGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source);
+    $violations = new LogMessageGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source);
 
     expect($violations)->toHaveCount(1)
         ->and($violations[0])->toContain("['exception' => \$e]");
@@ -46,9 +46,9 @@ it('accepts a fixed line with the exception as context, a console line and a res
         $failure = ['message' => $e->getMessage()];
         PHP;
 
-    expect(new LogMessageGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source))->toBe([]);
+    expect(new LogMessageGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source))->toBe([]);
 });
 
 it('never builds a log message or its context in app from the message of an exception', function (): void {
-    expect(new LogMessageGuard(new PhpFileInspector(), dirname(__DIR__, 2))->violations())->toBe([]);
+    expect(new LogMessageGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->violations())->toBe([]);
 });

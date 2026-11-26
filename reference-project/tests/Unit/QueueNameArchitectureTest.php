@@ -16,7 +16,7 @@ dataset('queue names written as text', [
 ]);
 
 it('detects a queue that is named with text', function (string $source, string $reason): void {
-    $violations = new QueueNameGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source);
+    $violations = new QueueNameGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source);
 
     expect($violations)->toHaveCount(1)
         ->and($violations[0])->toContain($reason)
@@ -41,9 +41,9 @@ it('accepts a queue named by the enum and a variable that happens to be called q
         }
         PHP;
 
-    expect(new QueueNameGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source))->toBe([]);
+    expect(new QueueNameGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source))->toBe([]);
 });
 
 it('names every queue in app with a case of the Queue enum', function (): void {
-    expect(new QueueNameGuard(new PhpFileInspector(), dirname(__DIR__, 2))->violations())->toBe([]);
+    expect(new QueueNameGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->violations())->toBe([]);
 });
