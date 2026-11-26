@@ -219,6 +219,9 @@ if [ "$PART" = "gate" ]; then
     exit 0
 fi
 
+# A drift check of a generated file (a typed client, a route list) generates it to a temporary path and compares it with the committed
+# copy by content: "gen --out \"$tmp\" && cmp -s <committed file> \"$tmp\"". Never ask version control what changed in the working tree:
+# a line with a diff command reads as a check over changed files, and the contract test over this file fails it.
 TASKS=(
     "Format::<formatter in check mode over the whole tree>"
     "Refactor::<refactoring tool in dry-run mode over the whole tree>"
