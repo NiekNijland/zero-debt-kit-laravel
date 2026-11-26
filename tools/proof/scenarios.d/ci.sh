@@ -78,3 +78,18 @@ if [ -f "$KIT/ci/checks.sh" ] && [ -f "$KIT/ci/prepush.sh" ]; then
     check CX12 "prepush.sh: a remote that cannot be fetched stops it before any part runs" fail 'Prepush: cannot fetch origin/main' cx env -u CHECK_BASE "$SHELL_BIN" -c "git remote set-url origin file:///nonexistent && bash scripts/prepush.sh; status=\$?; git remote set-url origin 'file://$CX_BARE'; exit \$status"
     check CX13 "prepush.sh --main needs no fetch (the remote is gone, the parts pass)" 0 '.' cx env -u CHECK_BASE CI= "$SHELL_BIN" -c "git remote set-url origin file:///nonexistent && bash scripts/prepush.sh --main; status=\$?; git remote set-url origin 'file://$CX_BARE'; exit \$status"
 fi
+
+# The skeletons: what a regression would silently bring back (text checks; the YAML itself is read by the contract test).
+if [ -f "$KIT/ci/github-actions.yml" ]; then
+    check CX20 "github-actions.yml: merge-first, no CHECK_HEAD and no checkout ref outside a comment" 0 '^0$' "$SHELL_BIN" -c "grep -v -E '^[[:space:]]*#' '$KIT/ci/github-actions.yml' | grep -c -E 'CHECK_HEAD|^[[:space:]]+ref:'; exit 0"
+    check CX21 "github-actions.yml: a concurrency group that cancels pull requests only, and the aggregate required check" 0 '^2$' "$SHELL_BIN" -c "grep -c -E \"^  cancel-in-progress: .*== 'pull_request'|^  checks-result:\" '$KIT/ci/github-actions.yml'"
+    check CX22 "github-actions.yml: every database service has its password variable and a health check (3 services)" 0 '^3 3$' "$SHELL_BIN" -c "echo \"\$(grep -c 'POSTGRES_PASSWORD: ci' '$KIT/ci/github-actions.yml') \$(grep -c -e '--health-cmd' '$KIT/ci/github-actions.yml')\""
+    check CX23 "github-actions.yml: every checkout has the full history (6 checkouts, 6 fetch-depth lines)" 0 '^6 6$' "$SHELL_BIN" -c "echo \"\$(grep -c -E '^      - uses: actions/checkout@' '$KIT/ci/github-actions.yml') \$(grep -c -E '^          fetch-depth: 0' '$KIT/ci/github-actions.yml')\""
+    check CX24 "github-actions.yml: the file is not a copy for the existing workflow: it names itself kit-checks.yml" 0 '[Cc]opy this file to \.github/workflows/kit-checks\.yml' "$SHELL_BIN" -c "tr '\n' ' ' < '$KIT/ci/github-actions.yml' | sed -E 's/#//g; s/  +/ /g' | grep -o -i 'copy this file to .github/workflows/kit-checks.yml'"
+fi
+if [ -f "$KIT/ci/gitlab-ci.yml" ]; then
+    check CX25 "gitlab-ci.yml: a branch rule of the workflow starts a pipeline for the push source only" 0 '^0$' "$SHELL_BIN" -c "grep -E 'if: \\\$CI_COMMIT_BRANCH' '$KIT/ci/gitlab-ci.yml' | grep -v -c 'CI_PIPELINE_SOURCE == \"push\"'; exit 0"
+fi
+if [ -f "$KIT/ci/CODEOWNERS.example" ]; then
+    check CX26 "CODEOWNERS.example: the scripts, the pipeline files, the guard folder and the file itself have a rule with an owner" 0 '^6$' "$SHELL_BIN" -c "grep -c -E '^(/scripts/|/\\.github/workflows/|/\\.gitlab-ci\\.yml|/tests/Support/Architecture/|/\\.github/CODEOWNERS|/CODEOWNERS) <owner>\$' '$KIT/ci/CODEOWNERS.example'"
+fi
