@@ -48,6 +48,10 @@ code-owners files). Changing one without the tag fails the ratchet step. The upg
 
 - the commit that changes the scripts carries the line `[ratchet: script] upgrade the kit scripts from v<A> to v<B>` (or the
   reason in your words; a reason is required), and
+- when the doctor carried ratchet rows the kit changed ("ratchet rows the kit changed since the project took them"), each carried row is
+  a change inside the table, and the gate fails it as `<row>  ...  redefined, FAILS` unless a commit that touches `scripts/ci-ratchets.sh`
+  carries its own line `[ratchet: <row>] <reason>`, besides `[ratchet: script]`. `doctor.sh --upgrade-plan` and `--apply` print one such
+  line per carried row: put them all in the commit message of the upgrade, and
 - a code owner approves the pull request (`ci/CODEOWNERS.example`; contract point 22). The author of the upgrade does not approve it.
 
 The ratchet step compares the scripts with the base branch: a change of `ci-ratchets.sh` outside its table, and a change of any other guarded script, needs the tag (the config block of `ci-ratchets.sh` counts as outside the table).
