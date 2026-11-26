@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-use Tests\Support\Unit\EmptyCatchArchitectureHelpers;
+use Tests\Support\Architecture\EmptyCatchGuard;
+use Tests\Support\Architecture\PhpFileInspector;
+use Tests\Support\SourceSandbox;
 
 uses()->group('arch');
 
@@ -25,30 +27,44 @@ dataset('swallowed broad catches', [
 ]);
 
 it('detects a broad catch that only swallows the exception', function (string $source): void {
-    expect(EmptyCatchArchitectureHelpers::swallowedCatchLines($source))->toHaveCount(1);
+    $violations = new EmptyCatchGuard(new PhpFileInspector(), dirname(__DIR__, 2), ['app'])->inSource($source);
+
+    expect($violations)->toHaveCount(1)
+        ->and($violations[0])->toContain('only swallows the exception', 'report it with report()', 'rethrow it', 'catch the exact exception');
 })->with('swallowed broad catches');
 
-it('accepts catches that report, rescue, rethrow, fail or name the exact expected exception', function (): void {
-    $source = <<<'PHP'
-        <?php
-        namespace App;
-        use Throwable;
-        use League\Flysystem\UnableToReadFile;
-        use Illuminate\Support\Facades\Exceptions;
-        try { f(); } catch (Throwable $e) { report($e); }
-        try { f(); } catch (Throwable $e) { throw $e; }
-        try { f(); } catch (Throwable $e) { throw new \DomainException('wrapped', previous: $e); }
-        try { f(); } catch (UnableToReadFile) {}
-        try { f(); } catch (Throwable $e) { rescue(static fn () => report($e), report: false); }
-        try { f(); } catch (Throwable $e) { Exceptions::report($e); }
-        try { f(); } catch (Throwable $e) { ReportedFailureException::reportSafely('Label', $e); }
-        function g(): ?int { try { return f(); } catch (Throwable $e) { report($e); return null; } }
-        final class T { public function test(): void { try { f(); } catch (\Exception $e) { $this->fail($e->getMessage()); } } }
-        PHP;
+dataset('catches that report, rescue, rethrow, fail or name the exact exception', [
+    'report' => ["<?php\nnamespace App;\nuse Throwable;\ntry { f(); } catch (Throwable \$e) { report(\$e); }\n"],
+    'rethrow' => ["<?php\nnamespace App;\nuse Throwable;\ntry { f(); } catch (Throwable \$e) { throw \$e; }\n"],
+    'wrap with the previous exception' => ["<?php\nnamespace App;\nuse Throwable;\ntry { f(); } catch (Throwable \$e) { throw new \\DomainException('wrapped', previous: \$e); }\n"],
+    'the exact exception, empty body' => ["<?php\nnamespace App;\nuse League\\Flysystem\\UnableToReadFile;\ntry { f(); } catch (UnableToReadFile) {}\n"],
+    'rescue' => ["<?php\nnamespace App;\nuse Throwable;\ntry { f(); } catch (Throwable \$e) { rescue(static fn () => report(\$e), report: false); }\n"],
+    'the exceptions facade' => ["<?php\nnamespace App;\nuse Throwable;\nuse Illuminate\\Support\\Facades\\Exceptions;\ntry { f(); } catch (Throwable \$e) { Exceptions::report(\$e); }\n"],
+    'a reporting factory' => ["<?php\nnamespace App;\nuse Throwable;\ntry { f(); } catch (Throwable \$e) { ReportedFailureException::reportSafely('Label', \$e); }\n"],
+    'report, then a fallback value' => ["<?php\nnamespace App;\nuse Throwable;\nfunction g(): ?int { try { return f(); } catch (Throwable \$e) { report(\$e); return null; } }\n"],
+    'a test that fails' => ["<?php\nnamespace App;\nfinal class T { public function test(): void { try { f(); } catch (\\Exception \$e) { \$this->fail(\$e->getMessage()); } } }\n"],
+]);
 
-    expect(EmptyCatchArchitectureHelpers::swallowedCatchLines($source))->toBe([]);
+it('accepts catches that report, rescue, rethrow, fail or name the exact expected exception', function (string $source): void {
+    expect(new EmptyCatchGuard(new PhpFileInspector(), dirname(__DIR__, 2), ['app'])->inSource($source))->toBe([]);
+})->with('catches that report, rescue, rethrow, fail or name the exact exception');
+
+it('reads a tree under a dot directory and names the file relative to the root', function (): void {
+    $root = SourceSandbox::create([
+        'app/Swallows.php' => "<?php\nnamespace App;\nuse Throwable;\ntry { f(); } catch (Throwable) {}\n",
+        'app/Reports.php' => "<?php\nnamespace App;\nuse Throwable;\ntry { f(); } catch (Throwable \$e) { report(\$e); }\n",
+    ], prefix: '.checkout-');
+
+    try {
+        $violations = new EmptyCatchGuard(new PhpFileInspector(), $root, ['app'])->violations();
+    } finally {
+        SourceSandbox::remove($root);
+    }
+
+    expect($violations)->toHaveCount(1)
+        ->and($violations[0])->toStartWith('app/Swallows.php:4: a broad catch that only swallows the exception');
 });
 
 it('lets no file in app swallow a broad exception', function (): void {
-    expect(EmptyCatchArchitectureHelpers::swallowedCatchCounts())->toBe([]);
+    expect(new EmptyCatchGuard(new PhpFileInspector(), dirname(__DIR__, 2), ['app'])->violations())->toBe([]);
 });

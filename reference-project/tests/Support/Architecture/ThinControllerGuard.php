@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Support\Unit;
+namespace Tests\Support\Architecture;
 
 use PhpParser\Node;
 use PhpParser\Node\Expr\MethodCall;
@@ -19,12 +19,9 @@ use PhpParser\NodeFinder;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\NameResolver;
 use PhpParser\ParserFactory;
-use Tests\Support\Architecture\PhpFileInspector;
 
-final class ThinControllersArchitectureHelpers
+final readonly class ThinControllerGuard
 {
-    public const int MAX_INVOKE_LINES = 40;
-
     private const array WRITES = [
         'save', 'savequietly', 'update', 'updatequietly', 'updateorcreate', 'updateorinsert', 'firstorcreate', 'create', 'createquietly', 'createmany',
         'delete', 'deletequietly', 'forcedelete', 'forcedeletequietly', 'restore', 'restorequietly', 'attach', 'sync', 'syncwithoutdetaching',
@@ -34,17 +31,29 @@ final class ThinControllersArchitectureHelpers
 
     private const array DB_FACADES = ['DB', 'Illuminate\Support\Facades\DB'];
 
-    private const array COLLABORATOR_FOLDERS = ['\Actions\\', '\Services\\'];
+    /**
+     * @param string $folder the controller folder under the root
+     * @param int $maxInvokeLines the longest `__invoke` a controller may have
+     * @param list<string> $collaboratorFolders namespace segments (`\Actions\`) whose classes a controller may call, from the guide's layout table
+     */
+    public function __construct(
+        private PhpFileInspector $inspector,
+        private string $root,
+        private string $folder,
+        private int $maxInvokeLines,
+        private array $collaboratorFolders,
+    ) {
+    }
 
     /**
-     * @return list<string> `line: reason` of every write, lock, transaction or `DB::` call in the source, and of an `__invoke` that is too long
+     * @return list<string> `line N: message` of every write, lock, transaction or `DB::` call in the source, and of an `__invoke` that is too long
      */
-    public static function violationsIn(string $source): array
+    public function inSource(string $source): array
     {
         $statements = (new NodeTraverser(new NameResolver()))->traverse((new ParserFactory())->createForHostVersion()->parse($source) ?? []);
         $finder = new NodeFinder();
-        $collaborators = self::collaborators($finder, $statements);
-        $violations = [];
+        $collaborators = $this->collaborators($finder, $statements);
+        $found = [];
 
         $calls = $finder->find(
             $statements,
@@ -56,10 +65,8 @@ final class ThinControllersArchitectureHelpers
                 continue;
             }
 
-            $line = $call->getStartLine();
-
             if ($call instanceof StaticCall && $call->class instanceof Name && in_array($call->class->toString(), self::DB_FACADES, true)) {
-                $violations[] = $line . ': DB::';
+                $found[] = [$call->getStartLine(), self::message('DB::')];
 
                 continue;
             }
@@ -74,50 +81,54 @@ final class ThinControllersArchitectureHelpers
                 continue;
             }
 
-            $violations[] = $line . ': ' . $name;
+            $found[] = [$call->getStartLine(), self::message($name . '()')];
         }
 
         foreach ($finder->findInstanceOf($statements, ClassMethod::class) as $method) {
             $length = $method->getEndLine() - $method->getStartLine() + 1;
 
-            if ($method->name->toLowerString() === '__invoke' && $length > self::MAX_INVOKE_LINES) {
-                $violations[] = $method->getStartLine() . ': __invoke has ' . $length . ' lines';
+            if ($method->name->toLowerString() === '__invoke' && $length > $this->maxInvokeLines) {
+                $found[] = [$method->getStartLine(), '__invoke has ' . $length . ' lines, the limit is ' . $this->maxInvokeLines . ': move the logic into an action of the module and call it'];
             }
         }
 
-        usort($violations, static fn (string $a, string $b): int => (int) $a <=> (int) $b);
+        usort($found, static fn (array $a, array $b): int => $a[0] <=> $b[0]);
+
+        return array_map(static fn (array $entry): string => 'line ' . $entry[0] . ': ' . $entry[1], $found);
+    }
+
+    /**
+     * @return list<string> `file:line N: message` for every controller, relative to the root
+     */
+    public function violations(): array
+    {
+        $violations = [];
+
+        foreach ($this->inspector->phpFiles($this->root . '/' . $this->folder) as $file) {
+            foreach ($this->inSource((string) file_get_contents($file)) as $violation) {
+                $violations[] = substr($file, strlen($this->root) + 1) . ':' . $violation;
+            }
+        }
 
         return $violations;
     }
 
-    /**
-     * @return list<string> `file:line: reason` for every controller
-     */
-    public static function offendersInControllers(): array
+    private static function message(string $call): string
     {
-        $root = dirname(__DIR__, 3);
-        $offenders = [];
-
-        foreach (new PhpFileInspector()->phpFiles($root . '/app/Http/Controllers') as $file) {
-            foreach (self::violationsIn((string) file_get_contents($file)) as $violation) {
-                $offenders[] = substr($file, strlen($root) + 1) . ':' . $violation;
-            }
-        }
-
-        return $offenders;
+        return $call . ' in a controller: move the write, lock or transaction into an action of the module and call the action';
     }
 
     /**
      * @param array<Node> $statements
      * @return list<string> the properties whose class is an Action or a Service of a module
      */
-    private static function collaborators(NodeFinder $finder, array $statements): array
+    private function collaborators(NodeFinder $finder, array $statements): array
     {
         $collaborators = [];
 
         foreach ($finder->findInstanceOf($statements, Class_::class) as $class) {
             foreach ($class->getProperties() as $property) {
-                if (self::isCollaborator($property->type)) {
+                if ($this->isCollaborator($property->type)) {
                     foreach ($property->props as $item) {
                         $collaborators[] = $item->name->toString();
                     }
@@ -127,7 +138,7 @@ final class ThinControllersArchitectureHelpers
             $constructor = $class->getMethod('__construct');
 
             foreach ($constructor !== null ? $constructor->params : [] as $param) {
-                if ($param->flags !== 0 && $param->var instanceof Variable && is_string($param->var->name) && self::isCollaborator($param->type)) {
+                if ($param->flags !== 0 && $param->var instanceof Variable && is_string($param->var->name) && $this->isCollaborator($param->type)) {
                     $collaborators[] = $param->var->name;
                 }
             }
@@ -136,7 +147,7 @@ final class ThinControllersArchitectureHelpers
         return $collaborators;
     }
 
-    private static function isCollaborator(?Node $type): bool
+    private function isCollaborator(?Node $type): bool
     {
         if ($type instanceof NullableType) {
             $type = $type->type;
@@ -148,7 +159,7 @@ final class ThinControllersArchitectureHelpers
 
         $class = '\\' . $type->toString();
 
-        foreach (self::COLLABORATOR_FOLDERS as $folder) {
+        foreach ($this->collaboratorFolders as $folder) {
             if (str_contains($class, $folder)) {
                 return true;
             }

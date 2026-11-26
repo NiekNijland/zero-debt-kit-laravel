@@ -98,7 +98,7 @@ House rules without a row:
 | Comments | ratchet row `comments` | Whether a comment let through with `[ratchet: comments]` earns its place |
 | Formatting and manifest | `vendor/bin/pint --test` and `npx prettier --check` on the whole tree; `composer validate --strict` | |
 | Path in a guide | `DocumentedPathArchitectureTest`: every backticked path in an `AGENTS.md`, `DESIGN.md` and this rubric exists | Whether the named file still shows the rule it is the example of |
-| Method length, traits, reflection in tests | `MethodLengthArchitectureTest`, `NoSingleUseTraitsArchitectureTest`, `NoReflectionInTestsArchitectureTest`, `NoGlobalImportInTestFilesArchitectureTest` | |
+| Method length, traits, reflection in tests | `MethodSizeArchitectureTest`, `NoSingleUseTraitsArchitectureTest`, `NoReflectionInTestsArchitectureTest`, `NoGlobalImportInTestFilesArchitectureTest` | |
 | Debug and exit | PHPStan `disallowedFunctionCalls`, `ExitArchitectureTest` | |
 
 ## PR checklist

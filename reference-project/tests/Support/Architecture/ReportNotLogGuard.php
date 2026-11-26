@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Support\Unit;
+namespace Tests\Support\Architecture;
 
 use Override;
 use PhpParser\Node;
@@ -17,39 +17,66 @@ use PhpParser\NodeVisitor;
 use PhpParser\NodeVisitor\NameResolver;
 use PhpParser\NodeVisitorAbstract;
 use PhpParser\ParserFactory;
-use Tests\Support\Architecture\PhpFileInspector;
 
-final class ReportNotLogArchitectureHelpers
+final readonly class ReportNotLogGuard
 {
     private const array LOG_FACADES = ['Log', 'Illuminate\Support\Facades\Log'];
 
     private const array SEVERE_LEVELS = ['warning', 'error', 'critical', 'alert', 'emergency'];
 
+    private const string SEVERE_MESSAGE = 'a log call of level warning or higher that handles a caught exception: report the exception with report() and let the handler log it';
+
+    private const string TENANT_MESSAGE = 'a tenant_id key written into a log context by hand: the log context adds the tenant, leave the key out';
+
+    public function __construct(
+        private PhpFileInspector $inspector,
+        private string $root,
+        private string $folder,
+    ) {
+    }
+
     /**
-     * @return list<string> `file:line` of every Log::warning or more severe call directly inside a catch block, and of every literal 'tenant_id' key in a Log:: context
+     * @return list<string> `line N: message` per violation in the source, in line order
      */
-    public static function offendersInApp(): array
+    public function inSource(string $source): array
     {
-        $root = dirname(__DIR__, 3);
-        $offenders = [];
+        $found = [];
 
-        foreach (new PhpFileInspector()->phpFiles($root . '/app') as $file) {
-            $source = (string) file_get_contents($file);
+        foreach ($this->severeLogInCatchLines($source) as $line) {
+            $found[$line . ':a'] = 'line ' . $line . ': ' . self::SEVERE_MESSAGE;
+        }
 
-            foreach ([...self::severeLogInCatchLines($source), ...self::tenantIdLogKeyLines($source)] as $line) {
-                $offenders[] = substr($file, strlen($root) + 1) . ':' . $line;
+        foreach ($this->tenantIdLogKeyLines($source) as $line) {
+            $found[$line . ':b'] = 'line ' . $line . ': ' . self::TENANT_MESSAGE;
+        }
+
+        ksort($found, SORT_NATURAL);
+
+        return array_values($found);
+    }
+
+    /**
+     * @return list<string> `file:` before each message of the source, relative to the root
+     */
+    public function violations(): array
+    {
+        $violations = [];
+
+        foreach ($this->inspector->phpFiles($this->root . '/' . $this->folder) as $file) {
+            foreach ($this->inSource((string) file_get_contents($file)) as $message) {
+                $violations[] = substr($file, strlen($this->root) + 1) . ': ' . $message;
             }
         }
 
-        sort($offenders);
+        sort($violations);
 
-        return $offenders;
+        return $violations;
     }
 
     /**
      * @return list<int>
      */
-    public static function severeLogInCatchLines(string $source): array
+    private function severeLogInCatchLines(string $source): array
     {
         $lines = [];
 
@@ -69,7 +96,7 @@ final class ReportNotLogArchitectureHelpers
     /**
      * @return list<int>
      */
-    public static function tenantIdLogKeyLines(string $source): array
+    private function tenantIdLogKeyLines(string $source): array
     {
         $lines = [];
         $finder = new NodeFinder();

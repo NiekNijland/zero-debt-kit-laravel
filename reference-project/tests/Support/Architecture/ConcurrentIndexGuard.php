@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Tests\Support\Unit;
+namespace Tests\Support\Architecture;
 
+use InvalidArgumentException;
 use PhpParser\Node;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr\ArrowFunction;
@@ -19,13 +20,65 @@ use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\NodeFinder;
 use PhpParser\ParserFactory;
+use Tests\Support\Globs;
 
-final class ConcurrentIndexMigrationHelpers
+/**
+ * An index or a foreign key on a table that exists takes a lock that blocks writes while it builds. The rule holds from one migration on
+ * (an append-only rule: the first file is one constant, passed by the test, and never moves forward).
+ */
+final readonly class ConcurrentIndexGuard
 {
+    private const string MESSAGE = 'an index or foreign key built on a table that already exists, which blocks writes: create the index with CREATE INDEX CONCURRENTLY outside a transaction ($withinTransaction = false), or add the foreign key NOT VALID and validate it afterwards';
+
+    /**
+     * @param string $folder the migration folder under the root
+     * @param string $firstFile the file name (or its date prefix) of the first migration under the rule
+     */
+    public function __construct(
+        private string $root,
+        private string $folder,
+        private string $firstFile,
+    ) {
+    }
+
+    /**
+     * @return list<string> `table: message` per table of the migration that gets a blocking index
+     */
+    public function inSource(string $source): array
+    {
+        return array_map(static fn (string $table): string => $table . ': ' . self::MESSAGE, $this->blockingTables($source));
+    }
+
+    /**
+     * @return list<string> `file: table: message` per blocking index in a migration from the first file on, relative to the root
+     */
+    public function violations(): array
+    {
+        $violations = [];
+
+        if (! is_dir($this->root . '/' . $this->folder)) {
+            throw new InvalidArgumentException('The directory ' . $this->folder . ' does not exist: a guard over a missing folder would pass without reading a file');
+        }
+
+        foreach (Globs::of($this->root . '/' . $this->folder . '/*.php') as $path) {
+            if (strcmp(basename($path), $this->firstFile) < 0) {
+                continue;
+            }
+
+            foreach ($this->inSource((string) file_get_contents($path)) as $violation) {
+                $violations[] = $this->folder . '/' . basename($path) . ': ' . $violation;
+            }
+        }
+
+        sort($violations);
+
+        return $violations;
+    }
+
     /**
      * @return list<string>
      */
-    public static function blockingIndexTables(string $source): array
+    private function blockingTables(string $source): array
     {
         $finder = new NodeFinder();
         $statements = self::upStatements($finder, $source);
@@ -138,10 +191,5 @@ final class ConcurrentIndexMigrationHelpers
         }
 
         return $sql;
-    }
-
-    public static function indexMigrationSource(string $up, string $members = ''): string
-    {
-        return "<?php\nreturn new class() extends Migration {\n{$members}\n    public function up(): void\n    {\n{$up}\n    }\n};\n";
     }
 }

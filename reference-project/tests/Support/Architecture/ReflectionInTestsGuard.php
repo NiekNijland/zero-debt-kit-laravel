@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Support\Unit;
+namespace Tests\Support\Architecture;
 
 use Override;
 use PhpParser\Node;
@@ -22,9 +22,8 @@ use PhpParser\NodeVisitor\NameResolver;
 use PhpParser\NodeVisitor\ParentConnectingVisitor;
 use PhpParser\NodeVisitorAbstract;
 use PhpParser\ParserFactory;
-use Tests\Support\Architecture\PhpFileInspector;
 
-final class NoReflectionInTestsArchitectureHelpers
+final readonly class ReflectionInTestsGuard
 {
     /** Reflection classes that hand out a private member or a private constant. */
     private const array MEMBER_REFLECTION = ['ReflectionMethod', 'ReflectionProperty', 'ReflectionClassConstant', 'ReflectionObject'];
@@ -40,10 +39,22 @@ final class NoReflectionInTestsArchitectureHelpers
         'isAnonymous', 'hasMethod', 'getConstructor', 'newInstance', 'newInstanceArgs', 'getMethods', 'getProperties',
     ];
 
+    private const string MESSAGE = 'a test reaches a private member through reflection: test through the public behavior, or give the class a public seam; read only the public structure of a class';
+
     /**
-     * @return list<string> `line: what` per way the source reaches into a class
+     * @param string $folder the test folder under the root
      */
-    public static function violations(string $source): array
+    public function __construct(
+        private PhpFileInspector $inspector,
+        private string $root,
+        private string $folder,
+    ) {
+    }
+
+    /**
+     * @return list<string> `line: what: message` per way the source reaches into a class
+     */
+    public function inSource(string $source): array
     {
         $statements = (new ParserFactory())->createForHostVersion()->parse($source) ?? [];
         $visitor = new class() extends NodeVisitorAbstract
@@ -54,7 +65,7 @@ final class NoReflectionInTestsArchitectureHelpers
             #[Override]
             public function enterNode(Node $node): null
             {
-                $this->found = [...$this->found, ...NoReflectionInTestsArchitectureHelpers::violationsOf($node)];
+                $this->found = [...$this->found, ...ReflectionInTestsGuard::violationsOf($node)];
 
                 return null;
             }
@@ -62,7 +73,25 @@ final class NoReflectionInTestsArchitectureHelpers
 
         (new NodeTraverser(new NameResolver(), new ParentConnectingVisitor(), $visitor))->traverse($statements);
 
-        return $visitor->found;
+        return array_map(static fn (string $found): string => $found . ': ' . self::MESSAGE, $visitor->found);
+    }
+
+    /**
+     * @return list<string> `file:line: what: message` relative to the root
+     */
+    public function violations(): array
+    {
+        $violations = [];
+
+        foreach ($this->inspector->phpFiles($this->root . '/' . $this->folder) as $file) {
+            foreach ($this->inSource((string) file_get_contents($file)) as $found) {
+                $violations[] = substr($file, strlen($this->root) + 1) . ':' . $found;
+            }
+        }
+
+        sort($violations);
+
+        return $violations;
     }
 
     /**
@@ -95,27 +124,6 @@ final class NoReflectionInTestsArchitectureHelpers
         }
 
         return [];
-    }
-
-    /**
-     * @return array<string, list<string>>
-     */
-    public static function violationsInTests(): array
-    {
-        $root = dirname(__DIR__, 3);
-        $violations = [];
-
-        foreach (new PhpFileInspector()->phpFiles($root . '/tests') as $file) {
-            $found = self::violations((string) file_get_contents($file));
-
-            if ($found !== []) {
-                $violations[substr($file, strlen($root) + 1)] = $found;
-            }
-        }
-
-        ksort($violations);
-
-        return $violations;
     }
 
     private static function readsPublicStructure(New_ $new): bool

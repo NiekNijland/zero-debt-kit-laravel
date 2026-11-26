@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Support\Unit;
+namespace Tests\Support\Architecture;
 
 use Override;
 use PhpParser\Node;
@@ -21,19 +21,57 @@ use PhpParser\Node\Stmt\Use_;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitorAbstract;
 use PhpParser\ParserFactory;
-use Tests\Support\Architecture\PhpFileInspector;
 
-final class NoInlineVarCastArchitectureHelpers
+/**
+ * A `@var` docblock on a statement, or on an expression inside a function body, tells the analyser a type it never checks.
+ * On a declaration (property, constant, class, function) it declares a type and passes; a parameter carries its type as `@param`.
+ */
+final readonly class InlineVarCastGuard
 {
-    public const array DIRECTORIES = ['app', 'bootstrap', 'config', 'database', 'routes'];
+    private const string MESSAGE = 'an inline @var narrows a type the analyser never checks: narrow it with a typed helper, a typed return or an assertion the code runs, and keep @var for a property or a constant';
 
     /**
-     * A `@var` docblock on a statement, or on an expression inside a function body, tells PHPStan a type it never checks.
-     * On a declaration (property, constant, class, function) it declares a type and passes; a parameter carries its type as `@param`.
-     *
+     * @param list<string> $directories folders under the root that the tree scan reads, relative to it; some may be absent
+     */
+    public function __construct(
+        private PhpFileInspector $inspector,
+        private string $root,
+        private array $directories,
+    ) {
+    }
+
+    /**
+     * @return list<string> `line N: message` per inline @var in the source
+     */
+    public function inSource(string $source): array
+    {
+        return array_map(static fn (int $line): string => 'line ' . $line . ': ' . self::MESSAGE, $this->lines($source));
+    }
+
+    /**
+     * @return list<string> `file:line: message` relative to the root
+     */
+    public function violations(): array
+    {
+        $violations = [];
+
+        foreach ($this->directories as $directory) {
+            foreach ($this->inspector->phpFiles($this->root . '/' . $directory, mayBeAbsent: true) as $file) {
+                foreach ($this->lines((string) file_get_contents($file)) as $line) {
+                    $violations[] = substr($file, strlen($this->root) + 1) . ':' . $line . ': ' . self::MESSAGE;
+                }
+            }
+        }
+
+        sort($violations);
+
+        return $violations;
+    }
+
+    /**
      * @return list<int>
      */
-    public static function inlineVarLines(string $source): array
+    private function lines(string $source): array
     {
         $visitor = new class() extends NodeVisitorAbstract
         {
@@ -90,29 +128,5 @@ final class NoInlineVarCastArchitectureHelpers
         sort($lines);
 
         return $lines;
-    }
-
-    /**
-     * @return array<string, int>
-     */
-    public static function inlineVarCounts(): array
-    {
-        $root = dirname(__DIR__, 3);
-        $inspector = new PhpFileInspector();
-        $counts = [];
-
-        foreach (self::DIRECTORIES as $directory) {
-            foreach ($inspector->phpFiles($root . '/' . $directory, mayBeAbsent: true) as $file) {
-                $count = count(self::inlineVarLines((string) file_get_contents($file)));
-
-                if ($count > 0) {
-                    $counts[substr($file, strlen($root) + 1)] = $count;
-                }
-            }
-        }
-
-        ksort($counts);
-
-        return $counts;
     }
 }

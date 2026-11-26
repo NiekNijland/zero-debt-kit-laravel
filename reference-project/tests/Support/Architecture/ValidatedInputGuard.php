@@ -2,11 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Tests\Support\Unit;
+namespace Tests\Support\Architecture;
 
-use Tests\Support\Architecture\PhpFileInspector;
-
-final class ValidatedInputArchitectureHelpers
+final readonly class ValidatedInputGuard
 {
     private const array RAW_READERS = [
         'input', 'string', 'str', 'integer', 'float', 'boolean', 'date', 'enum', 'enums', 'array', 'collect', 'query', 'post', 'get',
@@ -18,30 +16,40 @@ final class ValidatedInputArchitectureHelpers
 
     private const array REQUEST_FACADES = ['Request', 'Illuminate\Support\Facades\Request'];
 
+    private const string MESSAGE = 'request input read past the form request: read it from $request->validated() (or an accessor of the form request) so only validated data reaches the action';
+
     /**
-     * @return list<string> `file:line` of every raw input read in a controller
+     * @param string $folder the controller folder under the root
      */
-    public static function offendersInControllers(): array
-    {
-        $root = dirname(__DIR__, 3);
-        $inspector = new PhpFileInspector();
-        $offenders = [];
-
-        foreach ($inspector->phpFiles($root . '/app/Http/Controllers') as $file) {
-            foreach (self::rawReadLines($inspector->callsIn($file)) as $line) {
-                $offenders[] = substr($file, strlen($root) + 1) . ':' . $line;
-            }
-        }
-
-        return $offenders;
+    public function __construct(
+        private PhpFileInspector $inspector,
+        private string $root,
+        private string $folder,
+    ) {
     }
 
     /**
-     * @return list<int>
+     * @return list<string> `line N: message` per raw input read in the source
      */
-    public static function rawReadLinesIn(string $source): array
+    public function inSource(string $source): array
     {
-        return self::rawReadLines(new PhpFileInspector()->calls($source));
+        return array_map(static fn (int $line): string => 'line ' . $line . ': ' . self::MESSAGE, self::rawReadLines($this->inspector->calls($source)));
+    }
+
+    /**
+     * @return list<string> `file:line N: message` per raw input read in a controller, relative to the root
+     */
+    public function violations(): array
+    {
+        $violations = [];
+
+        foreach ($this->inspector->phpFiles($this->root . '/' . $this->folder) as $file) {
+            foreach (self::rawReadLines($this->inspector->callsIn($file)) as $line) {
+                $violations[] = substr($file, strlen($this->root) + 1) . ':line ' . $line . ': ' . self::MESSAGE;
+            }
+        }
+
+        return $violations;
     }
 
     /**

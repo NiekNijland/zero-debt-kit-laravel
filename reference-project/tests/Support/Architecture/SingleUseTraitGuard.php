@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Support\Unit;
+namespace Tests\Support\Architecture;
 
 use PhpParser\Node\Stmt\ClassLike;
 use PhpParser\Node\Stmt\Trait_;
@@ -11,10 +11,18 @@ use PhpParser\NodeFinder;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\NameResolver;
 use PhpParser\ParserFactory;
-use Tests\Support\Architecture\PhpFileInspector;
 
-final class NoSingleUseTraitsArchitectureHelpers
+final readonly class SingleUseTraitGuard
 {
+    private const string MESSAGE = 'a trait used by exactly one class: move its members into that class, or into a parent or a collaborator; a trait is for code that several classes share';
+
+    public function __construct(
+        private PhpFileInspector $inspector,
+        private string $root,
+        private string $folder,
+    ) {
+    }
+
     /**
      * Every trait declared in the sources with the number of distinct classes, enums or traits that use it; a use inside
      * an anonymous class counts once per anonymous class.
@@ -22,7 +30,7 @@ final class NoSingleUseTraitsArchitectureHelpers
      * @param list<string> $sources
      * @return array<string, int>
      */
-    public static function traitUsers(array $sources): array
+    public function traitUsers(array $sources): array
     {
         $declared = [];
         $users = [];
@@ -63,20 +71,22 @@ final class NoSingleUseTraitsArchitectureHelpers
 
     /**
      * @param list<string> $sources
-     * @return list<string>
+     * @return list<string> `Trait: message` per trait with exactly one user
      */
-    public static function singleUseTraits(array $sources): array
+    public function inSources(array $sources): array
     {
-        return array_keys(array_filter(self::traitUsers($sources), static fn (int $users): bool => $users === 1));
+        $single = array_keys(array_filter($this->traitUsers($sources), static fn (int $users): bool => $users === 1));
+
+        return array_map(static fn (string $trait): string => $trait . ': ' . self::MESSAGE, $single);
     }
 
     /**
      * @return list<string>
      */
-    public static function singleUseTraitsInApp(): array
+    public function violations(): array
     {
-        $files = new PhpFileInspector()->phpFiles(dirname(__DIR__, 3) . '/app');
+        $files = $this->inspector->phpFiles($this->root . '/' . $this->folder);
 
-        return self::singleUseTraits(array_map(static fn (string $file): string => (string) file_get_contents($file), $files));
+        return $this->inSources(array_map(static fn (string $file): string => (string) file_get_contents($file), $files));
     }
 }
