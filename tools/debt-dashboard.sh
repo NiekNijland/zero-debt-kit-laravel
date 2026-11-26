@@ -101,6 +101,18 @@ for argument in "$@"; do
     esac
 done
 
+# A regular expression that does not compile makes grep fail and print nothing: its row would read 0 and stay green. Every
+# expression of the config block is compiled once here, and an invalid one stops the run.
+for expression_name in SOURCE_FILES FRONTEND_FILES TEST_FILES SIZE_EXEMPT OPEN_CLASS BEHAVIOR_CLASSES SUPPORT_CLASSES NOT_A_CLASS FRONTEND_LOGIC FRONTEND_COMPONENTS FRONTEND_NOT_COUNTED; do
+    expression_value="${!expression_name}"
+    [ -n "$expression_value" ] || continue
+    printf '' | grep -E -e "$expression_value" > /dev/null 2>&1
+    if [ "$?" -gt 1 ]; then
+        echo "Dashboard: $expression_name in the config block is not a valid extended regular expression: $expression_value" >&2
+        exit 64
+    fi
+done
+
 [ -n "$RATCHET_SCRIPT" ] || RATCHET_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ci-ratchets.sh"
 cd "$(git rev-parse --show-toplevel)" || exit 64
 case "$RATCHET_SCRIPT" in
@@ -244,7 +256,7 @@ measured_row() {
 skipped_row() {
     SKIPPED=$((SKIPPED + 1))
     MEASURED="$MEASURED$2 "
-    print_row "$1" "$2" "-" "-" "skipped"
+    print_row "$1" "$2" "-" "-" "skipped${3:+ ($3)}"
 }
 
 detail() {
@@ -257,7 +269,11 @@ oversized() {
     local files
     files=$(cat)
     [ -n "$files" ] || return 0
-    printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 wc -l 2> /dev/null | awk -v max="$MAX_LINES" '{ lines = $1; sub(/^[[:space:]]*[0-9]+[[:space:]]+/, "") } $0 != "total" && lines > max { print lines "  " $0 }' | sort -rn
+    # awk counts the last line of a file that has no final newline too, which wc -l does not.
+    printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 awk -v max="$MAX_LINES" '
+        FNR == 1 { if (name != "" && last > max) print last "  " name; name = FILENAME }
+        { last = FNR }
+        END { if (name != "" && last > max) print last "  " name }' 2> /dev/null | sort -rn
 }
 
 open_classes() {
@@ -278,6 +294,25 @@ min_target() {
         fi
     done
     return 1
+}
+
+# The kit's end goals. A project whose organisation hosts the formatter config (the owner's exception of step 1) may hold a row at
+# a lower number than the kit's: its entry in MIN_ROW_TARGETS is then lower, with a decision row in the plan that names the
+# rules the hosted config lacks. The dashboard prints that in every run, so a lowered goal is never silent.
+kit_min_target() {
+    case "$1" in
+        coverage-floor | frontend-logic-coverage-floor) echo 95 ;;
+        refactor-sets) echo 19 ;;
+        formatter-rules) echo 21 ;;
+        advisory-block) echo 1 ;;
+        *) return 1 ;;
+    esac
+}
+
+lowered_note() {
+    local kit
+    kit=$(kit_min_target "$1") || return 0
+    [ "$2" -ge "$kit" ] || printf ' (goal lowered: the kit holds %s; needs a decision row in the plan)' "$kit"
 }
 
 real_classes() {
@@ -375,7 +410,7 @@ if [ -n "$RATCHETS" ]; then
                 UNKNOWN=$((UNKNOWN + 1))
                 print_row ratchet "$name" "$value" "?" "UNKNOWN (the number of $name in MIN_ROW_TARGETS is not a number)"
             elif [ "$value" -ge "$goal" ]; then
-                print_row ratchet "$name" "$value" "$goal" "ok"
+                print_row ratchet "$name" "$value" "$goal" "ok$(lowered_note "$name" "$goal")"
             else
                 OPEN=$((OPEN + 1))
                 print_row ratchet "$name" "$value" "$goal" "OPEN"
@@ -452,8 +487,19 @@ COMPONENTS_NO_TEST=$(printf '%s' "$COMPONENTS" | grep . | without_sibling_test)
 measured_row tests "frontend-components-without-test" "$(count_lines "$COMPONENTS_NO_TEST")"
 detail "Frontend components without a <file>.$FRONTEND_TEST_INFIX file next to them ($(count_lines "$COMPONENTS_NO_TEST") of $(count_lines "$COMPONENTS"))" "$COMPONENTS_NO_TEST"
 
-if [ "$OFFLINE" -eq 1 ] || [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
-    skipped_row docs "docs-older-than-limit"
+if [ "$OFFLINE" -eq 1 ]; then
+    skipped_row docs "docs-older-than-limit" "--offline"
+elif [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+    # The age of a doc is its last commit: a shallow clone dates every doc at the clone's first commit. The scheduled run
+    # (--final) must not pass that way; the gate of a pull request may skip the row, with the reason printed.
+    if [ "$FINAL" -eq 1 ]; then
+        MEASURED="$MEASURED""docs-older-than-limit "
+        fixed_row docs "docs-older-than-limit" "?" 0 "?" "shallow clone: the age of a doc needs the full history, fetch it"
+    else
+        skipped_row docs "docs-older-than-limit" "shallow clone"
+    fi
+elif [ -z "$DOCS_PATHS" ]; then
+    measured_row docs "docs-older-than-limit" 0
 else
     CUT=$(($(date +%s) - DOCS_MAX_AGE_DAYS * 86400))
     DOCS_TRACKED=$(git -c core.quotePath=false ls-files -- $DOCS_PATHS)
@@ -471,10 +517,12 @@ for entry in ${COMMAND_ROWS[@]+"${COMMAND_ROWS[@]}"}; do
     when="${rest%%::*}"
     command="${rest#*::}"
     if [ "$when" != "always" ] && [ "$OFFLINE" -eq 1 ]; then
-        skipped_row command "$name"
+        skipped_row command "$name" "--offline"
         continue
     fi
-    now=$(bash -c "$command" 2> /dev/null | tr -d '[:space:]')
+    now=$(bash -c "$command" 2> /dev/null)
+    # One whole number on one line: "1" and "2" on two lines are not 12.
+    if [[ "$now" =~ ^[[:space:]]*[0-9]+[[:space:]]*$ ]]; then now="${now//[[:space:]]/}"; else now="?"; fi
     if [ "$when" = "shown" ]; then
         TOTAL=$((TOTAL + 1))
         MEASURED="$MEASURED$name "
