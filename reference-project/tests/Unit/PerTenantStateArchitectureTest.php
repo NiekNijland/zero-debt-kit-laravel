@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Tests\Support\Architecture\PerTenantStateGuard;
 use Tests\Support\Architecture\PhpFileInspector;
 
+uses()->group('arch');
+
 dataset('config writes in the wrong place', [
     'a provider that reads the current tenant' => ["<?php\nnamespace App\\Providers;\nuse App\\Models\\Landlord\\Tenant;\nuse Illuminate\\Support\\Facades\\Config;\nuse Illuminate\\Support\\ServiceProvider;\nfinal class NameServiceProvider extends ServiceProvider { public function boot(): void { Config::set('app.name', Tenant::current()?->name); } }\n", 'a provider reads the current tenant to set config'],
     'a provider that checks for a tenant in a closure' => ["<?php\nnamespace App\\Providers;\nuse App\\Models\\Landlord\\Tenant;\nuse Illuminate\\Support\\Facades\\Config;\nuse Illuminate\\Support\\ServiceProvider;\nfinal class LocaleServiceProvider extends ServiceProvider { public function boot(): void { \$this->app->booted(function (): void { if (Tenant::checkCurrent()) { Config::set('app.locale', 'fr'); } }); } }\n", 'a provider reads the current tenant to set config'],

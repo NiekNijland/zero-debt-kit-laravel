@@ -7,6 +7,8 @@ use Tests\Support\Architecture\PhpFileInspector;
 use Tests\Support\Narrow;
 use Tests\Support\SourceSandbox;
 
+uses()->group('arch');
+
 $table = <<<'MD'
     Domain code lives in one module per domain, `app/Modules/<Domain>`, using only these folders:
 

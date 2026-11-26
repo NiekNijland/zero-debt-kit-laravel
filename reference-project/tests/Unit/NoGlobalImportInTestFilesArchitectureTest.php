@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+uses()->group('arch');
+
 it('never imports a global class by its bare name in a test file without a namespace', function (): void {
     $offenders = [];
 

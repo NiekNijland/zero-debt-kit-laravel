@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Tests\Support\Architecture\PhpFileInspector;
 use Tests\Support\Architecture\RegistryGuard;
 
+uses()->group('arch');
+
 it('detects an implementer the registry misses, an entry that is no implementer and an entry with another name', function (): void {
     $violations = RegistryGuard::mismatches(
         ['App\\A\\Services\\PostShippingService', 'App\\B\\Services\\CourierShippingService', 'App\\C\\Services\\PickupPoint'],

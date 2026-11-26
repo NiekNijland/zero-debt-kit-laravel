@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Tests\Support\Architecture\FlashMessageGuard;
 use Tests\Support\Architecture\PhpFileInspector;
 
+uses()->group('arch');
+
 dataset('flashes that are not one translated line', [
     'a literal text' => ["<?php\nnamespace App;\nuse Inertia\\Inertia;\nInertia::flash('success', 'Saved');\n", 'the message is not a translate call'],
     'a translation key' => ["<?php\nnamespace App;\nuse Inertia\\Inertia;\nInertia::flash('success', 'admin.products.toasts.saved');\n", 'the message is not a translate call'],

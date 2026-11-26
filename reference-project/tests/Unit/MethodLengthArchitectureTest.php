@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Tests\Support\Unit\MethodLengthArchitectureHelpers;
 
+uses()->group('arch');
+
 it('measures a method from its signature to its closing brace', function (): void {
     $body = str_repeat("        \$x = 1;\n", 77);
     $source = "<?php\nnamespace App;\nfinal class A\n{\n    public function fits(): void\n    {\n{$body}    }\n\n    #[\\Override]\n    public function tooLong(): void\n    {\n{$body}\$y = 2;\n    }\n}\n";

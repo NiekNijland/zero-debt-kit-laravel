@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Tests\Support\Architecture\ExitGuard;
 use Tests\Support\Architecture\PhpFileInspector;
 
+uses()->group('arch');
+
 it('detects exit and die in every spelling', function (string $source, string $construct): void {
     $violations = new ExitGuard(new PhpFileInspector(), dirname(__DIR__, 2))->inSource($source);
 

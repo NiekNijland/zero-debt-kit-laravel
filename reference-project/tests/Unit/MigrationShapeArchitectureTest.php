@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Tests\Support\Architecture\MigrationShapeGuard;
 
+uses()->group('arch');
+
 dataset('migrations out of shape', [
     'no down()' => ["public function up(): void\n{\n    Schema::create('shipments', fn (Blueprint \$table) => \$table->id());\n}", 'a migration without down(): add public function down(): void'],
     'an empty down() after a schema change' => ["public function up(): void\n{\n    Schema::table('shipments', fn (Blueprint \$table) => \$table->string('tracking_code')->nullable());\n}\npublic function down(): void\n{\n}", 'an empty down() in a migration that changes the schema: undo up() in it'],

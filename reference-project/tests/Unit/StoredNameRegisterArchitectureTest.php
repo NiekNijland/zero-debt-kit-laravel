@@ -7,6 +7,8 @@ use Tests\Support\Architecture\StoredNameRegisterGuard;
 use Tests\Support\Narrow;
 use Tests\Support\SourceSandbox;
 
+uses()->group('arch');
+
 $guideText = static fn (): string => "# Guide\n\n" . implode("\n", array_map(static fn (string $words): string => "- {$words}", StoredNameRegisterGuard::GUIDE)) . "\n";
 
 $run = static function (array $files, array $registers = [], ?string $guide = null, ?string $aliases = null) use ($guideText): array {

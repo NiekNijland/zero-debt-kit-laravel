@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+uses()->group('arch');
+
 // PHPStan fails on `$this->x = ...` in a test only while the test cases declare no fixture property
 // and are no universal object crate; this keeps both true.
 it('keeps fixture properties off the test cases', function (string $file): void {

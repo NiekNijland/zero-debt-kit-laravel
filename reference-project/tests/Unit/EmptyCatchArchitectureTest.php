@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Tests\Support\Unit\EmptyCatchArchitectureHelpers;
 
+uses()->group('arch');
+
 dataset('swallowed broad catches', [
     'imported throwable' => ["<?php\nnamespace App;\nuse Throwable;\ntry { f(); } catch (Throwable) {}\n"],
     'fully qualified exception' => ["<?php\nnamespace App;\ntry { f(); } catch (\\Exception \$e) {}\n"],

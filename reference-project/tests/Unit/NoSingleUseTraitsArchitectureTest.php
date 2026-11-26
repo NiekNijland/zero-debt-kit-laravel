@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Tests\Support\Unit\NoSingleUseTraitsArchitectureHelpers;
 
+uses()->group('arch');
+
 it('counts the distinct classes that use each trait', function (): void {
     $sources = [
         "<?php\nnamespace App\\Support;\ntrait Shared {}\ntrait Lonely {}\ntrait Unused {}\n",

@@ -6,6 +6,8 @@ use Tests\Support\Architecture\DocumentedPathGuard;
 use Tests\Support\Narrow;
 use Tests\Support\SourceSandbox;
 
+uses()->group('arch');
+
 dataset('guides that name a path that is gone', [
     'a file from the repository root' => [
         ['AGENTS.md' => "# Guide\n\nCopy `app/Support/Like.php`, not `app/Support/Search.php`.\n", 'app/Support/Like.php' => "<?php\n"],

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Tests\Support\Unit\TestFolderMirrorsAppArchitectureHelpers;
 
+uses()->group('arch');
+
 it('reports a test that sits away from the class it covers or from any folder of app', function (): void {
     $root = TestFolderMirrorsAppArchitectureHelpers::sandbox([
         'app/Http/Controllers/Order/ShowController.php' => "<?php\n",

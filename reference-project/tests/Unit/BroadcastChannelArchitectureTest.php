@@ -7,6 +7,8 @@ use Tests\Support\Architecture\PhpFileInspector;
 use Tests\Support\Narrow;
 use Tests\Support\SourceSandbox;
 
+uses()->group('arch');
+
 dataset('broadcast channels out of line', [
     'a channel that is not registered' => [
         ['app/Events/DoneEvent.php' => "<?php\nnamespace App\\Events;\nuse Illuminate\\Broadcasting\\PrivateChannel;\nfinal class DoneEvent { public function broadcastOn(): array { return [new PrivateChannel('invoice.' . \$this->key)]; } }\n"],

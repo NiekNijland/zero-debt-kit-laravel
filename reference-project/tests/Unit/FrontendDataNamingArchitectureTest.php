@@ -8,6 +8,8 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 use Tests\Support\Architecture\FrontendDataNamingGuard;
 use Tests\Support\Architecture\PhpFileInspector;
 
+uses()->group('arch');
+
 it('detects a snake_case property of a Data class the frontend reads', function (): void {
     $promoted = new #[TypeScript] class() extends Data
     {

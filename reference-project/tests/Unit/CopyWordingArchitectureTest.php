@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Tests\Support\Architecture\CopyWordingGuard;
 
+uses()->group('arch');
+
 dataset('copy with a word the interface never uses', [
     'cart in a sentence' => ['Your cart is empty.', '"cart": write "basket"'],
     'cart at the start of a sentence' => ['Cart total', '"cart": write "basket"'],

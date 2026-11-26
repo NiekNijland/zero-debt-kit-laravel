@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Tests\Support\Architecture\DatabaseRuleGuard;
 use Tests\Support\Architecture\PhpFileInspector;
 
+uses()->group('arch');
+
 dataset('database rules that skip the model or the tenant', [
     'a table name' => ["<?php\nuse Illuminate\\Validation\\Rule;\n\$r = Rule::exists('users', 'id')->where('tenant_id', \$id);\n", 'without a model class'],
     'a table name by the fully qualified facade' => ["<?php\n\$r = \\Illuminate\\Validation\\Rule::unique('coupons', 'name')->whereNull('tenant_id');\n", 'without a model class'],

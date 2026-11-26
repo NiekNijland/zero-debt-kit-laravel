@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Tests\Support\Unit\ValidatedInputArchitectureHelpers;
 
+uses()->group('arch');
+
 dataset('raw input reads', [
     'input' => ['<?php $a = $request->input(\'name\');'],
     'typed reader' => ['<?php $a = $request->string(\'name\')->toString();'],
