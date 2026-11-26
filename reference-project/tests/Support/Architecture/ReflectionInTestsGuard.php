@@ -17,11 +17,9 @@ use PhpParser\Node\FunctionLike;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\NodeFinder;
-use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\NameResolver;
 use PhpParser\NodeVisitor\ParentConnectingVisitor;
 use PhpParser\NodeVisitorAbstract;
-use PhpParser\ParserFactory;
 
 final readonly class ReflectionInTestsGuard
 {
@@ -56,7 +54,7 @@ final readonly class ReflectionInTestsGuard
      */
     public function inSource(string $source): array
     {
-        $statements = (new ParserFactory())->createForHostVersion()->parse($source) ?? [];
+        $statements = PhpSource::parse($source);
         $visitor = new class() extends NodeVisitorAbstract
         {
             /** @var list<string> */
@@ -71,7 +69,7 @@ final readonly class ReflectionInTestsGuard
             }
         };
 
-        (new NodeTraverser(new NameResolver(), new ParentConnectingVisitor(), $visitor))->traverse($statements);
+        PhpSource::traverse($statements, new NameResolver(), new ParentConnectingVisitor(), $visitor);
 
         return array_map(static fn (string $found): string => $found . ': ' . self::MESSAGE, $visitor->found);
     }

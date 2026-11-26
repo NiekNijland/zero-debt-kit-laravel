@@ -11,7 +11,6 @@ use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Return_;
 use PhpParser\NodeFinder;
-use PhpParser\ParserFactory;
 
 final readonly class FormRequestGuard
 {
@@ -43,7 +42,7 @@ final readonly class FormRequestGuard
      */
     public function inSource(string $source): array
     {
-        $statements = (new ParserFactory())->createForHostVersion()->parse($source) ?? [];
+        $statements = PhpSource::parse($source);
         $finder = new NodeFinder();
         $violations = [];
 

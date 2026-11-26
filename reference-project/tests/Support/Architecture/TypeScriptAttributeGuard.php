@@ -6,7 +6,6 @@ namespace Tests\Support\Architecture;
 
 use PhpParser\Node\Attribute;
 use PhpParser\NodeFinder;
-use PhpParser\ParserFactory;
 
 /**
  * A TypeScript type is named after its PHP class: the attribute carries no argument that renames it.
@@ -71,7 +70,7 @@ final readonly class TypeScriptAttributeGuard
      */
     private function attributes(string $source): array
     {
-        $statements = new ParserFactory()->createForHostVersion()->parse($source) ?? [];
+        $statements = PhpSource::parse($source);
 
         return array_values(array_filter(
             new NodeFinder()->findInstanceOf($statements, Attribute::class),

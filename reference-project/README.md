@@ -28,6 +28,20 @@ Run as a whole with Pest in a scratch setup (the guards' own dependencies, no ap
 
 Still not done in this folder: the failure messages of the CI guards mostly say what is wrong and not the value to write; the untyped receivers and the glob pattern named above; a case under a dot directory in the tests listed above; the detectors that autoload application classes.
 
+## The shared source reader
+
+One family in `tests/Support/Architecture/`, copied first and as a whole (`04-guards.md` C1; the first commit of step 3). A guard depends on these and never parses, resolves names or reads a list on its own:
+
+| Class | Answers |
+| --- | --- |
+| `PhpSource` | the one parser: `parse()` (names as written), `resolved()` (names resolved; `preserveOriginal: true` keeps the spelling), `statements()` (a named file, throws when missing) and `traverse()`, the visitor entry that takes any node visitor |
+| `PhpFileInspector` | the folder and file questions: `phpFiles()`, `declaredTypes()`, `referencedNames()`, string and keyed-array literals, swallowed catches, and `calls()` / `callsIn()` through the call reader |
+| `PhpCallReader` | the call reader: every function, method, nullsafe and static call with callee, receiver, line and printed arguments, and every `new` |
+| `ClassGraph` | the declaration reader: classes, interfaces and traits with parents, interfaces, traits, methods, properties and attributes |
+| `CountedList` | the counted list of `04-guards.md` C5: a committed file, one key per line, `added()` for a key not listed, `stale()` for a listed key no longer found, `violations()` for both |
+
+Reasoned, run once in the scratch Pest set-up: the guards of this folder were moved onto `PhpSource` by a codemod (31 files), and the run of the folder shows the same failing tests before and after, plus the five new tests of `CountedListTest.php`. `TypedReceivers.php` still builds its own traverser around a visitor class of its own.
+
 ## The guard library
 
 Each of these is a complete worked example: a detector class, a thin test with failing examples (each with the words the message must contain), passing examples with the near misses, and one real-tree case. The blind sides of `04-guards.md` C1 ("The standing blind-side list") are the checklist for the next guard you copy from them.

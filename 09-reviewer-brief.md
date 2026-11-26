@@ -57,6 +57,7 @@ Output per entry point: pass, or the finding with a proof-of-concept request.
 
 You did not build or measure this. Judge the tree, not the plan. List what you find, each with a count and the command that produced it.
 
+- **Your own errors count too.** A count you give is a claim the lead re-runs. When the lead's number differs from yours, the lead runs the row's own regex and paths and reads the matching lines before changing the row; a disagreement alone changes nothing. Give the exact command and the lines for every count, so the lead can do that in one step.
 - **Start variant** (step 1, before the definition of clean is signed): you get the draft dashboard and the mapping of the catalog onto the project. One question: what debt in this codebase does it not count? Use the list below as the places to look. Re-run a sample of the lead's rows with your own command, every zero among them (a count of 0 is proven by listing the files the pathspec matches), and say when a count or regex of the lead's looks wrong, with yours.
 - **Step variant** (at each step's end): one question about that step's kind of debt: what of it is still there that no counter shows? Check the step's exit artifact against the repository and the host yourself (the pipeline runs, the dashboard at that commit): what the plan pastes is a claim.
 - **End variant** (every counter reads zero): the full list below, a score out of 10, and what stands between the tree and 10. You do not see the previous auditor's report. The end rule is in `06-lock-and-audit.md` E2.

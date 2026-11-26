@@ -19,9 +19,6 @@ use PhpParser\Node\Name;
 use PhpParser\Node\Scalar\InterpolatedString;
 use PhpParser\Node\Scalar\String_;
 use PhpParser\NodeFinder;
-use PhpParser\NodeTraverser;
-use PhpParser\NodeVisitor\NameResolver;
-use PhpParser\ParserFactory;
 
 final readonly class BroadcastChannelGuard
 {
@@ -144,6 +141,6 @@ final readonly class BroadcastChannelGuard
      */
     private static function statements(string $source): array
     {
-        return (new NodeTraverser(new NameResolver()))->traverse((new ParserFactory())->createForHostVersion()->parse($source) ?? []);
+        return PhpSource::resolved($source);
     }
 }

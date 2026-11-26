@@ -8,7 +8,6 @@ use PhpParser\Node\Expr\Array_;
 use PhpParser\Node\Stmt\Declare_;
 use PhpParser\Node\Stmt\Nop;
 use PhpParser\Node\Stmt\Return_;
-use PhpParser\ParserFactory;
 use Throwable;
 
 /**
@@ -64,7 +63,7 @@ final readonly class FileSizeGuard
     private static function isData(string $source): bool
     {
         try {
-            $statements = (new ParserFactory())->createForHostVersion()->parse($source) ?? [];
+            $statements = PhpSource::parse($source);
         } catch (Throwable) {
             return false;
         }

@@ -7,7 +7,6 @@ namespace Tests\Support\Architecture;
 use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\Namespace_;
 use PhpParser\Node\Stmt\Use_;
-use PhpParser\ParserFactory;
 
 /**
  * A file without a namespace gains nothing from `use Name;`: PHP ignores the import of a global class there and warns. The guard
@@ -35,7 +34,7 @@ final readonly class GlobalImportGuard
      */
     public function inSource(string $source): array
     {
-        $statements = (new ParserFactory())->createForHostVersion()->parse($source) ?? [];
+        $statements = PhpSource::parse($source);
         $scope = self::globalScope($statements);
 
         foreach ($scope as $statement) {

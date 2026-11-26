@@ -7,7 +7,6 @@ namespace Tests\Support\Architecture;
 use PhpParser\Node\Stmt\Enum_;
 use PhpParser\Node\Stmt\EnumCase;
 use PhpParser\NodeFinder;
-use PhpParser\ParserFactory;
 
 final readonly class EnumCaseGuard
 {
@@ -70,6 +69,6 @@ final readonly class EnumCaseGuard
      */
     private function statements(string $source): array
     {
-        return new ParserFactory()->createForHostVersion()->parse($source) ?? [];
+        return PhpSource::parse($source);
     }
 }

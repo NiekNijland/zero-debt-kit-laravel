@@ -18,9 +18,7 @@ use PhpParser\Node\Stmt\Namespace_;
 use PhpParser\Node\Stmt\Property;
 use PhpParser\Node\Stmt\TraitUse;
 use PhpParser\Node\Stmt\Use_;
-use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitorAbstract;
-use PhpParser\ParserFactory;
 
 /**
  * A `@var` docblock on a statement, or on an expression inside a function body, tells the analyser a type it never checks.
@@ -122,7 +120,7 @@ final readonly class InlineVarCastGuard
             }
         };
 
-        (new NodeTraverser($visitor))->traverse((new ParserFactory())->createForHostVersion()->parse($source) ?? []);
+        PhpSource::traverse(PhpSource::parse($source), $visitor);
 
         $lines = array_values(array_unique($visitor->lines));
         sort($lines);

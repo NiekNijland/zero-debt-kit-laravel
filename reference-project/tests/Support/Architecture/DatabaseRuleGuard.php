@@ -19,9 +19,6 @@ use PhpParser\Node\InterpolatedStringPart;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar\String_;
 use PhpParser\NodeFinder;
-use PhpParser\NodeTraverser;
-use PhpParser\NodeVisitor\NameResolver;
-use PhpParser\ParserFactory;
 use ReflectionClass;
 
 final class DatabaseRuleGuard
@@ -71,7 +68,7 @@ final class DatabaseRuleGuard
      */
     public function inSource(string $source): array
     {
-        $statements = (new NodeTraverser(new NameResolver()))->traverse((new ParserFactory())->createForHostVersion()->parse($source) ?? []);
+        $statements = PhpSource::resolved($source);
         $finder = new NodeFinder();
         $found = [];
 
