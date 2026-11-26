@@ -6,8 +6,9 @@ FORMATS="tsc knip"
 # NORMALIZE_<name>: a sed -E expression that removes what moves when code above a finding changes: line and column numbers.
 # SECTION_<name>: empty, or an extended regular expression for a heading line. A finding is then written as
 # "<heading without its count>: <finding>", so the same line under two headings is two findings.
-# tsc: the TypeScript compiler.
-FINDING_tsc='error TS[0-9]+'
+# tsc: the TypeScript compiler. A finding has a position (plain "file(1,2): error TS1234" and pretty "file:1:2 - error TS1234"); a
+# start-up or config error ("error TS5058: ...") has none and is no finding: the command then fails without a finding.
+FINDING_tsc='\([0-9]+,[0-9]+\): error TS[0-9]+|:[0-9]+:[0-9]+ - error TS[0-9]+'
 NORMALIZE_tsc='s/\(([0-9]+),([0-9]+)\)//; s/:[0-9]+:[0-9]+//'
 SECTION_tsc=''
 # SKIP_<name>: empty, or an extended regular expression for a heading whose lines are not findings (the tool's own hints).
@@ -25,7 +26,8 @@ usage() {
     echo "  Compares the findings of the command with the baseline file: one line per finding, no line numbers, sorted." >&2
     echo "  Fails on a finding that is not in the file and on a line of the file that is no longer found." >&2
     echo "  --format <name>  the tool whose output the command prints; one of: $FORMATS" >&2
-    echo "  --write          rewrites the file from the findings; the ratchet row type-baseline stops it growing" >&2
+    echo "  --write          rewrites the file from the findings and drops the fixed lines; it refuses a finding the file lacks" >&2
+    echo "  --init           the first write of a file (or a deliberate rewrite): --write without that refusal; the ratchet row type-baseline stops growth later" >&2
     exit 64
 }
 
@@ -33,10 +35,12 @@ usage() {
 BASELINE="$1"
 shift
 WRITE=0
+INIT=0
 FORMAT=""
 while [ "$#" -gt 0 ] && [ "$1" != "--" ]; do
     case "$1" in
         --write) WRITE=1 ;;
+        --init) WRITE=1 INIT=1 ;;
         --format)
             shift
             FORMAT="${1:-}"
@@ -71,6 +75,7 @@ STATUS=0
 FINDING="$FINDING" SECTION="$SECTION" SKIP="$SKIP" awk '
     ENVIRON["SECTION"] != "" && $0 ~ ENVIRON["SECTION"] { heading = $0; sub(/[[:space:]]*\([0-9]+\)$/, "", heading); skipping = (ENVIRON["SKIP"] != "" && heading ~ ENVIRON["SKIP"]); next }
     skipping { next }
+    ENVIRON["SECTION"] != "" && heading == "" { next }
     $0 ~ ENVIRON["FINDING"] { print (heading == "" ? "" : heading ": ") $0 }' "$WORK/output" | sed -E "${NORMALIZE:-s/^//}" | sort > "$WORK/now"
 
 if [ "$STATUS" -ne 0 ] && [ ! -s "$WORK/now" ]; then
@@ -80,6 +85,17 @@ if [ "$STATUS" -ne 0 ] && [ ! -s "$WORK/now" ]; then
 fi
 
 if [ "$WRITE" -eq 1 ]; then
+    # --write only drops fixed lines. A finding that is not in the file is growth: it needs --init, which is for the first write
+    # of a file (step 2), so a command that prints something new cannot be written into the baseline by accident.
+    if [ "$INIT" -eq 0 ] && [ -s "$BASELINE" ]; then
+        sort "$BASELINE" > "$WORK/then"
+        GROWTH=$(comm -23 "$WORK/now" "$WORK/then")
+        if [ -n "$GROWTH" ]; then
+            echo "Keyed baseline: --write would add findings that are not in $BASELINE. FAILS: fix them; a line is never added to the baseline (--init writes the first file)"
+            printf '%s\n' "$GROWTH" | sed 's/^/  /'
+            exit 1
+        fi
+    fi
     mkdir -p "$(dirname "$BASELINE")"
     cat "$WORK/now" > "$BASELINE"
     echo "Keyed baseline: $BASELINE rewritten, $(wc -l < "$WORK/now" | tr -d ' ') lines."

@@ -7,9 +7,11 @@
 TICKET='<ticket pattern>'
 TYPES='feat|fix|refactor|test|docs|chore|style|ci|perf|build|revert'
 EXAMPLE='<example subject>'
-# Titles a tool or the host writes, accepted without the form (an extended regular expression, matched from the start of the
-# subject). A project that keeps a tool-made title adds its exact text here, for as long as open branches hold it.
-GENERATED='^(Merge (branch|remote-tracking branch|pull request|tag|commit) |Merge [0-9a-f]{7,40} into [0-9a-f]{7,40}$|Merged in .+ \(pull request #[0-9]+\)$|Revert ".+"|Reapply ".+")'
+# Titles a tool or the host writes, accepted without the form (an extended regular expression, matched over the whole subject).
+# A commit with more than one parent is never checked, so "Merge branch ..." and "Merge pull request ..." are not listed: on a
+# single-parent commit they would hide work behind a generated-looking title. A project that keeps a tool-made title adds its
+# exact text here, for as long as open branches hold it.
+GENERATED='^(Merge [0-9a-f]{7,40} into [0-9a-f]{7,40}|Merged in .+ \(pull request #[0-9]+\)|Revert ".+"|Reapply ".+")$'
 # The base branch, the remote and the host's variables are in kit-config.sh, next to this script.
 # <<< config
 

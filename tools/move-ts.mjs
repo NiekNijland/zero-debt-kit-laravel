@@ -4,7 +4,9 @@
 // Without a flag: git mv each file that is still at its old path (running it again changes nothing), then rewrite the specifiers in
 // the tracked files under the roots: relative, alias, import(), require() and mock calls. --reverse swaps the columns: the same
 // tool takes a group back out of a finished move. --verify changes nothing and exits 1 when an old path still exists, a new path
-// is missing, or a specifier still names an old path.
+// is missing, a specifier still names an old path, or a moved file has a relative or alias specifier that names no file.
+// Every map line is checked before the first git mv (a file that is not tracked, a target that exists): a map that fails
+// leaves nothing half moved.
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -21,23 +23,47 @@ const [aliasName, aliasDir] = option("--alias", "@=src").split("=");
 const roots = option("--roots", "src").split(",");
 const EXT = /\.(tsx?|jsx?|mjs|cjs|mts|cts)$/;
 const bare = (file) => file.replace(EXT, "").replace(/\/index$/, "");
+const fail = (message) => {
+    console.error(`Move: ${message}`);
+    process.exit(1);
+};
 
+// A line ends in LF or CRLF; the two paths are trimmed; a "#export" suffix of a path is dropped (a "#" inside a path stays).
 const pairs = readFileSync(mapFile, "utf8")
     .split("\n")
+    .map((line) => line.replace(/\r$/, ""))
     .filter((line) => line.trim() !== "")
-    .map((line) => line.split("\t").map((part) => part.split("#")[0]))
+    .map((line) => line.split("\t").map((part) => part.replace(/#[A-Za-z0-9_]*$/, "").trim()))
     .map(([from, to]) => (flag("--reverse") ? [to, from] : [from, to]));
 const moved = new Map(pairs.map(([from, to]) => [bare(from), bare(to)]));
 const origin = new Map(pairs.map(([from, to]) => [to, from]));
 
-const tracked = execFileSync("git", ["ls-files", ...roots], { encoding: "utf8" }).split("\n").filter((file) => EXT.test(file));
-const quoted = /((?:from|import\(|require\(|\.mock\(|\.doMock\(|\.importActual\(|import)\s*)(["'])([^"']+)\2/g;
+// -z and core.quotePath=false: a path with a non-ASCII character is listed as it is, not quoted and escaped.
+const listFiles = (...paths) =>
+    execFileSync("git", ["-c", "core.quotePath=false", "ls-files", "-z", ...paths], { encoding: "utf8", maxBuffer: 1 << 28 })
+        .split("\0")
+        .filter((file) => file !== "");
+const tracked = listFiles(...roots).filter((file) => EXT.test(file));
+// Every spelling that takes a module path as its first argument: the lead of a quoted specifier.
+const quoted = new RegExp(
+    String.raw`((?:from|import\(|require\(|require\.resolve\(|\.(?:mock|doMock|unmock|doUnmock|importActual|importMock|requireActual|requireMock|setMock)\(|import)\s*)(["'])([^"']+)\2`,
+    "g",
+);
 let problems = 0;
 
 const movedNow = new Set();
 if (!flag("--verify")) {
+    // Check every line before the first git mv: a map line that fails halfway would leave a move that no second run can repair.
+    const known = new Set(listFiles());
+    const targets = new Set();
     for (const [from, to] of pairs) {
-        if (existsSync(from) && !existsSync(to)) {
+        if (targets.has(to)) fail(`${to}: two map lines move a file there`);
+        targets.add(to);
+        if (known.has(from) && (known.has(to) || existsSync(to))) fail(`${from} and ${to} both exist: nothing is moved, resolve the map or the files`);
+        if (!known.has(from) && !known.has(to)) fail(`${from}: not tracked by git, and ${to} does not exist either`);
+    }
+    for (const [from, to] of pairs) {
+        if (known.has(from) && !existsSync(to)) {
             mkdirSync(path.dirname(to), { recursive: true });
             execFileSync("git", ["mv", from, to]);
             movedNow.add(to);
@@ -45,7 +71,15 @@ if (!flag("--verify")) {
     }
 }
 
-const files = flag("--verify") ? tracked : execFileSync("git", ["ls-files", ...roots], { encoding: "utf8" }).split("\n").filter((file) => EXT.test(file));
+let everything = null;
+const resolves = (candidate) => {
+    everything ??= new Set(listFiles());
+    const extensions = ["", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"];
+    // "./x.js" may name x.ts (the TypeScript spelling of an ES module import), so a code extension is tried as a stem too.
+    return [candidate, candidate.replace(EXT, "")].some((stem) => extensions.some((ext) => everything.has(stem + ext) || (ext !== "" && everything.has(`${stem}/index${ext}`))));
+};
+
+const files = flag("--verify") ? tracked : listFiles(...roots).filter((file) => EXT.test(file));
 for (const file of files) {
     const text = readFileSync(file, "utf8");
     const was = movedNow.has(file) ? origin.get(file) : file;
@@ -58,6 +92,10 @@ for (const file of files) {
         if (flag("--verify")) {
             if (moved.has(target) && moved.get(target) !== target) {
                 console.error(`${file}: the specifier ${specifier} still names the old path ${target}`);
+                problems += 1;
+            } else if (origin.has(file) && !resolves(specifier.startsWith(".") ? path.posix.normalize(path.posix.join(path.posix.dirname(file), specifier)) : path.posix.join(aliasDir, specifier.slice(aliasName.length + 1)))) {
+                // A moved file whose specifier names no file: the rewrite of a half move (a crash between git mv and the rewrite).
+                console.error(`${file}: the specifier ${specifier} names no file`);
                 problems += 1;
             }
             return whole;

@@ -46,19 +46,22 @@ CHANGED=""
 if [ "$MODE" = "--changed" ]; then
     BASE="${CHECK_BASE:-$DEFAULT_BASE_BRANCH}"
     # shellcheck disable=SC2086
-    CHANGED=$(git diff --name-only --diff-filter=AM "$REMOTE/$BASE"...HEAD -- $MUTATION_SOURCE_FOLDERS | tr '\n' ',' | sed 's/,$//')
+    CHANGED=$(git -c core.quotePath=false diff --no-renames --name-only --diff-filter=AM "$REMOTE/$BASE"...HEAD -- $MUTATION_SOURCE_FOLDERS | tr '\n' ',' | sed 's/,$//')
     if [ -z "$CHANGED" ]; then
         echo "Mutation: this pull request changes no source file; nothing to mutate."
         exit 0
     fi
 fi
 
+# Stryker has no command-line option for the break threshold: stryker.config.mjs reads the floor from the environment variable
+# MUTATION_FLOOR that this script sets (thresholds: { break: Number(process.env.MUTATION_FLOOR) }), so the floor file stays the
+# one place of the number. Stryker and Infection are not run for this kit: verify both lines in step 2.
 case "$MUTATION_TOOL:$MODE" in
     pest:) vendor/bin/pest --mutate --everything --parallel --min="$FLOOR" ;;
     pest:--changed) vendor/bin/pest --mutate --parallel --path="$CHANGED" --min="$FLOOR" ;;
     infection:) vendor/bin/infection --threads=max --min-msi="$FLOOR" ;;
-    infection:--changed) vendor/bin/infection --threads=max --min-msi="$FLOOR" --git-diff-filter=AM --git-diff-base="$REMOTE/${CHECK_BASE:-$DEFAULT_BASE_BRANCH}" ;;
-    stryker:) STRYKER_THRESHOLD_BREAK="$FLOOR" npx stryker run ;;
-    stryker:--changed) STRYKER_THRESHOLD_BREAK="$FLOOR" npx stryker run --mutate "${CHANGED//,/ }" ;;
+    infection:--changed) vendor/bin/infection --threads=max --min-msi="$FLOOR" --git-diff-filter=AMR --git-diff-base="$REMOTE/${CHECK_BASE:-$DEFAULT_BASE_BRANCH}" ;;
+    stryker:) MUTATION_FLOOR="$FLOOR" npx stryker run ;;
+    stryker:--changed) MUTATION_FLOOR="$FLOOR" npx stryker run --mutate "$CHANGED" ;;
     *) fail "MUTATION_TOOL is \"$MUTATION_TOOL\": it is one of pest, infection, stryker" ;;
 esac

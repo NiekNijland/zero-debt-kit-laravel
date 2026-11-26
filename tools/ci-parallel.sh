@@ -15,6 +15,28 @@ if [ "$#" -eq 0 ]; then
 fi
 
 CHECK_TIMEOUT="${CI_CHECK_TIMEOUT:-$DEFAULT_TIMEOUT}"
+case "$CHECK_TIMEOUT$GRACE" in
+    "" | *[!0-9]*)
+        echo "ci-parallel: the time limit ($CHECK_TIMEOUT, from CI_CHECK_TIMEOUT or DEFAULT_TIMEOUT) and GRACE ($GRACE) are whole numbers of seconds" >&2
+        exit 64
+        ;;
+esac
+# A task is "Name::command" with a command that is not blank: a command that expanded to nothing (an unset variable in the
+# caller) must not be a green check.
+for task in "$@"; do
+    case "$task" in
+        *"::"*) ;;
+        *)
+            echo "ci-parallel: \"$task\" is not Name::command" >&2
+            exit 64
+            ;;
+    esac
+    command_text="${task#*::}"
+    if [ -z "${command_text//[[:space:]]/}" ] || [ -z "${task%%::*}" ]; then
+        echo "ci-parallel: \"$task\" has no name or no command" >&2
+        exit 64
+    fi
+done
 LOG_DIR="$(mktemp -d)"
 [ -d "$LOG_DIR" ] || exit 1
 NAMES=()
@@ -22,7 +44,7 @@ RUNNERS=()
 
 stop_all() {
     local runner file
-    for file in "$LOG_DIR"/*.pid; do
+    for file in "$LOG_DIR"/*.pid "$LOG_DIR"/*.wd; do
         [ -f "$file" ] && kill -TERM "-$(cat "$file")" 2> /dev/null
     done
     for runner in ${RUNNERS[@]+"${RUNNERS[@]}"}; do
@@ -51,6 +73,7 @@ run() {
         kill -KILL "-$pid" 2> /dev/null
     ) > /dev/null 2>&1 < /dev/null &
     watchdog=$!
+    echo "$watchdog" > "$LOG_DIR/$index.wd"
     wait "$pid" 2> /dev/null
     status=$?
     kill -KILL "-$watchdog" 2> /dev/null
