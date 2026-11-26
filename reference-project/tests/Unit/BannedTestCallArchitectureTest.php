@@ -63,7 +63,7 @@ it('finds every banned spelling in a test file', function (string $path, string 
     $root = SourceSandbox::create([$path => $source]);
 
     try {
-        $violations = (new BannedTestCallGuard(new PhpFileInspector(), $root))->violations();
+        $violations = (new BannedTestCallGuard(new PhpFileInspector(), $root, 'tests', ['tests/Unit', 'tests/Concerns']))->violations();
 
         expect($violations)->toHaveKey($path)
             ->and($violations[$path])->toHaveCount(1)
@@ -107,12 +107,27 @@ it('allows the spelling the tests are written in', function (string $path, strin
     $root = SourceSandbox::create([$path => $source]);
 
     try {
-        expect((new BannedTestCallGuard(new PhpFileInspector(), $root))->violations())->toBe([]);
+        expect((new BannedTestCallGuard(new PhpFileInspector(), $root, 'tests', ['tests/Unit', 'tests/Concerns']))->violations())->toBe([]);
     } finally {
         SourceSandbox::remove($root);
     }
 })->with('allowed test calls');
 
+it('filters on the path relative to the root when the checkout sits under a dot directory', function (): void {
+    $root = SourceSandbox::create([
+        'tests/Feature/FooTest.php' => "<?php\nuse Illuminate\\Support\\Carbon;\nCarbon::setTestNow('2026-01-01');\n",
+        'tests/Unit/BarTest.php' => "<?php\nuse Illuminate\\Support\\Carbon;\nCarbon::setTestNow('2026-01-01');\n",
+    ], prefix: '.checkout-');
+
+    try {
+        $violations = (new BannedTestCallGuard(new PhpFileInspector(), $root, 'tests', ['tests/Unit', 'tests/Concerns']))->violations();
+
+        expect(array_keys($violations))->toBe(['tests/Feature/FooTest.php']);
+    } finally {
+        SourceSandbox::remove($root);
+    }
+});
+
 it('keeps every banned call out of the test suite', function (): void {
-    expect((new BannedTestCallGuard(new PhpFileInspector(), dirname(__DIR__, 2)))->violations())->toBe([]);
+    expect((new BannedTestCallGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'tests', ['tests/Unit', 'tests/Concerns']))->violations())->toBe([]);
 });

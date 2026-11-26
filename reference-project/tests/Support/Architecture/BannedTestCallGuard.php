@@ -21,8 +21,6 @@ use PhpParser\ParserFactory;
 final class BannedTestCallGuard
 {
     /** Tests without the booted application have no $this->travel(): they, and the tier traits that reset the clock, may use setTestNow(). */
-    private const array CLOCK_EXEMPT = ['tests/Unit/', 'tests/Concerns/'];
-
     private const array CLOCK_CLASSES = [
         'Carbon',
         'CarbonImmutable',
@@ -76,9 +74,15 @@ final class BannedTestCallGuard
         503 => 'assertServiceUnavailable',
     ];
 
+    /**
+     * @param string $tests the test folder, relative to the root
+     * @param list<string> $withoutTestClock folders (relative to the root) whose tests have no test clock: the pure unit tier and the test concerns
+     */
     public function __construct(
         private readonly PhpFileInspector $inspector,
         private readonly string $root,
+        private readonly string $tests,
+        private readonly array $withoutTestClock,
     ) {
     }
 
@@ -91,7 +95,7 @@ final class BannedTestCallGuard
     {
         $violations = [];
 
-        foreach ($this->inspector->phpFiles($this->root . '/tests') as $file) {
+        foreach ($this->inspector->phpFiles($this->root . '/' . $this->tests) as $file) {
             $relative = substr($file, strlen($this->root) + 1);
             $found = $this->inFile($file, $relative);
 
@@ -216,7 +220,7 @@ final class BannedTestCallGuard
         }
 
         if ($call['kind'] === 'static' && $call['name'] === 'settestnow' && in_array($call['class'], self::CLOCK_CLASSES, true) && ! $this->isClockExempt($relative)) {
-            return 'setTestNow(): use $this->travelTo(), $this->freezeTime() or test()->travelTo(); only tests/Unit has no test clock';
+            return 'setTestNow(): use $this->travelTo(), $this->freezeTime() or test()->travelTo(); only a test in a folder without a test clock (the pure unit tier, a test concern) may call it';
         }
 
         if ($call['kind'] === 'method' && $call['receiver'] === '->app' && in_array($call['name'], self::BINDINGS, true)) {
@@ -274,7 +278,7 @@ final class BannedTestCallGuard
 
     private function isClockExempt(string $relative): bool
     {
-        return array_any(self::CLOCK_EXEMPT, static fn (string $prefix): bool => str_starts_with($relative, $prefix));
+        return array_any($this->withoutTestClock, static fn (string $folder): bool => str_starts_with($relative, rtrim($folder, '/') . '/'));
     }
 
     private function returnsReadyObject(string $closure): bool
