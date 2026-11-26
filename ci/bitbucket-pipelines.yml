@@ -12,7 +12,8 @@
 # A pull-request pipeline merges the destination branch into the checkout first, so HEAD is that merge and
 # BITBUCKET_COMMIT is not: the checks read HEAD, and CHECK_HEAD is never set here.
 # Step 9 of the program adds one line to the backend tests of a pull request: bash scripts/mutation.sh --changed (the files
-# the pull request changes, with the committed minimum score).
+# the pull request changes, with the committed minimum score). That step exports CHECK_BASE, which the mutation script reads.
+# The scheduled step has the database service too: the whole-tree mutation run runs the project's test suite.
 
 # Speed (04-guards.md C4, "CI speed"): cache the dependency directories and downloaded tools by the hash of the lock file,
 # keep the analyser's result cache between builds (not the type-aware lint cache), run independent jobs side by side, and
@@ -89,6 +90,7 @@ pipelines:
               services:
                 - database
               script:
+                - export CHECK_BASE="$BITBUCKET_PR_DESTINATION_BRANCH"
                 - <install dependencies from the lock file>
                 - <backend test command, with coverage held at the committed floor (tools/README.md, "Coverage")>
           - step:
@@ -169,6 +171,8 @@ pipelines:
       - step:
           name: Scheduled
           max-time: <maximum minutes>
+          services:
+            - database
           script:
             - <install dependencies from the lock file>
             - bash scripts/checks.sh --scheduled

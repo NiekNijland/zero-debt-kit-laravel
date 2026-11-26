@@ -20,24 +20,32 @@
 # audit everything.
 # Dependency cache: a cache block keyed by the lock file (key: files: [<lock file>]), with the dependency directory as path.
 # Step 9 of the program adds, to backend-tests on merge requests: bash scripts/mutation.sh --changed.
+# A merge request pipeline checks out the source branch, so CHECK_HEAD is its commit (CI_COMMIT_SHA; in a merged results
+# pipeline that is the merge commit, which is right too). Merge requests from a fork are not supported: the target branch is
+# not in the fork's origin, so the base fetch fails.
+# "Pipelines must succeed" accepts a pipeline whose jobs were all skipped: the contract test asserts that the merge request
+# pipeline holds the checks job. The official database images exit without a password: the variables of the service jobs
+# set one, and the tests reach the service by its alias (DB_HOST=database, as on GitHub). The test and check jobs are
+# interruptible: with "Auto-cancel redundant pipelines" on, a push cancels the run it replaces.
 
 image: <image with bash, git and the project's toolchain, pinned by digest>
 
 variables:
-  GIT_DEPTH: 0
+  GIT_DEPTH: "0"
 
 workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_PIPELINE_SOURCE == "schedule"
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    - if: $CI_COMMIT_BRANCH == "<other deploying branch>"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "<other deploying branch>"
 
 stages:
   - verify
 
 checks:
   stage: verify
+  interruptible: true
   timeout: <maximum minutes> minutes
   parallel:
     matrix:
@@ -66,7 +74,11 @@ checks-main:
 
 backend-tests:
   stage: verify
+  interruptible: true
   timeout: <maximum minutes> minutes
+  variables:
+    POSTGRES_PASSWORD: ci
+    DB_HOST: database
   services:
     - name: <the image of DATABASE_IMAGE in scripts/kit-config.sh>
       alias: database
@@ -78,6 +90,7 @@ backend-tests:
 
 frontend-tests:
   stage: verify
+  interruptible: true
   timeout: <maximum minutes> minutes
   rules:
     - if: $CI_PIPELINE_SOURCE != "schedule"
@@ -87,7 +100,11 @@ frontend-tests:
 
 smoke:
   stage: verify
+  interruptible: true
   timeout: <maximum minutes> minutes
+  variables:
+    POSTGRES_PASSWORD: ci
+    DB_HOST: database
   services:
     - name: <the image of DATABASE_IMAGE in scripts/kit-config.sh>
       alias: database
@@ -101,6 +118,12 @@ smoke:
 scheduled:
   stage: verify
   timeout: <maximum minutes> minutes
+  variables:
+    POSTGRES_PASSWORD: ci
+    DB_HOST: database
+  services:
+    - name: <the image of DATABASE_IMAGE in scripts/kit-config.sh>
+      alias: database
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
   script:
