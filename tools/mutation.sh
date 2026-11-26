@@ -44,7 +44,12 @@ FLOOR=$(sed -n -E 's/^threshold: ([0-9]+)$/\1/p' "$MUTATION_FLOOR_FILE" | awk 'N
 
 CHANGED=""
 if [ "$MODE" = "--changed" ]; then
-    BASE="${CHECK_BASE:-$DEFAULT_BASE_BRANCH}"
+    # The base of the pull request: CHECK_BASE, else the host's variable (BASE_BRANCH_VARS), else the default branch.
+    BASE="${CHECK_BASE:-}"
+    for variable in $BASE_BRANCH_VARS; do
+        [ -n "$BASE" ] || BASE=$(eval "printf '%s' \"\${$variable:-}\"")
+    done
+    BASE="${BASE:-$DEFAULT_BASE_BRANCH}"
     # shellcheck disable=SC2086
     CHANGED=$(git -c core.quotePath=false diff --no-renames --name-only --diff-filter=AM "$REMOTE/$BASE"...HEAD -- $MUTATION_SOURCE_FOLDERS | tr '\n' ',' | sed 's/,$//')
     if [ -z "$CHANGED" ]; then
@@ -60,7 +65,7 @@ case "$MUTATION_TOOL:$MODE" in
     pest:) vendor/bin/pest --mutate --everything --parallel --min="$FLOOR" ;;
     pest:--changed) vendor/bin/pest --mutate --parallel --path="$CHANGED" --min="$FLOOR" ;;
     infection:) vendor/bin/infection --threads=max --min-msi="$FLOOR" ;;
-    infection:--changed) vendor/bin/infection --threads=max --min-msi="$FLOOR" --git-diff-filter=AMR --git-diff-base="$REMOTE/${CHECK_BASE:-$DEFAULT_BASE_BRANCH}" ;;
+    infection:--changed) vendor/bin/infection --threads=max --min-msi="$FLOOR" --git-diff-filter=AMR --git-diff-base="$REMOTE/$BASE" ;;
     stryker:) MUTATION_FLOOR="$FLOOR" npx stryker run ;;
     stryker:--changed) MUTATION_FLOOR="$FLOOR" npx stryker run --mutate "$CHANGED" ;;
     *) fail "MUTATION_TOOL is \"$MUTATION_TOOL\": it is one of pest, infection, stryker" ;;

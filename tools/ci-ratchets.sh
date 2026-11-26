@@ -40,7 +40,7 @@ LINT_BASELINE="eslint-suppressions.json?"
 KEYED_BASELINES="baselines?"
 CI_FILES="bitbucket-pipelines.yml?,.github/workflows?,.gitlab-ci.yml?,scripts"
 # The values that other scripts read too (the caps file, the base branch, the remote) are in kit-config.sh, next to this script.
-GUARDED_FILES=".gitattributes?,scripts/kit-config.sh?,scripts/debt-dashboard.sh?,scripts/ci-commit-messages.sh?,scripts/ci-parallel.sh?,scripts/keyed-baseline.sh?,scripts/audit-gate.sh?,scripts/mutation.sh?,scripts/checks.sh?,bitbucket-pipelines.yml?,.github/workflows?,.gitlab-ci.yml?"
+GUARDED_FILES=".gitattributes?,CODEOWNERS?,.github/CODEOWNERS?,docs/CODEOWNERS?,.gitlab/CODEOWNERS?,scripts/kit-config.sh?,scripts/debt-dashboard.sh?,scripts/ci-commit-messages.sh?,scripts/ci-parallel.sh?,scripts/keyed-baseline.sh?,scripts/audit-gate.sh?,scripts/mutation.sh?,scripts/checks.sh?,bitbucket-pipelines.yml?,.github/workflows?,.gitlab-ci.yml?"
 # The rows that never go below 0 but still take an override at 0 (a reason that is itself a decision: a justified comment, a pinned
 # major). A comma list of row names; every other max row at 0 takes none.
 OVERRIDE_AT_ZERO="comments,cap-dependencies-majors-behind"
@@ -955,6 +955,14 @@ selftest() {
             index=$((index + 1))
             continue
         }
+        # The two audit-ignore cases are written for the composer key; a project that reads another manifest key (package.json) has
+        # changed the row's expression, so the cases do not describe it: skipped, not failed.
+        if [ "$row" = "audit-ignore" ] && [ "${spec#count? }" != "config.audit.ignore" ]; then
+            skipped=$((skipped + 1))
+            covered="$covered $row "
+            index=$((index + 1))
+            continue
+        fi
         path="${paths[$index]}"
         [ "$method" != "without" ] || path="$(dirname "$path")"
         status=0
