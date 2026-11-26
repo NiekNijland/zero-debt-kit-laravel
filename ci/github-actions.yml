@@ -16,9 +16,14 @@
 # Merge-first, as on Bitbucket: a pull_request run checks out GitHub's merge ref (the pull request merged into the base as it is
 # when the run starts), so HEAD is that merge, the ratchets compare it with the base, and CHECK_HEAD is never set here. Every
 # job checks out the same ref, so one pull request is judged on one tree. The merge ref is made when the event fires and is not
-# made again when the base moves later: the repository setting "Require branches to be up to date before merging" (or a merge
-# queue, which this file does not support: no merge_group trigger) is what makes the last merge the one that was tested. A push
-# to a deploying branch checks out that branch, which is what --main wants.
+# made again when the base moves later: the repository setting "Require branches to be up to date before merging" is what makes
+# the last merge the one that was tested. A push to a deploying branch checks out that branch, which is what --main wants.
+# No merge queue: this file has no merge_group trigger, on purpose, and a project must not turn the queue on for a branch that
+# requires these checks (a required check that never reports on the queue's ref blocks every merge). Reason: on a merge_group
+# event GITHUB_BASE_REF is empty (the base is in github.event.merge_group.base_ref, with the refs/heads/ prefix), and the commit
+# range base..HEAD of a queued ref holds the commits of every pull request queued before it, so the override tags, the commit
+# messages and the guarded-file check would judge other pull requests' commits against this one. Supporting the queue needs a
+# change in ci-ratchets.sh (the range of one pull request on a queue ref), not only a trigger here.
 # The retarget of a stacked pull request (07-process.md section 9) fires "edited" with changes.base: the type is listed, and the
 # concurrency group cancels the run it replaces. An edit of the title or the description starts a run too; that is the price.
 # Do not set persist-credentials: false on the checkout: checks.sh fetches the base with the credentials the checkout leaves.
