@@ -211,7 +211,7 @@ final class BannedTestCallGuard
             return 'Config::set(): write config([\'key\' => $value])';
         }
 
-        if ($call['kind'] === 'method' && $call['name'] === 'set' && $call['receiver'] === 'config()') {
+        if ($call['kind'] === 'method' && $call['name'] === 'set' && in_array($call['receiver'], ['config()', "app('config')", "->app['config']"], true)) {
             return 'config()->set(): write config([\'key\' => $value])';
         }
 
@@ -239,7 +239,7 @@ final class BannedTestCallGuard
             return 'App::' . $call['name'] . '() of a ready object: write app()->instance(Abstract::class, $fake)';
         }
 
-        if ($call['kind'] === 'function' && $call['name'] === 'expect' && in_array($call['arguments'], [['true'], ['\\true']], true)) {
+        if ($call['kind'] === 'function' && $call['name'] === 'expect' && count($call['arguments']) === 1 && ltrim(strtolower($call['arguments'][0]), '\\') === 'true') {
             return 'expect(true): assert the state the code leaves behind, or end the test with ->throwsNoExceptions()';
         }
 

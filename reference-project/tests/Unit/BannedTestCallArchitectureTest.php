@@ -6,10 +6,15 @@ use Tests\Support\Architecture\BannedTestCallGuard;
 use Tests\Support\Architecture\PhpFileInspector;
 use Tests\Support\SourceSandbox;
 
+uses()->group('arch');
+
 dataset('banned test calls', [
     'Config::set with a key and a value' => ['tests/Feature/FooTest.php', "<?php\nuse Illuminate\\Support\\Facades\\Config;\nConfig::set('app.name', 'x');\n", 'Config::set()'],
     'Config::set with an array' => ['tests/Feature/FooTest.php', "<?php\nuse Illuminate\\Support\\Facades\\Config;\nConfig::set(['app.name' => 'x']);\n", 'Config::set()'],
     'Config::set by its fully qualified name' => ['tests/Support/Foo.php', "<?php\n\\Illuminate\\Support\\Facades\\Config::set('app.name', 'x');\n", 'Config::set()'],
+    'config set through the container string' => ['tests/Feature/FooTest.php', "<?php\napp('config')->set('app.name', 'x');\n", 'config()->set()'],
+    'config set through the container as an array' => ['tests/Feature/FooTest.php', "<?php\nfinal class T { public function f(): void { \$this->app['config']->set('app.name', 'x'); } }\n", 'config()->set()'],
+    'expect(TRUE) in capitals' => ['tests/Feature/FooTest.php', "<?php\nexpect(TRUE)->toBeTrue();\n", 'expect(true)'],
     'config()->set' => ['tests/Feature/FooTest.php', "<?php\nconfig()->set('app.name', 'x');\n", 'config()->set()'],
     'setTestNow in a feature test' => ['tests/Feature/FooTest.php', "<?php\nuse Illuminate\\Support\\Carbon;\nCarbon::setTestNow('2025-01-02');\n", 'setTestNow()'],
     'setTestNow of the immutable class in a helper' => ['tests/Support/Foo.php', "<?php\nuse Carbon\\CarbonImmutable;\nCarbonImmutable::setTestNow();\n", 'setTestNow()'],
@@ -94,6 +99,7 @@ dataset('allowed test calls', [
     'hooks with a return type or an arrow function' => ['tests/Feature/FooTest.php', "<?php\nbeforeEach(function (): void {\n    config(['app.name' => 'x']);\n});\nafterEach(fn () => TemporaryPaths::delete());\n"],
     'a closure that is not a test' => ['tests/Feature/FooTest.php', "<?php\ncollect(\$rows)->each(function (\$row) {\n    return \$row;\n});\nexpect(function () {\n    return 1;\n})->toThrow(FooException::class);\n"],
     'assertStatus with a code that has no named assertion' => ['tests/Feature/FooTest.php', "<?php\n\$response->assertStatus(502);\n\$response->assertStatus(\$status);\n\$response->assertOk();\n"],
+    'a set on a container binding that is not the config' => ['tests/Feature/FooTest.php', "<?php\napp('cache')->set('a', 'b');\n\$this->app['files']->set('a');\nexpect(\$flag)->toBeTrue();\n"],
     'banned calls in a string' => ['tests/Feature/FooTest.php', "<?php\n\$source = 'Config::set(\"a\", \"b\"); \$this->app->bind(Foo::class, fn () => \$foo);';\n"],
 ]);
 

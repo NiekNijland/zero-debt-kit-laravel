@@ -261,6 +261,17 @@ final class PhpCallReader
             return mb_strtolower($expression->name->getLast()) . '()';
         }
 
+        // `app('config')`: the container called with one string, the form that names what it resolves.
+        if ($expression instanceof FuncCall && $expression->name instanceof Name && mb_strtolower($expression->name->getLast()) === 'app'
+            && count($expression->args) === 1 && $expression->args[0] instanceof Node\Arg && $expression->args[0]->value instanceof String_) {
+            return "app('" . $expression->args[0]->value->value . "')";
+        }
+
+        // `$this->app['config']`: the container used as an array.
+        if ($expression instanceof Node\Expr\ArrayDimFetch && $expression->dim instanceof String_ && $expression->var instanceof PropertyFetch) {
+            return self::receiver($expression->var) . "['" . $expression->dim->value . "']";
+        }
+
         if (($expression instanceof MethodCall || $expression instanceof NullsafeMethodCall) && $expression->name instanceof Identifier && $expression->args === []) {
             return '->' . mb_strtolower($expression->name->toString()) . '()';
         }
