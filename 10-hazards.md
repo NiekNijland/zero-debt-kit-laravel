@@ -111,3 +111,12 @@ A project that has a bot that commits fixes (kept or not yet decided in step 1) 
 - The unused-code tool flags exports of test helpers no sibling imports. An entry file referenced only from a server template looks unused to it: declare it as an entry, never as an ignore.
 
 Traps of one framework are in its catalog: `catalog/backend-laravel.md`, "Framework traps".
+
+## Closing the program (step 10)
+
+- A dashboard row that counts by a folder regex reads zero when a folder is missing from the regex (25 untested classes in `Support` folders). Prove every zero by listing the files the pathspec matches and the folders of the tree that match no row.
+- Serialized closures carry class names in their bodies, not only in their scope. An alias list built from the class moves misses a class that only a closure body names; the runtime check with old-tree payloads found three. Read every serialized closure of the old tree and list the names its body resolves, before the release that moves them.
+- The first end audit finds the rest of the definition, not nothing: two auditors scored 7 and 6.5 although the dashboard was green. Make the dashboard hold every number the definition states (type coverage, pinned images, path conditions, inline casts) before step 10 starts, and budget three audit rounds.
+- Builders cut from one base collide when one moves tests and another writes tests for the same classes. Merge the move branch first and cut the test builders from it.
+- Run the guard group on the tip of every PR in a chain; a fix that lived on the top merge belongs on the lower PR, or the lower PR is red alone.
+- A private package host that refuses authentication in a non-interactive session turns the online dashboard rows into UNKNOWN. Put one measuring command that works without it (a scratch manifest) in the profile.
