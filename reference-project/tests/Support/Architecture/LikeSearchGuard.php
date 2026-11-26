@@ -8,6 +8,11 @@ final readonly class LikeSearchGuard
 {
     private const string CASE_INSENSITIVE = '/\bilike\b|\blower\s*\(.*\)\s*like\b/is';
 
+    /** `whereLike` is case-insensitive by default, so any hand-built pattern in it is the case this guard is about. */
+    private const array LIKE_METHODS = ['wherelike', 'orwherelike', 'wherenotlike', 'orwherenotlike'];
+
+    private const string HELPER_CALL = '/Like::\w+(\((?:[^()]|(?1))*\))/';
+
     private const string CLOSURE = '/^(static\s+)?(fn|function)\b/';
 
     public function __construct(
@@ -41,9 +46,17 @@ final readonly class LikeSearchGuard
         $violations = [];
 
         foreach ($this->inspector->calls($source) as $call) {
-            $arguments = implode(', ', array_filter($call['arguments'], static fn (string $argument): bool => preg_match(self::CLOSURE, $argument) !== 1));
+            $arguments = array_values(array_filter($call['arguments'], static fn (string $argument): bool => preg_match(self::CLOSURE, $argument) !== 1));
+            $insensitive = in_array(strtolower($call['name']), self::LIKE_METHODS, true) || preg_match(self::CASE_INSENSITIVE, implode(', ', $arguments)) === 1;
 
-            if (preg_match(self::CASE_INSENSITIVE, $arguments) !== 1 || str_contains($arguments, 'Like::') || ! str_contains($arguments, '$')) {
+            if (! $insensitive) {
+                continue;
+            }
+
+            // A call of the helper is cut out of its argument, so one helper call does not excuse a second pattern built by hand in the same call.
+            $arguments = array_map(static fn (string $argument): string => (string) preg_replace(self::HELPER_CALL, '', $argument), $arguments);
+
+            if (! $this->builtByHand($arguments)) {
                 continue;
             }
 
@@ -51,5 +64,27 @@ final readonly class LikeSearchGuard
         }
 
         return array_values(array_unique($violations));
+    }
+
+    /**
+     * The first argument holds the SQL or the column: a variable there is a fragment of SQL, an interpolation or a
+     * percent sign in it is a pattern. Every other argument is a binding or a pattern: a variable or a call in it
+     * that is not the helper is a pattern built by hand, a plain quoted text is a fixed pattern.
+     *
+     * @param list<string> $arguments
+     */
+    private function builtByHand(array $arguments): bool
+    {
+        foreach ($arguments as $index => $argument) {
+            if ($index === 0 && preg_match('/\{\$|\$\{|%/', $argument) === 1) {
+                return true;
+            }
+
+            if ($index > 0 && preg_match('/\$|\w\s*\(/', $argument) === 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
