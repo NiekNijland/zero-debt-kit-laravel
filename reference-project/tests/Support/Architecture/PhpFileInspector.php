@@ -228,7 +228,8 @@ final class PhpFileInspector
      */
     public function callsIn(string $file): array
     {
-        $key = $file . '@' . (string) filemtime($file);
+        // The key is the content, not the modification time: two writes inside one second (a test that rewrites a file) must not read the first parse.
+        $key = $file . '@' . (string) md5_file($file);
 
         return self::$calls[$key] ??= $this->calls((string) file_get_contents($file));
     }
