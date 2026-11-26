@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Support\Architecture;
 
+use InvalidArgumentException;
 use PhpParser\Node;
 use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Expr\StaticCall;
@@ -18,14 +19,16 @@ use Tests\Support\Globs;
 
 final readonly class MigrationShapeGuard
 {
-    private const string FIRST_FILE = '2025_01_01';
-
     private const array ON_DELETE = ['ondelete', 'cascadeondelete', 'restrictondelete', 'nullondelete', 'noactionondelete'];
 
+    /**
+     * @param string $migrations the folder of the migrations, relative to the root; a folder that does not exist is an error
+     * @param string $firstFile the file name (or its date prefix) from which the rule holds: earlier files, such as the framework's own, are skipped
+     */
     public function __construct(
         private string $root,
-        /** @var string the folder of the migrations, relative to the root */
         private string $migrations,
+        private string $firstFile,
     ) {
     }
 
@@ -34,15 +37,19 @@ final readonly class MigrationShapeGuard
      */
     public function violations(): array
     {
+        if (! is_dir($this->root . '/' . $this->migrations)) {
+            throw new InvalidArgumentException('The directory ' . $this->root . '/' . $this->migrations . ' does not exist: a guard over a missing folder would pass without reading a file');
+        }
+
         $violations = [];
 
         foreach (Globs::of($this->root . '/' . $this->migrations . '/*.php') as $file) {
-            if (strcmp(basename($file), self::FIRST_FILE) < 0) {
+            if (strcmp(basename($file), $this->firstFile) < 0) {
                 continue;
             }
 
             foreach ($this->inSource((string) file_get_contents($file)) as $violation) {
-                $violations[] = basename($file) . ':' . $violation;
+                $violations[] = $this->migrations . '/' . basename($file) . ':' . $violation;
             }
         }
 
@@ -57,7 +64,7 @@ final readonly class MigrationShapeGuard
         $finder = new NodeFinder();
         $violations = [];
 
-        foreach ($finder->findInstanceOf((new ParserFactory())->createForHostVersion()->parse($source) ?? [], Class_::class) as $class) {
+        foreach ($finder->findInstanceOf(new ParserFactory()->createForHostVersion()->parse($source) ?? [], Class_::class) as $class) {
             if ($class->getMethod('up') === null) {
                 continue;
             }
@@ -66,7 +73,7 @@ final readonly class MigrationShapeGuard
 
             if ($down === null) {
                 $violations[] = $class->getStartLine() . ': a migration without down(): add public function down(): void that undoes up(), so a failed deploy can roll back';
-            } elseif (($down->stmts ?? []) === [] && self::changesSchema($class)) {
+            } elseif (($down->stmts ?? []) === [] && $this->changesSchema($class)) {
                 $violations[] = $down->getStartLine() . ': an empty down() in a migration that changes the schema: undo up() in it (drop the table, column or index it adds); only a migration that changes rows alone leaves down() empty';
             }
 
@@ -78,7 +85,7 @@ final readonly class MigrationShapeGuard
                     continue;
                 }
 
-                $chain = self::chain($call);
+                $chain = $this->chain($call);
 
                 if ((in_array('constrained', $chain, true) || in_array('references', $chain, true)) && array_intersect($chain, self::ON_DELETE) === []) {
                     $violations[] = $call->getStartLine() . ': a foreign key without its on-delete action: end it with ->cascadeOnDelete(), ->nullOnDelete() or ->restrictOnDelete(), so what happens to the row when its parent goes is a choice';
@@ -95,7 +102,7 @@ final readonly class MigrationShapeGuard
         return array_values(array_unique($violations));
     }
 
-    private static function changesSchema(Class_ $class): bool
+    private function changesSchema(Class_ $class): bool
     {
         $finder = new NodeFinder();
         $methods = array_filter($class->getMethods(), static fn (ClassMethod $method): bool => $method->name->toLowerString() !== 'down');
@@ -106,19 +113,13 @@ final readonly class MigrationShapeGuard
             }
         }
 
-        foreach ($finder->findInstanceOf($methods, String_::class) as $string) {
-            if (preg_match('/^\s*(create|alter|drop|truncate)\s/i', $string->value) === 1) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any($finder->findInstanceOf($methods, String_::class), fn (String_ $string): bool => preg_match('/^\s*(create|alter|drop|truncate)\s/i', $string->value) === 1);
     }
 
     /**
      * @return list<string>
      */
-    private static function chain(Node $call): array
+    private function chain(Node $call): array
     {
         $names = [];
 

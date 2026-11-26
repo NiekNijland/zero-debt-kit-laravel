@@ -24,6 +24,8 @@ dataset('tests that sit away from the code they cover', [
     'a class in another folder of the same tier' => ['tests/Feature/Modules/Orders/CancelOrderTest.php', 'the class CancelOrder lives in app/Modules/Orders/Actions, the test belongs in the same folder of tests/Feature'],
     'a class under a shorter path' => ['tests/Feature/Models/OrderTest.php', 'the class Order lives in app/Models/Tenant, the test belongs in the same folder of tests/Feature'],
     'a class at the root of the tier' => ['tests/Feature/UpdateControllerTest.php', 'the class UpdateController lives in app/Http/Controllers/Order'],
+    'a seeder test outside the database home' => ['tests/Feature/Seeders/ProductSeederTest.php', 'app/Seeders does not exist, the test belongs in the folder of the code it covers'],
+    'a translation test outside the lang home' => ['tests/Feature/Translations/KeysTest.php', 'app/Translations does not exist, the test belongs in the folder of the code it covers'],
     'a folder of the integration tier that is not in app' => ['tests/Integration/Checkout/CheckoutEndToEndTest.php', 'app/Checkout does not exist, the test belongs in the folder of the code it covers'],
 ]);
 
@@ -47,6 +49,8 @@ dataset('tests that sit where the code sits', [
     'an action test in its folder' => ['tests/Feature/Modules/Orders/Actions/CancelOrderTest.php'],
     'a model test in its folder' => ['tests/Feature/Models/Tenant/OrderTest.php'],
     'a migration test in the database home' => ['tests/Feature/Database/Migrations/AddOrdersMigrationTest.php'],
+    'a seeder test in the database home' => ['tests/Feature/Database/Seeders/ProductSeederTest.php'],
+    'a translation test in the lang home' => ['tests/Feature/Lang/KeysTest.php'],
     'a config test in the config home' => ['tests/Feature/Config/QueueConfigTest.php'],
     'a route test in the routing home' => ['tests/Feature/Routing/RouteFilesTest.php'],
     'a flow test at the root of the tier' => ['tests/Feature/ExampleTest.php'],

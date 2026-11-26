@@ -23,16 +23,14 @@ final readonly class JsonEndpointGuard
     /**
      * @param string $folder the application folder, relative to the root
      * @param string $controllers the controller folder, relative to the root
-     * @param list<class-string> $payloadsOfOthers the controllers that answer in the format of another system: a counted list, each must still call json()
-     * @param class-string $pageResponse the class of a page answer, which is not a JSON endpoint
+     * @param class-string|null $pageResponse the class of a page answer (an Inertia response), which is not a JSON endpoint; null in a project with no pages
      */
     public function __construct(
         private PhpFileInspector $inspector,
         private string $root,
         private string $folder,
         private string $controllers,
-        private array $payloadsOfOthers,
-        private string $pageResponse,
+        private ?string $pageResponse = null,
     ) {
     }
 
@@ -43,7 +41,6 @@ final readonly class JsonEndpointGuard
     {
         $controllers = $this->root . '/' . $this->controllers . '/';
         $violations = [];
-        $listed = [];
 
         foreach ($this->inspector->phpFiles($this->root . '/' . $this->folder) as $path) {
             $isController = str_starts_with($path, $controllers);
@@ -55,7 +52,7 @@ final readonly class JsonEndpointGuard
 
             $types = array_keys($this->inspector->declaredTypes($path));
             $returns = $isController && $types !== [] ? $this->invokeReturnType(ClassNames::of($types[0])) : null;
-            $isPage = $returns instanceof ReflectionUnionType && array_any($returns->getTypes(), fn (ReflectionType $type): bool => $type instanceof ReflectionNamedType && $type->getName() === $this->pageResponse);
+            $isPage = $this->pageResponse !== null && $returns instanceof ReflectionUnionType && array_any($returns->getTypes(), fn (ReflectionType $type): bool => $type instanceof ReflectionNamedType && $type->getName() === $this->pageResponse);
 
             if ($isController && ! $isPage) {
                 foreach (PhpNewArgumentTypes::firstArgumentTypesOfNew($path, JsonResponse::class) as $argument) {
@@ -65,12 +62,6 @@ final readonly class JsonEndpointGuard
                 }
             }
 
-            if ($lines !== [] && array_intersect($types, $this->payloadsOfOthers) !== []) {
-                $listed = [...$listed, ...array_intersect($types, $this->payloadsOfOthers)];
-
-                continue;
-            }
-
             foreach ($lines as $line) {
                 $violations[] = substr($path, strlen($this->root) + 1) . ': line ' . $line . ': a JSON answer that is not a Data object: return a Data object and let the framework write the response';
             }
@@ -78,10 +69,6 @@ final readonly class JsonEndpointGuard
             if ($returns instanceof ReflectionNamedType && $returns->getName() === 'array') {
                 $violations[] = $types[0] . ' returns an array: return a Data object';
             }
-        }
-
-        foreach (array_diff($this->payloadsOfOthers, $listed) as $stale) {
-            $violations[] = $stale . ' is on the list of payloads of other systems and no longer answers in JSON by hand: remove it from the list';
         }
 
         return $violations;

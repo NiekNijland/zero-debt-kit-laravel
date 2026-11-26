@@ -4,23 +4,25 @@ declare(strict_types=1);
 
 namespace Tests\Support\Architecture;
 
+use InvalidArgumentException;
 use Tests\Support\Globs;
 
 /**
  * A migration that ran in production is history: it names no application class, because a class that moves or is deleted must not break a migration
- * that has run. The live role and permission enums are named in the same breath, since they are the classes that change most.
+ * that has run. The classes that change most (the live role and permission enums) are handed in by name, and a migration that spells one of them,
+ * as a `use` or as `Short::CASE`, fails with its own message.
  */
 final readonly class MigrationClassGuard
 {
     /**
-     * @param string $folder the migration folder, relative to the root
-     * @param string $liveEnums the namespace of the live role and permission enums, as written in a `use`
+     * @param string $folder the migration folder, relative to the root; a folder that does not exist is an error
+     * @param list<class-string> $liveEnums the fully qualified names of the live role and permission enums: no short name is assumed
      * @param string $applicationNamespace the root namespace of the application, with one trailing backslash
      */
     public function __construct(
         private string $root,
         private string $folder,
-        private string $liveEnums,
+        private array $liveEnums,
         private string $applicationNamespace,
     ) {
     }
@@ -30,12 +32,16 @@ final readonly class MigrationClassGuard
      */
     public function violations(): array
     {
+        if (! is_dir($this->root . '/' . $this->folder)) {
+            throw new InvalidArgumentException('The directory ' . $this->root . '/' . $this->folder . ' does not exist: a guard over a missing folder would pass without reading a file');
+        }
+
         $files = Globs::of($this->root . '/' . $this->folder . '/*.php');
         $violations = $files === [] ? [$this->folder . ': no migration was read, so the guard has read nothing: is the folder renamed?'] : [];
 
         foreach ($files as $file) {
             foreach ($this->inSource((string) file_get_contents($file)) as $message) {
-                $violations[] = substr($file, strlen($this->root) + 1) . ': ' . $message;
+                $violations[] = mb_substr($file, mb_strlen($this->root) + 1) . ': ' . $message;
             }
         }
 
@@ -49,8 +55,12 @@ final readonly class MigrationClassGuard
     {
         $messages = [];
 
-        if (preg_match('/' . preg_quote($this->liveEnums, '/') . '\\\\(Permission|Role)\b|(?<![\w\\\\])(Permission|Role)::/', $source) === 1) {
-            $messages[] = 'a migration uses the live permission or role class: write the name as a string, so a rename of the class cannot break a migration that has run';
+        foreach ($this->liveEnums as $enum) {
+            $short = mb_substr($enum, (int) mb_strrpos($enum, '\\') + 1);
+
+            if (preg_match('/' . preg_quote($enum, '/') . '\b|(?<![\w\\\\])' . preg_quote($short, '/') . '::/', $source) === 1) {
+                $messages[] = 'a migration uses the live permission or role class: write the name as a string, so a rename of the class cannot break a migration that has run';
+            }
         }
 
         if (preg_match('/(?<![A-Za-z0-9_])' . preg_quote($this->applicationNamespace, '/') . '/', $source) === 1) {

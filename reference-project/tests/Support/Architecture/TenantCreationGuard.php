@@ -9,7 +9,7 @@ use Tests\Support\ClassNames;
 
 /**
  * A tenant model creates with its tenant, unless its tenant is optional. The traits are read from the loaded class (a trait that uses the trait
- * counts), so the real-tree case needs the application; the rule itself is `isMissingTenant()`, which the examples run on lists.
+ * counts), so the real-tree case needs the application; the rule itself is `inClass()`, which the examples run on lists.
  */
 final readonly class TenantCreationGuard
 {
@@ -42,19 +42,32 @@ final readonly class TenantCreationGuard
             $class = new ReflectionClass(ClassNames::of($this->namespace . str_replace('/', '\\', substr($file, strlen($this->root . '/' . $this->folder . '/'), -4))));
             $arguments = ($class->getAttributes($this->scope)[0] ?? null)?->getArguments();
 
-            if ($this->isMissingTenant(array_values(class_uses_recursive($class->getName())), $arguments)) {
-                $violations[] = $class->getName() . ' is a tenant model that creates without its tenant: use ' . basename(str_replace('\\', '/', $this->creates)) . ', or scope it with ' . basename(str_replace('\\', '/', $this->nullableScope)) . ' when the tenant is optional';
-            }
+            $violations = [...$violations, ...$this->inClass($class->getName(), array_values(class_uses_recursive($class->getName())), $arguments)];
         }
 
         return $violations;
     }
 
     /**
+     * @param string $class the name of the class, for the message
+     * @param list<string> $traits every trait of the class, the traits of its traits included
+     * @param array<int|string, mixed>|null $scopeArguments the arguments of the scope attribute, null when the class has none
+     * @return list<string> the message of a tenant model that creates without its tenant, an empty list for one that does not
+     */
+    public function inClass(string $class, array $traits, ?array $scopeArguments): array
+    {
+        if (! $this->isMissingTenant($traits, $scopeArguments)) {
+            return [];
+        }
+
+        return [$class . ' is a tenant model that creates without its tenant: use ' . basename(str_replace('\\', '/', $this->creates)) . ', or scope it with ' . basename(str_replace('\\', '/', $this->nullableScope)) . ' when the tenant is optional'];
+    }
+
+    /**
      * @param list<string> $traits every trait of the class, the traits of its traits included
      * @param array<int|string, mixed>|null $scopeArguments the arguments of the scope attribute, null when the class has none
      */
-    public function isMissingTenant(array $traits, ?array $scopeArguments): bool
+    private function isMissingTenant(array $traits, ?array $scopeArguments): bool
     {
         return ! in_array($this->creates, $traits, true) && $scopeArguments !== [$this->nullableScope];
     }

@@ -147,7 +147,7 @@ final readonly class GithubJobRules
     {
         $violations = [];
 
-        if (! empty($job['continue-on-error']) || (isset($job['if']) && trim((string) $job['if']) === 'false')) {
+        if (! empty($job['continue-on-error']) || self::switchedOff($job['if'] ?? null, ['false'])) {
             $violations[] = $where . ' may fail or is switched off (`continue-on-error` or `if: false`): nothing is allowed to fail';
         }
 
@@ -162,12 +162,34 @@ final readonly class GithubJobRules
                 $violations = [...$violations, ...self::checkoutRules($where, $step)];
             }
 
-            if (! empty($step['continue-on-error']) || (isset($step['if']) && in_array(trim((string) $step['if']), ['false', 'always()'], true))) {
+            if (! empty($step['continue-on-error']) || self::switchedOff($step['if'] ?? null, ['false', 'always()'])) {
                 $violations[] = $where . ', a step may fail or is forced on (`continue-on-error`, `if: false`, `if: always()`)';
             }
         }
 
         return [...$violations, ...(new CiSafetyGuard('', $this->writingLines))->inCommands(GithubWorkflowReader::lines($job))];
+    }
+
+    /**
+     * Whether an `if` switches a job or a step off (or, for a step, forces it on). The YAML parser answers the boolean `false` for `if: false`, and
+     * `(string) false` is the empty string: a comparison of the text alone never sees it. The expression form `${{ false }}` is the same switch.
+     *
+     * @param list<string> $words the conditions that count, lower case
+     */
+    private static function switchedOff(mixed $condition, array $words): bool
+    {
+        if ($condition === false) {
+            return in_array('false', $words, true);
+        }
+
+        if (! is_string($condition)) {
+            return false;
+        }
+
+        $text = strtolower(trim($condition));
+        $text = preg_replace('/^\$\{\{\s*(.*?)\s*\}\}$/', '$1', $text) ?? $text;
+
+        return in_array($text, $words, true);
     }
 
     /**

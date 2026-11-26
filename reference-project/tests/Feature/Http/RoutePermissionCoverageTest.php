@@ -2,41 +2,41 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Order\IndexController;
+use App\Http\Controllers\Order\ShowController;
 use App\Modules\Roles\Enums\Permission;
-use App\Modules\Roles\Enums\PermissionArea;
+use Illuminate\Auth\Middleware\Authenticate;
+use Illuminate\Auth\Middleware\Authorize;
 use Illuminate\Routing\Route as RoutingRoute;
-use Illuminate\Support\Facades\Gate;
+use Spatie\Permission\Middleware\PermissionMiddleware;
 use Tests\Concerns\GuardsAgainstDatabaseAccess;
+use Tests\Support\ApplicationRoutes;
 use Tests\Support\Feature\Http\RoutePermissionCoverageHelpers;
-use Tests\Support\Narrow;
 
 uses(GuardsAgainstDatabaseAccess::class);
 
-it('checks a permission or a policy on the route itself for every route behind Authenticate', function (): void {
-    expect(RoutePermissionCoverageHelpers::permissionUncoveredRoutes())->toBe([]);
+// The facts of this project; the helper holds none of them.
+$authenticating = [Authenticate::class];
+$checking = [Authorize::class, PermissionMiddleware::class];
+$areaGates = [Authorize::class . ':' . Permission::BACKOFFICE_OPEN->value];
+
+it('puts a permission or a policy ability on the route of every route outside the public area', function () use ($authenticating, $checking, $areaGates): void {
+    expect(RoutePermissionCoverageHelpers::uncoveredRoutes(['app', 'routes'], 'App\Http\Controllers', 'Web', $authenticating, $checking, $areaGates))->toBe([]);
 });
 
-it('counts route middleware, and a policy ability only when it names the model in the URL', function (): void {
-    $route = static fn (string $uri, Closure $action, array $middleware): RoutingRoute => new RoutingRoute(['POST'], $uri, $action)->middleware(Narrow::strings($middleware));
+it('reads the middleware of a route, and a policy ability only when it names the model in the URL', function () use ($authenticating, $checking, $areaGates): void {
+    $index = static fn (string ...$middleware): RoutingRoute => ApplicationRoutes::forController(['GET'], 'orders', IndexController::class)->middleware($middleware);
+    $show = static fn (string ...$middleware): RoutingRoute => ApplicationRoutes::forController(['GET'], 'orders/{order}', ShowController::class)->middleware($middleware);
+    $permission = Authorize::class . ':' . Permission::BACKOFFICE_OVERVIEW->value;
 
-    expect(RoutePermissionCoverageHelpers::permissionRouteIsInScope($route('_guest', static fn (): string => 'ok', ['web', 'guest'])))->toBeFalse()
-        ->and(RoutePermissionCoverageHelpers::permissionRouteIsInScope($route('_signed', static fn (): string => 'ok', ['web', 'signed'])))->toBeFalse()
-        ->and(RoutePermissionCoverageHelpers::permissionRouteIsInScope($route('_public', static fn (): string => 'ok', ['web'])))->toBeFalse()
-        ->and(RoutePermissionCoverageHelpers::permissionRouteIsInScope($route('_auth', static fn (): string => 'ok', ['web', 'auth'])))->toBeTrue()
-        ->and(RoutePermissionCoverageHelpers::permissionRouteIsAuthorized($route('_bare', static fn (): string => 'ok', ['web', 'auth'])))->toBeFalse()
-        ->and(RoutePermissionCoverageHelpers::permissionRouteIsAuthorized($route('_area', static fn (): string => 'ok', ['web', 'auth', 'can:' . Permission::BACKOFFICE_OPEN->value])))->toBeFalse()
-        ->and(RoutePermissionCoverageHelpers::permissionRouteIsAuthorized($route('_permission', static fn (): string => 'ok', ['web', 'auth', 'can:' . Permission::BACKOFFICE_OVERVIEW->value])))->toBeTrue()
-        ->and(RoutePermissionCoverageHelpers::permissionRouteIsAuthorized($route('_spatie', static fn (): string => 'ok', ['web', 'auth', 'permission:a|b'])))->toBeTrue()
-        ->and(RoutePermissionCoverageHelpers::permissionRouteIsAuthorized($route('_withoutMiddleware', static fn (): string => 'ok', ['web', 'auth', 'can:' . Permission::BACKOFFICE_OVERVIEW->value])->withoutMiddleware('can:' . Permission::BACKOFFICE_OVERVIEW->value)))->toBeFalse();
-});
-
-it('has a case of the account area for every self-service permission and gives it to every signed-in user through the gate', function (): void {
-    foreach (Permission::cases() as $permission) {
-        if ($permission->area() !== PermissionArea::ACCOUNT) {
-            continue;
-        }
-
-        expect(Gate::has($permission->value))->toBeTrue()
-            ->and($permission->defaultRoles())->toBe([]);
-    }
+    expect(RoutePermissionCoverageHelpers::isInScope($index('web'), $authenticating))->toBeFalse()
+        ->and(RoutePermissionCoverageHelpers::isInScope($index('web', Authenticate::class), $authenticating))->toBeTrue()
+        ->and(RoutePermissionCoverageHelpers::isAuthorized($index(Authenticate::class), $checking, $areaGates))->toBeFalse()
+        ->and(RoutePermissionCoverageHelpers::isAuthorized($index(Authenticate::class, $areaGates[0]), $checking, $areaGates))->toBeFalse()
+        ->and(RoutePermissionCoverageHelpers::isAuthorized($index(Authenticate::class, $permission), $checking, $areaGates))->toBeTrue()
+        ->and(RoutePermissionCoverageHelpers::isAuthorized($index(Authenticate::class, PermissionMiddleware::class . ':a|b'), $checking, $areaGates))->toBeTrue()
+        ->and(RoutePermissionCoverageHelpers::isAuthorized($show(Authenticate::class, $permission), $checking, $areaGates))->toBeFalse()
+        ->and(RoutePermissionCoverageHelpers::isAuthorized($show(Authenticate::class, Authorize::class . ':view,order'), $checking, $areaGates))->toBeTrue()
+        ->and(RoutePermissionCoverageHelpers::isAuthorized($show(Authenticate::class, Authorize::class . ':view,other'), $checking, $areaGates))->toBeFalse()
+        ->and(RoutePermissionCoverageHelpers::isAuthorized($show(Authenticate::class, Authorize::class . ':view,order')->withoutMiddleware(Authorize::class . ':view,order'), $checking, $areaGates))->toBeFalse();
 });

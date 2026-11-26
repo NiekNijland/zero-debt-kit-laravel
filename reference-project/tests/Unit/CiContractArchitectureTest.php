@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use Tests\Support\Architecture\CiContractGuard;
 use Tests\Support\Architecture\ChecksParts;
-use Tests\Support\Architecture\CiExamples;
+use Tests\Support\Ci\CiExamples;
 use Tests\Support\Architecture\CiSafetyGuard;
 
 uses()->group('arch');

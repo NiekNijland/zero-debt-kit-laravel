@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Tests\Support\Architecture\MigrationShapeGuard;
+use Tests\Support\SourceSandbox;
 
 uses()->group('arch');
 
@@ -17,7 +18,7 @@ dataset('migrations out of shape', [
 
 it('detects a migration that cannot roll back or leaves a choice of the schema open', function (string $members, string $reason): void {
     $source = "<?php\nuse Illuminate\\Database\\Migrations\\Migration;\nreturn new class() extends Migration\n{\n" . $members . "\n};\n";
-    $violations = new MigrationShapeGuard(dirname(__DIR__, 2), 'database/migrations')->inSource($source);
+    $violations = new MigrationShapeGuard(dirname(__DIR__, 2), 'database/migrations', '2025_01_01')->inSource($source);
 
     expect($violations)->toHaveCount(1)
         ->and($violations[0])->toContain($reason);
@@ -59,12 +60,35 @@ it('accepts a migration that undoes its schema change and one that changes rows 
             }
         };
         PHP;
-    $guard = new MigrationShapeGuard(dirname(__DIR__, 2), 'database/migrations');
+    $guard = new MigrationShapeGuard(dirname(__DIR__, 2), 'database/migrations', '2025_01_01');
 
     expect($guard->inSource($schema))->toBe([])
         ->and($guard->inSource($rows))->toBe([]);
 });
 
-it('keeps every migration dated 2025-01-01 or later in shape', function (): void {
-    expect(new MigrationShapeGuard(dirname(__DIR__, 2), 'database/migrations')->violations())->toBe([]);
+it('holds from the first file on, and names the file relative to the root under a dot directory', function (): void {
+    $bad = "<?php\nreturn new class() extends Migration\n{\n    public function up(): void\n    {\n        Schema::create('t', fn (Blueprint \$table) => \$table->id());\n    }\n};\n";
+    $root = SourceSandbox::create([
+        'database/migrations/2024_12_31_000000_old.php' => $bad,
+        'database/migrations/2025_01_01_000000_first.php' => $bad,
+    ], prefix: '.checkout-');
+
+    try {
+        $violations = new MigrationShapeGuard($root, 'database/migrations', '2025_01_01')->violations();
+    } finally {
+        SourceSandbox::remove($root);
+    }
+
+    expect($violations)->toHaveCount(1)
+        ->and($violations[0])->toStartWith('database/migrations/2025_01_01_000000_first.php:')
+        ->and($violations[0])->toContain('a migration without down()');
+});
+
+it('throws on a migrations folder that does not exist', function (): void {
+    expect(fn (): array => new MigrationShapeGuard(dirname(__DIR__, 2), 'database/renamed-migrations', '0001_01_01_000000')->violations())
+        ->toThrow(InvalidArgumentException::class, 'does not exist');
+});
+
+it('keeps every migration of the project, from the first one, in shape', function (): void {
+    expect(new MigrationShapeGuard(dirname(__DIR__, 2), 'database/migrations', '0001_01_01_000000')->violations())->toBe([]);
 });

@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Tests\Support\Architecture;
+namespace Tests\Support\Ci;
+
+use Tests\Support\Architecture\GithubWorkflowGuard;
+use Tests\Support\Architecture\GitlabPipelineGuard;
 
 /**
  * The guards of the GitHub and GitLab forms as the thin tests build them, and the changes of the skeleton examples that the

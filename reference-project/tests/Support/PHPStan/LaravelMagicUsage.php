@@ -80,4 +80,31 @@ final class LaravelMagicUsage extends ReflectionBasedMemberUsageProvider
             default => null,
         };
     }
+
+    /**
+     * The folders of a Laravel application and the method the framework calls on a class in each: nothing in the code calls them, so the dead-code detector
+     * would report each one.
+     */
+    private function isCalledByTheFramework(string $class, string $method): bool
+    {
+        $byFolder = [
+            'App\\Http\\Controllers\\' => ['__invoke'],
+            'App\\Http\\Middleware\\' => ['handle'],
+            'App\\Http\\Requests\\' => ['rules', 'authorize', 'messages', 'attributes', 'prepareForValidation', 'passedValidation'],
+            'App\\Providers\\' => ['boot', 'register'],
+            'App\\Console\\Commands\\' => ['handle'],
+            'App\\Rules\\' => ['validate'],
+            'App\\Models\\' => ['casts', 'booted'],
+        ];
+
+        foreach ($byFolder as $folder => $methods) {
+            if (str_starts_with($class, $folder) && in_array($method, $methods, true)) {
+                return true;
+            }
+        }
+
+        return str_contains($class, '\\Commands\\') && $method === 'handle'
+            || str_contains($class, '\\Listeners\\') && $method === 'handle'
+            || str_contains($class, '\\Jobs\\') && $method === 'handle';
+    }
 }

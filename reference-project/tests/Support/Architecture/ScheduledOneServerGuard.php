@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Support\Architecture;
 
+use InvalidArgumentException;
 use PhpToken;
 use Tests\Support\Globs;
 
@@ -12,6 +13,10 @@ use Tests\Support\Globs;
  */
 final readonly class ScheduledOneServerGuard
 {
+    /**
+     * @param string $folder the folder of the route files that hold the schedule, relative to the root; it must exist and hold a PHP file, but it may hold no
+     *     scheduled task: a project with an empty schedule keeps the guard on and fails the first task that lacks onOneServer()
+     */
     public function __construct(
         private string $root,
         private string $folder,
@@ -23,20 +28,24 @@ final readonly class ScheduledOneServerGuard
      */
     public function violations(): array
     {
-        $violations = [];
-        $scheduled = 0;
+        if (! is_dir($this->root . '/' . $this->folder)) {
+            throw new InvalidArgumentException('The directory ' . $this->root . '/' . $this->folder . ' does not exist: a guard over a missing folder would pass without reading a file');
+        }
 
-        foreach (Globs::of($this->root . '/' . $this->folder . '/*.php') as $file) {
+        $files = Globs::of($this->root . '/' . $this->folder . '/*.php');
+
+        if ($files === []) {
+            throw new InvalidArgumentException('The directory ' . $this->folder . ' holds no PHP file: is the schedule file renamed or moved?');
+        }
+
+        $violations = [];
+
+        foreach ($files as $file) {
             $source = (string) file_get_contents($file);
-            $scheduled += count($this->tasks($source));
 
             foreach ($this->inSource($source) as $message) {
                 $violations[] = substr($file, strlen($this->root) + 1) . ': ' . $message;
             }
-        }
-
-        if ($scheduled === 0) {
-            $violations[] = $this->folder . ': no scheduled task was read, so the guard has read nothing: is the folder renamed?';
         }
 
         return $violations;

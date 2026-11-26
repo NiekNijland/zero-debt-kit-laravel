@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Support;
 
+use Illuminate\Filesystem\Filesystem;
+
 final class SourceSandbox
 {
     /**
      * @param array<string, string> $files
-     * @param string $prefix the folder name before the random part: a guard's test passes a dot-prefixed one (`.checkout-`)
-     *                       to prove that it filters on the path relative to the root, not on the absolute path
      */
     public static function create(array $files, string $prefix = 'source-sandbox-'): string
     {
@@ -31,7 +31,7 @@ final class SourceSandbox
     public static function remove(string $root): void
     {
         foreach (RecursiveFiles::in($root, childFirst: true) as $entry) {
-            $entry->isDir() ? rmdir($entry->getPathname()) : unlink($entry->getPathname());
+            $entry->isDir() ? rmdir($entry->getPathname()) : new Filesystem()->delete($entry->getPathname());
         }
 
         rmdir($root);

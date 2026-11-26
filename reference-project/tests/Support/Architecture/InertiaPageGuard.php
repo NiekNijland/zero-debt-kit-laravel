@@ -8,12 +8,14 @@ use Inertia\Inertia;
 
 final readonly class InertiaPageGuard
 {
+    /**
+     * @param list<string> $sources the folders that render pages, relative to the root; any of them may be absent
+     * @param string $pages the folder of the page files, relative to the root
+     */
     public function __construct(
         private PhpFileInspector $inspector,
         private string $root,
-        /** @var list<string> the folders that render pages, relative to the root; any of them may be absent */
         private array $sources,
-        /** @var string the folder of the page files, relative to the root */
         private string $pages,
     ) {
     }

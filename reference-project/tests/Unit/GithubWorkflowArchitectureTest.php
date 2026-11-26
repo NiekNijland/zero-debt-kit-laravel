@@ -2,18 +2,17 @@
 
 declare(strict_types=1);
 
-use Tests\Support\Architecture\CiExamples;
-use Tests\Support\Architecture\CiHostExamples;
-use Tests\Support\Architecture\CiHostVariants;
-use Tests\Support\Architecture\CodeOwnersGuard;
 use Tests\Support\Architecture\DatabaseEngine;
 use Tests\Support\Architecture\GithubWorkflowGuard;
+use Tests\Support\Ci\CiExamples;
+use Tests\Support\Ci\CiHostExamples;
+use Tests\Support\Ci\CiHostVariants;
 use Tests\Support\SourceSandbox;
 
 uses()->group('arch');
 
-// The GitHub form (a workflow directory, the kit's jobs in a file of their own), the GitLab form and point 22 (code owners) of the
-// contract in 04-guards.md C4. CiContractArchitectureTest holds the Bitbucket form and the checks script.
+// The GitHub form of the contract in 04-guards.md C4: a workflow directory, with the kit's jobs in a file of their own. A project on another host keeps the
+// test of its own host and deletes this one with its guard.
 
 dataset('GitHub workflows that narrow a check or skip a run', [
     'a manual trigger' => [fn (): string => CiExamples::change(CiHostExamples::githubWorkflow(), "on:\n", "on:\n  workflow_dispatch:\n"), 'the trigger `workflow_dispatch` is not one of'],
@@ -29,6 +28,9 @@ dataset('GitHub workflows that narrow a check or skip a run', [
     'a part without a matrix entry' => [fn (): string => CiHostVariants::inGithubJob('checks', 'part: [gate, static, guards, repo]', 'part: [gate, static, guards]'), 'the matrix of job `checks` is not exactly the parts'],
     'a part dropped by an exclude' => [fn (): string => CiHostVariants::inGithubJob('checks', "        part: [gate, static, guards, repo]\n", "        part: [gate, static, guards, repo]\n        exclude:\n          - part: static\n"), 'has the key `exclude` besides `part`'],
     'a matrix that is an expression' => [fn (): string => CiHostVariants::inGithubJob('checks', 'part: [gate, static, guards, repo]', "part: \${{ fromJSON('[\"gate\"]') }}"), 'the matrix of job `checks` is not exactly the parts'],
+    'a job switched off with the boolean false' => [fn (): string => CiHostVariants::inGithubJob('checks-main', "if: github.event_name == 'push'", 'if: false'), 'is switched off'],
+    'a job switched off with the expression false' => [fn (): string => CiHostVariants::inGithubJob('checks-main', "if: github.event_name == 'push'", 'if: ${{ false }}'), 'is switched off'],
+    'a step switched off with the boolean false' => [fn (): string => CiHostVariants::inGithubJob('smoke', 'run: composer install', "run: composer install\n        if: false"), 'a step may fail or is forced on'],
     'a checks step that may fail' => [fn (): string => CiHostVariants::inGithubJob('checks', "      - run: bash scripts/checks.sh --part \${{ matrix.part }}\n", "      - run: bash scripts/checks.sh --part \${{ matrix.part }}\n        continue-on-error: true\n"), 'a step may fail'],
     'a checks step with a base of its own' => [fn (): string => CiHostVariants::inGithubJob('checks', "      - run: bash scripts/checks.sh --part \${{ matrix.part }}\n", "      - run: bash scripts/checks.sh --part \${{ matrix.part }}\n        env:\n          CHECK_BASE: main\n"), 'sets CHECK_BASE in its own env'],
     'a checks step under another shell' => [fn (): string => CiHostVariants::inGithubJob('checks', "      - run: bash scripts/checks.sh --part \${{ matrix.part }}\n", "      - run: bash scripts/checks.sh --part \${{ matrix.part }}\n        shell: bash -c true {0}\n"), 'sets `shell`'],
@@ -147,64 +149,9 @@ it('names the engine of a database image', function (): void {
         ->and(DatabaseEngine::of('valkey:8'))->toBe('');
 });
 
-dataset('GitLab pipelines that narrow a check or skip a run', [
-    'a shallow clone' => [fn (): string => CiExamples::change(CiHostExamples::gitlabPipeline(), 'GIT_DEPTH: "0"', 'GIT_DEPTH: 20'), 'GIT_DEPTH is not 0'],
-    'a branch rule that lets every source through' => [fn (): string => CiExamples::change(CiHostExamples::gitlabPipeline(), '- if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH', '- if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'), 'lets every pipeline source through'],
-    'a part without a matrix entry' => [fn (): string => CiHostVariants::inGitlabJob('checks', 'PART: [gate, static, guards, repo]', 'PART: [gate, static, guards]'), 'is not exactly the parts'],
-    'a changes filter on the checks job' => [fn (): string => CiHostVariants::inGitlabJob('checks', "    - if: \$CI_PIPELINE_SOURCE == \"merge_request_event\"\n", "    - if: \$CI_PIPELINE_SOURCE == \"merge_request_event\"\n      changes: ['app/**']\n"), 'has another rule than'],
-    'a job that may fail' => [fn (): string => CiHostVariants::inGitlabJob('smoke', "  stage: verify\n", "  stage: verify\n  allow_failure: true\n"), 'may fail or waits for a click'],
-    'a job without a maximum time' => [fn (): string => CiHostVariants::inGitlabJob('scheduled', "  timeout: 20 minutes\n", ''), 'job `scheduled` has no timeout'],
-    'an image that is not pinned by digest' => [fn (): string => CiExamples::change(CiHostExamples::gitlabPipeline(), 'php:8.4@sha256:0000000000000000000000000000000000000000000000000000000000000000', 'php:8.4'), 'image is not pinned by digest'],
-    'a service image that is not the production engine' => [fn (): string => CiHostVariants::inGitlabJob('backend-tests', 'name: postgres:17', 'name: postgres:16'), 'is not DATABASE_IMAGE'],
-    'a service without a password' => [fn (): string => CiHostVariants::inGitlabJob('scheduled', "    POSTGRES_PASSWORD: ci\n", ''), 'no password variable'],
-    'no base for the ratchets' => [fn (): string => CiHostVariants::inGitlabJob('checks', "    CHECK_BASE: \$CI_MERGE_REQUEST_TARGET_BRANCH_NAME\n", ''), 'does not set CHECK_BASE'],
-    'a command that succeeds anyway' => [fn (): string => CiHostVariants::inGitlabJob('checks', '- composer install', '- composer install || true'), 'a check is made to succeed anyway'],
-    'the scheduled checks on another source' => [fn (): string => CiHostVariants::inGitlabJob('scheduled', '- if: $CI_PIPELINE_SOURCE == "schedule"', '- if: $CI_PIPELINE_SOURCE == "web"'), 'runs the scheduled checks on another rule'],
-    'the tests twice on one pipeline' => [fn (): string => CiHostExamples::gitlabPipeline() . "again:\n  timeout: 5 minutes\n  script:\n    - composer test:unit\n", 'the backend tests run 2 times'],
-]);
+it('keeps the workflow directory of the repository within the contract', function (): void {
+    $root = dirname(__DIR__, 2);
+    $guard = new GithubWorkflowGuard($root . '/.github/workflows', $root . '/scripts/checks.sh', 'kit-checks.yml', ['main', 'develop'], 'composer test:unit', 'postgres:17', smokeBrowser: 'playwright');
 
-it('detects a GitLab pipeline that narrows a check or skips a run', function (Closure $pipeline, string $reason): void {
-    $violations = CiHostVariants::gitlabGuard()->inPipeline($pipeline(), CiExamples::checks());
-
-    expect(implode("\n", $violations))->toContain($reason);
-})->with('GitLab pipelines that narrow a check or skip a run');
-
-it('reads the engine of a GitLab service from DATABASE_IMAGE', function (): void {
-    $mysql = CiExamples::change(CiExamples::change(CiHostExamples::gitlabPipeline(), 'name: postgres:17', 'name: mysql:8.4'), 'POSTGRES_PASSWORD: ci', 'MYSQL_ROOT_PASSWORD: ci');
-    $guard = CiHostVariants::gitlabGuard('mysql:8.4');
-
-    expect($guard->inPipeline($mysql, CiExamples::checks()))->toBe([])
-        ->and(implode("\n", $guard->inPipeline(CiExamples::change(CiHostExamples::gitlabPipeline(), 'name: postgres:17', 'name: mysql:8.4'), CiExamples::checks())))->toContain('no password variable of its engine (mysql: MYSQL_ROOT_PASSWORD');
-});
-
-it('accepts the GitLab skeleton with its placeholders filled', function (): void {
-    expect(CiHostVariants::gitlabGuard()->inPipeline(CiHostExamples::gitlabPipeline(), CiExamples::checks()))->toBe([]);
-});
-
-// Point 22: the files that carry the guards are covered by a code-owners rule that names an owner.
-dataset('code-owners files that leave a guard file without a human review', [
-    'the scripts not covered' => [fn (): string => CiExamples::change(CiHostExamples::codeOwners(), "/scripts/ @lead\n", ''), 'scripts/debt-caps.json is covered by no code-owners rule'],
-    'the workflow directory not covered' => [fn (): string => CiExamples::change(CiHostExamples::codeOwners(), "/.github/workflows/ @lead\n", ''), '.github/workflows/kit-checks.yml is covered by no'],
-    'the guard folder not covered' => [fn (): string => CiExamples::change(CiHostExamples::codeOwners(), "/tests/Support/Architecture/ @lead\n", ''), 'tests/Support/Architecture/CiContractGuard.php is covered by no'],
-    'the file not covering itself' => [fn (): string => CiExamples::change(CiHostExamples::codeOwners(), "/.github/CODEOWNERS @lead\n", ''), '.github/CODEOWNERS is covered by no'],
-    'a later rule that takes a script out of the review' => [fn (): string => CiHostExamples::codeOwners() . "/scripts/kit-config.sh\n", 'scripts/kit-config.sh is matched last by a rule with no owner'],
-    'a pattern that matches nothing' => [fn (): string => CiExamples::change(CiHostExamples::codeOwners(), "/scripts/ @lead\n", "/script/ @lead\n"), 'scripts/checks.sh is covered by no'],
-    'a negated rule' => [fn (): string => CiHostExamples::codeOwners() . "!/scripts/checks.sh\n", 'negates a rule'],
-    'a bot as the only owner' => [fn (): string => CiExamples::change(CiHostExamples::codeOwners(), "/scripts/ @lead\n", "/scripts/ @release-bot\n"), 'scripts/checks.sh is owned by a bot only'],
-    'an automation account as the only owner' => [fn (): string => CiExamples::change(CiHostExamples::codeOwners(), "/scripts/ @lead\n", "/scripts/ @renovate[bot]\n"), 'scripts/checks.sh is owned by a bot only'],
-]);
-
-it('detects a code-owners file that leaves a guard file without the review of its owner', function (Closure $codeOwners, string $reason): void {
-    $violations = new CodeOwnersGuard('', CiHostExamples::guardedPaths())->inCodeOwners($codeOwners());
-
-    expect(implode("\n", $violations))->toContain($reason);
-})->with('code-owners files that leave a guard file without a human review');
-
-it('accepts a code-owners file that covers every guard file, and a host that enforces the owners outside the repository', function (): void {
-    $withBot = CiExamples::change(CiHostExamples::codeOwners(), "/scripts/ @lead\n", "/scripts/ @lead @release-bot\n");
-
-    expect(new CodeOwnersGuard('', CiHostExamples::guardedPaths())->inCodeOwners(CiHostExamples::codeOwners()))->toBe([])
-        ->and(new CodeOwnersGuard('', CiHostExamples::guardedPaths())->inCodeOwners($withBot))->toBe([])
-        ->and(new CodeOwnersGuard('/no/such/CODEOWNERS', CiHostExamples::guardedPaths(), hostEnforced: true)->violations())->toBe([])
-        ->and(implode("\n", new CodeOwnersGuard('/no/such/CODEOWNERS', CiHostExamples::guardedPaths())->violations()))->toContain('no code-owners file');
+    expect($guard->violations())->toBe([]);
 });

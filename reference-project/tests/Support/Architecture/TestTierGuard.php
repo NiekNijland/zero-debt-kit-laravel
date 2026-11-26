@@ -4,25 +4,20 @@ declare(strict_types=1);
 
 namespace Tests\Support\Architecture;
 
+use InvalidArgumentException;
 use Tests\Support\Globs;
 
 final class TestTierGuard
 {
-    public const array BOOTING_ROOTS = [
-        'Tests\TestCase',
-        'Tests\FeatureTestCase',
-        'Tests\Concerns\RefreshesDatabaseOncePerWorker',
-        'Tests\Concerns\GuardsAgainstDatabaseAccess',
-        'Illuminate\Foundation\Testing\TestCase',
-        'Illuminate\Foundation\Testing\RefreshDatabase',
-        'Illuminate\Foundation\Testing\LazilyRefreshDatabase',
-        'Illuminate\Foundation\Testing\DatabaseTransactions',
-        'Illuminate\Foundation\Testing\DatabaseMigrations',
-        'Illuminate\Foundation\Testing\DatabaseTruncation',
-        'Illuminate\Foundation\Testing\WithCachedConfig',
-        'Illuminate\Foundation\Testing\WithCachedRoutes',
-        'Orchestra\Testbench\TestCase',
-    ];
+    /**
+     * The framework's booting classes are written as a prefix joined to a short name: the formatter rewrites a plain class-name string into `X::class`, and a
+     * guard that names a booting class that way is a booting support type of its own check, so a unit test that imports the guard would fail the guard it tests.
+     */
+    private const string FRAMEWORK_TESTING = 'Illuminate\\Foundation\\Testing\\';
+
+    private const array FRAMEWORK_BOOTING = ['TestCase', 'RefreshDatabase', 'LazilyRefreshDatabase', 'DatabaseTransactions', 'DatabaseMigrations', 'DatabaseTruncation', 'WithCachedConfig', 'WithCachedRoutes'];
+
+    private const array OTHER_BOOTING = ['Orchestra\\Testbench\\' . 'TestCase'];
 
     private const array FACTORY_FORBIDDEN_NAMES = [
         'Illuminate\Support\Facades\DB',
@@ -42,6 +37,7 @@ final class TestTierGuard
      * @param string $bootstrapFile the global file of the test framework, relative to the root
      * @param list<string> $pureLayers globs of the folders that may not name the database layer, relative to the root
      * @param list<string> $factoryLayers the pure layers of which a class may name a model inside its static factories
+     * @param list<string> $bootingRoots the project's own classes and concerns that boot the application (its base test cases, its database traits), as the test builds them from two parts
      */
     public function __construct(
         private readonly PhpFileInspector $inspector,
@@ -51,6 +47,7 @@ final class TestTierGuard
         private readonly string $bootstrapFile,
         private readonly array $pureLayers,
         private readonly array $factoryLayers,
+        private readonly array $bootingRoots,
     ) {
     }
 
@@ -59,7 +56,7 @@ final class TestTierGuard
      */
     public function unitTestViolations(): array
     {
-        $booting = array_merge(self::BOOTING_ROOTS, $this->bootingSupportTypes());
+        $booting = array_merge($this->roots(), $this->bootingSupportTypes());
         $violations = [];
 
         foreach ($this->inspector->phpFiles($this->root . '/' . $this->unitFolder) as $file) {
@@ -95,10 +92,16 @@ final class TestTierGuard
      */
     public function pureLayerViolations(): array
     {
+        $directories = array_map(fn (string $layer): array => Globs::of($this->root . '/' . $layer, GLOB_ONLYDIR), $this->pureLayers);
+
+        if (array_merge(...$directories) === []) {
+            throw new InvalidArgumentException('None of the pure layers ' . implode(', ', $this->pureLayers) . ' exists: a guard that reads no file passes without checking');
+        }
+
         $violations = [];
 
-        foreach ($this->pureLayers as $layer) {
-            foreach (Globs::of($this->root . '/' . $layer, GLOB_ONLYDIR) as $directory) {
+        foreach ($this->pureLayers as $index => $layer) {
+            foreach ($directories[$index] as $directory) {
                 foreach ($this->inspector->phpFiles($directory) as $file) {
                     $hits = in_array($layer, $this->factoryLayers, true)
                         ? $this->namesOutsideFactories($file)
@@ -143,6 +146,14 @@ final class TestTierGuard
         return str_starts_with($name, 'App\\') && preg_match('/\\\\Models\\\\/', $name) === 1;
     }
 
+    /**
+     * @return list<string>
+     */
+    private function roots(): array
+    {
+        return [...$this->bootingRoots, ...self::OTHER_BOOTING, ...array_map(static fn (string $name): string => self::FRAMEWORK_TESTING . $name, self::FRAMEWORK_BOOTING)];
+    }
+
     private function coversUnitDirectory(string $target): bool
     {
         return $target === '*' || preg_match('#(^|/)' . preg_quote(basename($this->unitFolder), '#') . '(/|$)#', $target) === 1;
@@ -161,7 +172,8 @@ final class TestTierGuard
             }
         }
 
-        $booting = self::BOOTING_ROOTS;
+        $roots = $this->roots();
+        $booting = $roots;
 
         do {
             $grew = false;
@@ -174,7 +186,7 @@ final class TestTierGuard
             }
         } while ($grew);
 
-        return array_values(array_diff($booting, self::BOOTING_ROOTS));
+        return array_values(array_diff($booting, $roots));
     }
 
     /**

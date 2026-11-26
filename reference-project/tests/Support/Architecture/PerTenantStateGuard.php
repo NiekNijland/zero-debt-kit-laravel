@@ -31,11 +31,13 @@ final readonly class PerTenantStateGuard
 
     private const string TASK = 'a SwitchTenantTask, listed in switch_tenant_tasks of %s';
 
+    /**
+     * @param string $registry the config file that lists the tenant switch tasks, relative to the root
+     */
     public function __construct(
         private PhpFileInspector $inspector,
         private string $root,
         private string $source,
-        /** @var string the config file that lists the tenant switch tasks, relative to the root */
         private string $registry,
     ) {
     }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Support\Architecture;
 
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Config;
 use PhpParser\Node;
 use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Expr\FuncCall;
@@ -18,24 +20,19 @@ use PhpParser\Node\Scalar\String_;
 use PhpParser\NodeFinder;
 use PhpParser\ParserFactory;
 
-final class BannedTestCallGuard
+final readonly class BannedTestCallGuard
 {
-    /** Tests without the booted application have no $this->travel(): they, and the tier traits that reset the clock, may use setTestNow(). */
-    private const array CLOCK_CLASSES = [
-        'Carbon',
-        'CarbonImmutable',
-        'Date',
-        'Illuminate\Support\Carbon',
-        'Illuminate\Support\Facades\Date',
-        'Carbon\Carbon',
-        'Carbon\CarbonImmutable',
-    ];
+    private const array CLOCK_CLASSES = ['Carbon', 'CarbonImmutable', 'Date', 'Illuminate\\Support\\' . 'Carbon', 'Carbon\\' . 'Carbon', 'Carbon\\' . 'CarbonImmutable', 'Illuminate\\Support\\Facades\\' . 'Date'];
 
     private const array BINDINGS = ['instance', 'bind', 'singleton', 'scoped', 'bindif', 'singletonif', 'extend'];
 
-    private const array APP_FACADES = ['Illuminate\Support\Facades\App', 'App'];
+    private const array APP_FACADES = [App::class, 'App'];
 
     private const array PEST_TEST_FUNCTIONS = ['it', 'test', 'describe', 'arch', 'todo'];
+
+    private const array STRAY_SWITCHES = ['allowstrayrequests' => 'allowStrayRequests()', 'allowstrayprocesses' => 'allowStrayProcesses()'];
+
+    private const array STRAY_PREVENTERS = ['preventstrayrequests' => 'preventStrayRequests(false)', 'preventstrayprocesses' => 'preventStrayProcesses(false)'];
 
     private const array LOOSE_EXPECTATIONS = ['tobetruthy' => 'toBeTruthy(): assert the exact value with toBeTrue(), toBe() or not->toBeEmpty()', 'tobefalsy' => 'toBeFalsy(): assert the exact value with toBeFalse(), toBeNull() or toBeEmpty()'];
 
@@ -75,20 +72,17 @@ final class BannedTestCallGuard
     ];
 
     /**
-     * @param string $tests the test folder, relative to the root
-     * @param list<string> $withoutTestClock folders (relative to the root) whose tests have no test clock: the pure unit tier and the test concerns
+     * @param list<string> $withoutTestClock
      */
     public function __construct(
-        private readonly PhpFileInspector $inspector,
-        private readonly string $root,
-        private readonly string $tests,
-        private readonly array $withoutTestClock,
+        private PhpFileInspector $inspector,
+        private string $root,
+        private string $tests,
+        private array $withoutTestClock,
     ) {
     }
 
     /**
-     * Every banned call of the test suite, per file, as `line N: the call: what to write instead`.
-     *
      * @return array<string, list<string>>
      */
     public function violations(): array
@@ -96,7 +90,7 @@ final class BannedTestCallGuard
         $violations = [];
 
         foreach ($this->inspector->phpFiles($this->root . '/' . $this->tests) as $file) {
-            $relative = substr($file, strlen($this->root) + 1);
+            $relative = mb_substr($file, mb_strlen($this->root) + 1);
             $found = $this->inFile($file, $relative);
 
             if ($found !== []) {
@@ -133,10 +127,10 @@ final class BannedTestCallGuard
     private function chainedOnATest(string $source): array
     {
         $found = [];
-        $statements = (new ParserFactory())->createForHostVersion()->parse($source) ?? [];
+        $statements = new ParserFactory()->createForHostVersion()->parse($source) ?? [];
 
-        foreach ((new NodeFinder())->find($statements, static fn (Node $node): bool => $node instanceof MethodCall || $node instanceof NullsafeMethodCall) as $call) {
-            if (! ($call instanceof MethodCall || $call instanceof NullsafeMethodCall) || ! $call->name instanceof Identifier) {
+        foreach (new NodeFinder()->find($statements, static fn (Node $node): bool => $node instanceof MethodCall || $node instanceof NullsafeMethodCall) as $call) {
+            if (! $call instanceof MethodCall && ! $call instanceof NullsafeMethodCall || ! $call->name instanceof Identifier) {
                 continue;
             }
 
@@ -170,7 +164,7 @@ final class BannedTestCallGuard
     {
         $found = [];
 
-        foreach ((new NodeFinder())->findInstanceOf($statements, FuncCall::class) as $call) {
+        foreach (new NodeFinder()->findInstanceOf($statements, FuncCall::class) as $call) {
             if (! $call->name instanceof Name || $call->isFirstClassCallable() || $call->getArgs() === []) {
                 continue;
             }
@@ -181,11 +175,15 @@ final class BannedTestCallGuard
             $closure = $arguments[count($arguments) - 1]->value;
             $line = 'line ' . $call->getStartLine() . ': ';
 
-            if ($name === 'test' && $description instanceof String_ && str_starts_with($description->value, 'it ')) {
-                $found[] = $line . 'test(\'it ...\'): write it(\'...\'), Pest puts "it" in front of the description';
+            if ($name === 'test') {
+                $found[] = $line . "test(): write it('does x', function (): void { ... }), the one spelling of a test";
             }
 
-            if (in_array($name, self::TEST_CLOSURE_FUNCTIONS, true) && $closure instanceof Closure && ! ($closure->returnType instanceof Identifier && $closure->returnType->toLowerString() === 'void')) {
+            if ($name === 'it' && $description instanceof String_ && preg_match('/^it\b/i', $description->value) === 1) {
+                $found[] = $line . 'it(\'it ...\'): Pest puts "it" in front of the description, write it(\'does x\')';
+            }
+
+            if (in_array($name, self::TEST_CLOSURE_FUNCTIONS, true) && $closure instanceof Closure && (! $closure->returnType instanceof Identifier || $closure->returnType->toLowerString() !== 'void')) {
                 $found[] = $line . 'a closure of ' . $name . '() without a return type: write function (): void';
             }
         }
@@ -211,7 +209,7 @@ final class BannedTestCallGuard
      */
     private function reasonToBan(array $call, string $relative): ?string
     {
-        if ($call['kind'] === 'static' && $call['name'] === 'set' && in_array($call['class'], ['Illuminate\Support\Facades\Config', 'Config'], true)) {
+        if ($call['kind'] === 'static' && $call['name'] === 'set' && in_array($call['class'], [Config::class, 'Config'], true)) {
             return 'Config::set(): write config([\'key\' => $value])';
         }
 
@@ -243,12 +241,28 @@ final class BannedTestCallGuard
             return 'App::' . $call['name'] . '() of a ready object: write app()->instance(Abstract::class, $fake)';
         }
 
-        if ($call['kind'] === 'function' && $call['name'] === 'expect' && count($call['arguments']) === 1 && ltrim(strtolower($call['arguments'][0]), '\\') === 'true') {
+        if ($call['kind'] === 'function' && $call['name'] === 'expect' && count($call['arguments']) === 1 && mb_ltrim(mb_strtolower($call['arguments'][0]), '\\') === 'true') {
             return 'expect(true): assert the state the code leaves behind, or end the test with ->throwsNoExceptions()';
         }
 
         if ($call['kind'] === 'method' && $call['receiver'] === '->not' && $call['name'] === 'tothrow') {
             return '->not->toThrow(): call the code directly so an exception fails the test, and assert the state it leaves behind';
+        }
+
+        if ($call['kind'] === 'function' && in_array($call['name'], ['sleep', 'usleep'], true)) {
+            return $call['name'] . '(): wait with Sleep::for(...)->seconds(), which the base set-up fakes, or move the clock with $this->travelTo()';
+        }
+
+        if (isset(self::STRAY_SWITCHES[$call['name']])) {
+            return self::STRAY_SWITCHES[$call['name']] . ': a test fakes the requests and processes it expects, the stray guard stays on';
+        }
+
+        if (isset(self::STRAY_PREVENTERS[$call['name']]) && mb_ltrim(mb_strtolower($call['arguments'][0] ?? ''), '\\') === 'false') {
+            return self::STRAY_PREVENTERS[$call['name']] . ': a test fakes the requests and processes it expects, the stray guard stays on';
+        }
+
+        if ($call['kind'] === 'method' && $call['name'] === 'ignoring') {
+            return 'ignoring() on an architecture rule: the rule has no exception, fix the code';
         }
 
         if ($call['kind'] !== 'static' && isset(self::LOOSE_EXPECTATIONS[$call['name']])) {
@@ -272,13 +286,13 @@ final class BannedTestCallGuard
 
     private function dropsItsResult(string $closure): bool
     {
-        return preg_match('/^(static )?(fn|function)\s*\((?:(?!=>)[^{])*?\)\s*:\s*bool\b/', $closure) === 1
+        return preg_match('/^(static )?(fn|function)\s*\((?:[^{=]|=(?!>))*?\)\s*:\s*bool\b/', $closure) === 1
             || preg_match('/^(static )?fn\s*\([^)]*\)\s*(:\s*\S+\s*)?=>(?!\s*\\\\?expect\()/', $closure) === 1;
     }
 
     private function isClockExempt(string $relative): bool
     {
-        return array_any($this->withoutTestClock, static fn (string $folder): bool => str_starts_with($relative, rtrim($folder, '/') . '/'));
+        return array_any($this->withoutTestClock, static fn (string $folder): bool => str_starts_with($relative, mb_rtrim($folder, '/') . '/'));
     }
 
     private function returnsReadyObject(string $closure): bool

@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Tests\Support\Architecture;
+namespace Tests\Support\Ci;
+
+use Tests\Support\Architecture\CiContractGuard;
 
 /**
  * The skeletons of ci/github-actions.yml and ci/gitlab-ci.yml with every placeholder filled, and a code-owners file that covers the

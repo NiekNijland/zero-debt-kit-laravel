@@ -1,0 +1,73 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Modules\Roles\Enums\Permission;
+use App\Modules\Roles\Enums\Role;
+use Tests\Support\Architecture\MigrationClassGuard;
+use Tests\Support\SourceSandbox;
+
+uses()->group('arch');
+
+dataset('migrations that name a class', [
+    'the live role enum' => ["<?php\nuse App\\Modules\\Roles\\Enums\\Role;\n", 'the live permission or role class'],
+    'the live permission enum' => ["<?php\nuse App\\Modules\\Roles\\Enums\\Permission;\n", 'the live permission or role class'],
+    'a live permission case' => ["<?php\n\$a = Permission::VIEW_ORDERS;\n", 'write the name as a string'],
+    'an application class' => ["<?php\nuse App\\Models\\Order;\n", 'names an application class'],
+    'an application class in a call' => ["<?php\n\$a = \\App\\Support\\Json::decode(\$x);\n", 'names an application class'],
+]);
+
+it('detects a migration that names an application class', function (string $source, string $words): void {
+    $messages = new MigrationClassGuard(dirname(__DIR__, 2), 'database/migrations', [Permission::class, Role::class], 'App\\')->inSource($source);
+
+    expect($messages)->not->toBe([])
+        ->and($messages[0])->toContain($words);
+})->with('migrations that name a class');
+
+it('reads the live enums from the argument, not from their names', function (): void {
+    $guard = new MigrationClassGuard(dirname(__DIR__, 2), 'database/migrations', ['App\Modules\Notes\Enums\Ability'], 'App\\');
+
+    expect($guard->inSource("<?php\n\$a = Ability::VIEW;\n"))->toContain('a migration uses the live permission or role class: write the name as a string, so a rename of the class cannot break a migration that has run')
+        ->and($guard->inSource("<?php\n\$a = Permission::VIEW;\n"))->toBe([]);
+});
+
+dataset('migrations that name no class', [
+    'a plain migration' => ["<?php\nuse Illuminate\\Database\\Migrations\\Migration;\nreturn new class extends Migration {};\n"],
+    'a word that ends like the namespace' => ["<?php\n\$a = 'MyApp\\\\Models';\n"],
+    'a role as a string' => ["<?php\nDB::table('roles')->insert(['name' => 'admin']);\n"],
+    'a class that ends in the name of an enum' => ["<?php\n\$a = SomeRole::class;\n"],
+    'a case of a class with another namespace and the same short name' => ["<?php\n\$a = Other\\Permissions::VIEW;\n"],
+]);
+
+it('accepts a migration that names no application class', function (string $source): void {
+    expect(new MigrationClassGuard(dirname(__DIR__, 2), 'database/migrations', [Permission::class, Role::class], 'App\\')->inSource($source))->toBe([]);
+})->with('migrations that name no class');
+
+it('names the file of a migration that names a class, in a checkout under a dot directory, and fails on an empty folder', function (): void {
+    $root = SourceSandbox::create([
+        'database/migrations/2024_01_01_000000_a.php' => "<?php\nuse App\\Models\\Order;\n",
+        'database/migrations/2024_01_02_000000_b.php' => "<?php\n",
+        'empty/.gitkeep' => '',
+    ], prefix: '.checkout-');
+
+    try {
+        $violations = new MigrationClassGuard($root, 'database/migrations', [Permission::class, Role::class], 'App\\')->violations();
+        $empty = new MigrationClassGuard($root, 'empty', [Permission::class, Role::class], 'App\\')->violations();
+    } finally {
+        SourceSandbox::remove($root);
+    }
+
+    expect($violations)->toHaveCount(1)
+        ->and($violations[0])->toStartWith('database/migrations/2024_01_01_000000_a.php: a migration names an application class')
+        ->and($empty)->toHaveCount(1)
+        ->and($empty[0])->toContain('no migration was read');
+});
+
+it('throws on a migration folder that does not exist', function (): void {
+    expect(fn (): array => new MigrationClassGuard(dirname(__DIR__, 2), 'database/renamed-migrations', [Permission::class, Role::class], 'App\\')->violations())
+        ->toThrow(InvalidArgumentException::class, 'does not exist');
+});
+
+it('keeps application classes out of the migrations', function (): void {
+    expect(new MigrationClassGuard(dirname(__DIR__, 2), 'database/migrations', [Permission::class, Role::class], 'App\\')->violations())->toBe([]);
+});

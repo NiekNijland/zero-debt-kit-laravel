@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Support\Architecture;
 
-use App\Providers\RateLimitServiceProvider;
 use Illuminate\Cache\RateLimiter as CacheRateLimiter;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\RateLimiter;
@@ -27,13 +26,19 @@ use PhpParser\ParserFactory;
 
 final readonly class RateLimiterGuard
 {
-    private const string NUMBER_IN_CONFIG = "the number of a limit lives in the limits config file (%s): Limit::perMinute(Config::integer('rate_limiting.<name>_per_minute'))->by(\$key), and the window is the factory (perMinute, perHour, perDay)";
+    private const string NUMBER_IN_CONFIG = "the number of a limit lives in the limits config file (%s): Limit::perMinute(Config::integer('<file>.<name>'))->by(\$key), and the window is the factory (perMinute, perHour, perDay)";
 
+    /**
+     * @param list<string> $folders the folders that hold PHP and route files (`app`, `bootstrap`, `routes`): a `throttle:60,1` string in a route file is as much a number in the code as `Limit::perMinute(60)`
+     * @param string $limitsConfig the config file that holds the numbers, named in the message
+     * @param class-string $provider the one provider that defines every limiter
+     */
     public function __construct(
         private PhpFileInspector $inspector,
         private string $root,
-        private string $source,
+        private array $folders,
         private string $limitsConfig,
+        private string $provider,
     ) {
     }
 
@@ -42,15 +47,7 @@ final readonly class RateLimiterGuard
      */
     public function violations(): array
     {
-        $violations = [];
-
-        foreach ($this->inspector->phpFiles($this->root . '/' . $this->source) as $file) {
-            foreach ($this->inSource((string) file_get_contents($file)) as $violation) {
-                $violations[] = substr($file, strlen($this->root) + 1) . ':' . $violation;
-            }
-        }
-
-        return $violations;
+        return FolderScan::over($this->inspector, $this->root, $this->folders, fn (string $path, string $source): array => $this->inSource($source));
     }
 
     /**
@@ -58,12 +55,12 @@ final readonly class RateLimiterGuard
      */
     public function inSource(string $source): array
     {
-        $statements = (new NodeTraverser(new NameResolver()))->traverse((new ParserFactory())->createForHostVersion()->parse($source) ?? []);
+        $statements = new NodeTraverser(new NameResolver())->traverse(new ParserFactory()->createForHostVersion()->parse($source) ?? []);
         $finder = new NodeFinder();
         $violations = [];
 
         foreach ($finder->find($statements, static fn (Node $node): bool => $node instanceof StaticCall || $node instanceof New_) as $call) {
-            if (! ($call instanceof StaticCall || $call instanceof New_) || ! $call->class instanceof Name || ltrim($call->class->toString(), '\\') !== Limit::class) {
+            if (! $call instanceof StaticCall && ! $call instanceof New_ || ! $call->class instanceof Name || mb_ltrim($call->class->toString(), '\\') !== Limit::class) {
                 continue;
             }
 
@@ -78,25 +75,24 @@ final readonly class RateLimiterGuard
         $limiters = TypedReceivers::in($statements, [RateLimiter::class, CacheRateLimiter::class]);
 
         foreach ($finder->find($statements, static fn (Node $node): bool => $node instanceof StaticCall || $node instanceof MethodCall) as $call) {
-            if (! ($call instanceof StaticCall || $call instanceof MethodCall) || ! $call->name instanceof Identifier || $call->name->toLowerString() !== 'for') {
+            if (! $call instanceof StaticCall && ! $call instanceof MethodCall || ! $call->name instanceof Identifier || $call->name->toLowerString() !== 'for') {
                 continue;
             }
 
-            // The facade, an injected limiter and `app(RateLimiter::class)` are the same call.
             $onLimiter = $call instanceof StaticCall
-                ? $call->class instanceof Name && ltrim($call->class->toString(), '\\') === RateLimiter::class
+                ? $call->class instanceof Name && mb_ltrim($call->class->toString(), '\\') === RateLimiter::class
                 : $limiters->holds($call->var);
 
             if (! $onLimiter) {
                 continue;
             }
 
-            $provider = $finder->findFirst($statements, static fn (Node $node): bool => $node instanceof Class_
-                && $node->namespacedName?->toString() === RateLimitServiceProvider::class
+            $provider = $finder->findFirst($statements, fn (Node $node): bool => $node instanceof Class_
+                && $node->namespacedName?->toString() === $this->provider
                 && $node->getStartLine() <= $call->getStartLine() && $call->getEndLine() <= $node->getEndLine());
 
             if (! $provider instanceof Class_) {
-                $violations[] = $call->getStartLine() . ': a limiter defined outside ' . RateLimitServiceProvider::class . ': every RateLimiter::for() lives in that provider, and a route takes it with throttle:<name>';
+                $violations[] = $call->getStartLine() . ': a limiter defined outside ' . $this->provider . ': every RateLimiter::for() lives in that provider, and a route takes it with throttle:<name>';
             }
 
             $name = $call->args[0] ?? null;
