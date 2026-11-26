@@ -33,7 +33,7 @@ dataset('broadcast channels out of line', [
 ]);
 
 it('detects a broadcast channel that is not registered or not tested', function (array $files, string $reason): void {
-    $root = SourceSandbox::create(Narrow::stringMap($files));
+    $root = SourceSandbox::create(['app/.gitkeep' => '', ...Narrow::stringMap($files)]);
 
     try {
         $violations = new BroadcastChannelGuard(new PhpFileInspector(), $root, 'app')->violations();

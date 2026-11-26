@@ -60,5 +60,5 @@ it('accepts camelCase properties, a snake_case key on the wire and a class the f
 });
 
 it('names every property of a Data class with a TypeScript type in camelCase', function (): void {
-    expect(FrontendDataNamingGuard::violations(new PhpFileInspector(), dirname(__DIR__, 2)))->toBe([]);
+    expect(FrontendDataNamingGuard::violations(new PhpFileInspector(), dirname(__DIR__, 2), 'app'))->toBe([]);
 });
