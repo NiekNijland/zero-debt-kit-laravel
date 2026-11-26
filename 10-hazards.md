@@ -120,8 +120,8 @@ Traps of one framework are in its catalog: `catalog/backend-laravel.md`, "Framew
 
 ## Closing the program (step 10)
 
-- A dashboard row that counts by a folder regex reads zero when a folder is missing from the regex (25 untested classes in `Support` folders). Prove every zero by listing the files the pathspec matches and the folders of the tree that match no row.
-- Serialized closures carry class names in their bodies, not only in their scope. An alias list built from the class moves misses a class that only a closure body names; the runtime check with old-tree payloads found three. Read every serialized closure of the old tree and list the names its body resolves, before the release that moves them.
+- A dashboard row that counts by a folder regex reads zero when a folder is missing from the regex (a folder of untested support classes that no row named). Prove every zero by listing the files the pathspec matches and the folders of the tree that match no row.
+- Serialized closures carry class names in their bodies, not only in their scope. An alias list built from the class moves misses a class that only a closure body names; the runtime check with old-tree payloads found such classes. Read every serialized closure of the old tree and list the names its body resolves, before the release that moves them.
 - The first end audit finds the rest of the definition, not nothing: in a measured run two auditors scored 7 and 6.5 out of 10 although the dashboard was green. Make the dashboard hold every number the definition states (type coverage, pinned images, path conditions, inline casts) before step 10 starts, and budget three audit rounds.
 - Builders cut from one base collide when one moves tests and another writes tests for the same classes. Merge the move branch first and cut the test builders from it.
 - Run the guard group on the tip of every PR in a chain; a fix that lived on the top merge belongs on the lower PR, or the lower PR is red alone.
