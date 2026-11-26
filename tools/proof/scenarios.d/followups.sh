@@ -82,3 +82,9 @@ commit "PROJ-9 chore: a new code-owners file"
 check_php FX32 "ratchets: a code-owners file that is not on the base yet is no change of a guarded file" 0 '^Ratchets against' ratchets
 git checkout -q -f main
 git branch -D fx30 fx32 > /dev/null 2>&1
+
+# ---------------------------------------------------------------- the self-test of a project that reads another manifest key (the gate runs it)
+mkdir -p "$ROOT/fx-st"
+cp "$KIT/tools/kit-config.sh" "$ROOT/fx-st/kit-config.sh"
+sed 's/^audit-ignore \(.*\) count? config.audit.ignore$/audit-ignore \1 count? auditIgnore/' "$KIT/tools/ci-ratchets.sh" > "$ROOT/fx-st/ci-ratchets.sh"
+check FX20 "self-test: a project whose audit-ignore row reads another key (package.json) skips the composer cases and passes" 0 'Self-test: [0-9]+ cases run, 0 wrong, 2 skipped' "$SHELL_BIN" -c "cd '$ROOT' && '$SHELL_BIN' fx-st/ci-ratchets.sh --self-test"

@@ -955,6 +955,14 @@ selftest() {
             index=$((index + 1))
             continue
         }
+        # The two audit-ignore cases are written for the composer key; a project that reads another manifest key (package.json) has
+        # changed the row's expression, so the cases do not describe it: skipped, not failed.
+        if [ "$row" = "audit-ignore" ] && [ "${spec#count? }" != "config.audit.ignore" ]; then
+            skipped=$((skipped + 1))
+            covered="$covered $row "
+            index=$((index + 1))
+            continue
+        fi
         path="${paths[$index]}"
         [ "$method" != "without" ] || path="$(dirname "$path")"
         status=0
