@@ -168,7 +168,7 @@ Blockers
 5. A migration that builds an index or a foreign key on an existing table without the engine's non-blocking form.
 6. A commit with `[ratchet: <name>] <reason>` or `[ratchet: script] <reason>`: read the reason and the diff. A "new row" in the ratchet output that does not belong to a guard this PR installs.
 7. Production behaves differently after the PR and the description does not say so under "Behavior that changes on purpose": a fix a test on the real path exposed, a corrected lookup key.
-8. A raised cap in the caps file; a test that switches off middleware or exception handling; a new double of a class of the project where the real class or a fake works.
+8. A raised cap in the caps file without its `[ratchet: cap-<key>]` tag, or with a reason that does not hold (item 6); a test that switches off middleware or exception handling; a new double of a class of the project where the real class or a fake works.
 
 Warnings
 

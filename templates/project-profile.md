@@ -43,7 +43,7 @@ Filled in during step 1 from the repository and the hosting API. Mark each line 
 - Paths that skip CI:
 - Autofix bots that push commits, and whether the owner kept them (the steps that may write, named for the contract test):
 - Branches that deploy, each with its pipeline (the checks, tests and smoke run on every one) and whether the pipeline of a deploying branch is the deploy pipeline (then smoke sits in front of the deploy step):
-- Does the pipeline merge the base branch first (Bitbucket does: `CHECK_HEAD` is then never set):
+- Does the pipeline merge the base branch first (Bitbucket and GitHub do: `CHECK_HEAD` is then never set; GitLab checks out the branch as it is):
 - Price of a pipeline minute, what that means for pushes, and the cost of the runs of step 2 as told to the owner (`02-step-1-discover.md` 1.10):
 - Does retargeting a PR, or merging one PR into another PR's branch, start a pipeline run:
 - Where the error of a failed step is read when the log is short (the host's API field for a runner or image failure):
@@ -71,6 +71,8 @@ Filled in during step 1 from the repository and the hosting API. Mark each line 
 - Queue workers: do they restart with a deploy, and how long can old payloads live:
 - What to watch after a deploy (error tracker and its query, queue dashboard, failed jobs):
 - Preview environments, tags that skip them:
+- Retention period of soft-deleted rows (asked in 1.10, where the project has any):
+- Stored names: three releases (default) or the one-release variant (`05-program.md` D9), as the owner chose in 1.10:
 - From where the production-like environment is reachable (the lead's machine, the pipeline's runners, only the owner) and the form of the runtime check that follows (`05-program.md` D4, point 5):
 - The production-like environment for the runtime check (`05-program.md` D4): its cache store, queue and database engine, how a merge reaches it, where its deploy result is read, the pages to request, and the seeded test user the lead signs in as (where its secret lives, never the secret itself):
 

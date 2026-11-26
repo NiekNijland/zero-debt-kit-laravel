@@ -113,9 +113,11 @@ Filter with: "could a good product owner choose this without the owner?" If yes,
 - deletions another system may depend on;
 - data migrations on big tables;
 - each major upgrade above the floor: do it or pin it;
+- for a project with stored names: three releases (the default) or the one-release variant of `05-program.md` D9;
+- the retention period of soft-deleted rows, where the project has any (recorded in the profile);
 - reviewers and the merge rule, if not readable.
 
-**This is the one round of questions of the program.** Before you send it, read the part of `05-program.md` D2 of every step, and list what each will need from the owner: type and stored-data questions of steps 5 to 8 (a value that changes what is stored, a deletion, a default), the exceptions each step would otherwise discover, the behavior changes, the deploy-bound steps. A question that is first found in step 5 and blocks it for days is a failure of this step: it goes in the kit's lessons, and the next run asks it here.
+**This is the one round of owner decisions of the program** (1.1 was the round of facts, before measuring). Before you send it, read the part of `05-program.md` D2 of every step, and list what each will need from the owner: type and stored-data questions of steps 5 to 8 (a value that changes what is stored, a deletion, a default), the exceptions each step would otherwise discover, the behavior changes, the deploy-bound steps. A question that is first found in step 5 and blocks it for days is a failure of this step: it goes in the kit's lessons, and the next run asks it here.
 
 Ask each as a real question: what is going on in plain words, the options, what each means, the kit's reasons where a kit rule is involved, your proposal. One subject per question. An empty answer or "ok" means the proposal stands.
 
