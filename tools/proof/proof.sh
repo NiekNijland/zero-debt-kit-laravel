@@ -92,7 +92,7 @@ fi
 
 # The checks that write files or commit, so that a later check reads what they leave (found with PROOF_AUDIT=1). Under PROOF_ONLY
 # they run even when the filter does not select them.
-PROOF_STEPS=""
+PROOF_STEPS="H01 H02 B01 B07 MU03 MU04 MV01 MV06 CX06b CX08 CX08b CX08c CX08d CX10 CX10b CX10c CX12 CX13 DX14 DX25 RX30 RX30b RX31b TX21 TX24 TX26 TX33 TX39 TX40 VX01 VX09 VX10 VX15 VX16 VX17 VX18 VX19 VX22"
 
 SHELL_BIN="${1:-/bin/bash}"
 LABEL="${2:-bash}"
