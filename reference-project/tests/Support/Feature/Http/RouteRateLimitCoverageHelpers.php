@@ -4,99 +4,82 @@ declare(strict_types=1);
 
 namespace Tests\Support\Feature\Http;
 
-use Closure;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Routing\Route as RoutingRoute;
-use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
-use InvalidArgumentException;
-use ReflectionClass;
-use ReflectionFunction;
+use Tests\Support\ApplicationRoutes;
 
 final class RouteRateLimitCoverageHelpers
 {
-    /** @var array<string, array{reason: string, routes: list<string>}> */
-    public const array DEDICATED_LIMITERS = [
-    'newsletter' => ['reason' => 'the sign-up form of the newsletter keeps its own limit per address', 'routes' => ['newsletter.subscribe']],
-    ];
+    private const array READ_METHODS = ['GET', 'HEAD', 'OPTIONS'];
 
-    /** @var list<string> */
-    public const array OUT_OF_SCOPE_SOURCES = ['tests'];
-
-    public static function rateLimitOutOfScope(RoutingRoute $route): bool
+    /**
+     * Every route of the application takes exactly one limiter by name (`throttle:<name>`), the limiter is one the rate-limit provider registered (asked of the
+     * rate limiter, not read from a table of names here), and a route that writes takes one of the write limiters, a route that reads none of them.
+     *
+     * @param list<string> $folders the folders that hold a controller or a route closure, relative to the base path
+     * @param list<string> $writeLimiters the names of the limiters a write uses
+     * @return list<string> `METHODS route-name problem` per route
+     */
+    public static function problems(array $folders, array $writeLimiters): array
     {
-        $uses = $route->getAction('uses');
-        $controller = $route->getControllerClass();
-        $source = match (true) {
-            $uses instanceof Closure => new ReflectionFunction($uses)->getFileName(),
-            $controller !== null && class_exists($controller) => new ReflectionClass($controller)->getFileName(),
-            default => false,
-        };
+        $problems = [];
 
-        return is_string($source) && array_any(self::OUT_OF_SCOPE_SOURCES, static fn (string $directory): bool => str_starts_with($source, base_path($directory)));
-    }
+        foreach (ApplicationRoutes::all($folders) as $route) {
+            $problem = self::problem($route, $writeLimiters);
 
-    public static function rateLimitNamedRoute(string $name): RoutingRoute
-    {
-        return Route::getRoutes()->getByName($name) ?? throw new InvalidArgumentException("No route is named {$name}");
-    }
+            if ($problem !== null) {
+                $problems[] = implode('|', $route->methods()) . ' ' . ApplicationRoutes::identifier($route) . ' ' . $problem;
+            }
+        }
 
-    public static function rateLimitRouteIdentifier(RoutingRoute $route): string
-    {
-        $name = $route->getName();
-
-        return $name === null || str_starts_with($name, 'generated::') ? $route->uri() : $name;
+        return $problems;
     }
 
     /**
-     * @return list<string>
+     * @param list<string> $writeLimiters
      */
-    public static function rateLimitRouteLimiters(RoutingRoute $route): array
+    public static function problem(RoutingRoute $route, array $writeLimiters): ?string
     {
-        return array_values(collect(Route::gatherRouteMiddleware($route))
-            ->filter(static fn (mixed $middleware): bool => is_string($middleware) && ($middleware === ThrottleRequests::class || str_starts_with($middleware, ThrottleRequests::class . ':')))
-            ->map(static fn (string $middleware): string => $middleware === ThrottleRequests::class ? 'package' : Str::after($middleware, ':'))
-            ->all());
+        $limiters = self::limiters($route);
+
+        if ($limiters === []) {
+            return 'has no throttle:<name> limiter';
+        }
+
+        if (count($limiters) > 1) {
+            return 'counts in more than one limiter: ' . implode(', ', $limiters);
+        }
+
+        $limiter = $limiters[0];
+
+        if (RateLimiter::limiter($limiter) === null) {
+            return 'uses ' . $limiter . ', which is not a limiter registered in the rate-limit provider';
+        }
+
+        $writes = array_diff($route->methods(), self::READ_METHODS) !== [];
+
+        return $writes === in_array($limiter, $writeLimiters, true)
+            ? null
+            : ($writes ? 'writes with the read limiter ' . $limiter : 'reads with the write limiter ' . $limiter);
     }
 
     /**
-     * @return list<string>
+     * @return list<string> the limiter names of the route, `a throttle without a limiter name` for a bare throttle
      */
-    public static function rateLimitRouteCategories(RoutingRoute $route): array
+    public static function limiters(RoutingRoute $route): array
     {
-        return array_values(array_diff(self::rateLimitRouteLimiters($route), ['app', 'reads', 'writes']));
-    }
+        $limiters = [];
 
-    public static function rateLimitRouteProblem(RoutingRoute $route): ?string
-    {
-        $limiters = self::rateLimitRouteLimiters($route);
-        $own = self::rateLimitRouteCategories($route);
-        $accepted = [...array_keys(Config::array('rate_limiting.actions')), 'package'];
-
-        if (count($own) > 1) {
-            return 'counts in more than one bucket: ' . implode(', ', $own);
+        foreach (ApplicationRoutes::middleware($route) as $middleware) {
+            if ($middleware === ThrottleRequests::class) {
+                $limiters[] = 'a throttle without a limiter name';
+            } elseif (str_starts_with($middleware, ThrottleRequests::class . ':')) {
+                $limiters[] = Str::after($middleware, ':');
+            }
         }
 
-        if ($own === []) {
-            $reads = array_intersect($route->methods(), ['GET', 'HEAD', 'OPTIONS']) !== [];
-            $writes = array_diff($route->methods(), ['GET', 'HEAD', 'OPTIONS']) !== [];
-
-            return (! $reads || in_array('reads', $limiters, true)) && (! $writes || in_array('writes', $limiters, true))
-                ? null
-                : 'has no rate limit category';
-        }
-
-        if (in_array($own[0], $accepted, true)) {
-            return null;
-        }
-
-        if (array_key_exists($own[0], self::DEDICATED_LIMITERS)) {
-            return collect(self::DEDICATED_LIMITERS[$own[0]]['routes'])->contains(static fn (string $pattern): bool => Str::is($pattern, self::rateLimitRouteIdentifier($route)))
-                ? null
-                : 'uses the dedicated limiter ' . $own[0] . ' outside the routes it is meant for';
-        }
-
-        return 'uses a limiter that is not a category: ' . $own[0];
+        return $limiters;
     }
 }
