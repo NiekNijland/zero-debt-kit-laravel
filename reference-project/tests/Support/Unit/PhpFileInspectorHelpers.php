@@ -4,32 +4,23 @@ declare(strict_types=1);
 
 namespace Tests\Support\Unit;
 
-use Tests\Support\ArchChecks;
+use Tests\Support\Architecture\DateCastGuard;
 use Tests\Support\Architecture\PhpFileInspector;
-use Tests\Support\SourceSandbox;
+use Tests\Support\Architecture\RoleNameGuard;
 
+/**
+ * The helpers of `tests/Unit/PhpFileInspectorTest.php`: the reader is exercised through the two guards that read strings and keyed arrays of a file.
+ */
 final class PhpFileInspectorHelpers
 {
     public static function checksRoleName(string $source): bool
     {
-        $root = SourceSandbox::create(['Subject.php' => $source]);
-
-        try {
-            return ArchChecks::checksRoleName(new PhpFileInspector(), $root . '/Subject.php');
-        } finally {
-            SourceSandbox::remove($root);
-        }
+        return new RoleNameGuard(new PhpFileInspector(), sys_get_temp_dir(), [])->inSource($source) !== [];
     }
 
     public static function castsDateMutably(string $source): bool
     {
-        $root = SourceSandbox::create(['Subject.php' => $source]);
-
-        try {
-            return ArchChecks::castsDateMutably(new PhpFileInspector(), $root . '/Subject.php');
-        } finally {
-            SourceSandbox::remove($root);
-        }
+        return new DateCastGuard(new PhpFileInspector(), sys_get_temp_dir(), '')->inSource($source) !== [];
     }
 
     /**

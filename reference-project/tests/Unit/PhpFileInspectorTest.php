@@ -6,6 +6,8 @@ use Tests\Support\Architecture\PhpFileInspector;
 use Tests\Support\SourceSandbox;
 use Tests\Support\Unit\PhpFileInspectorHelpers;
 
+uses()->group('arch');
+
 it('lists the php files below a directory in a stable order and nothing else', function (): void {
     $root = SourceSandbox::create(['b.php' => '<?php', 'a/c.php' => '<?php', 'a/readme.md' => 'text', 'a/d.txt' => 'text']);
 

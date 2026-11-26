@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 use App\Support\RouteMatcher;
 use Illuminate\Routing\Router;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Route;
-use Tests\Support\ArchChecks;
+use Tests\Support\Architecture\BootstrapRegistrationGuard;
+use Tests\Support\Architecture\ContainerBindingGuard;
+use Tests\Support\Architecture\ContainerCallGuard;
 use Tests\Support\Architecture\PhpFileInspector;
-use Tests\Support\Globs;
+use Tests\Support\Architecture\RouteFileLoadGuard;
+use Tests\Support\Architecture\ScheduledOneServerGuard;
+use Tests\Support\SourceSandbox;
 
 uses()->group('arch');
 
@@ -15,167 +20,203 @@ arch('routes are registered only in routes/ and bootstrap/app.php')
     ->expect([Route::class, Router::class])
     ->toOnlyBeUsedIn([RouteMatcher::class, 'Tests']);
 
-test('no class under app/ loads a route file', function (): void {
-    $root = dirname(__DIR__, 2);
-    $inspector = new PhpFileInspector();
-    $offenders = [];
+dataset('route file loads', [
+    'in a provider method' => ["<?php\nfinal class P { public function boot(): void { \$this->loadRoutesFrom(__DIR__ . '/x.php'); } }\n"],
+    'on a held object' => ["<?php\n\$provider->loadRoutesFrom(\$path);\n"],
+]);
 
-    foreach ($inspector->phpFiles($root . '/app') as $file) {
-        if (ArchChecks::loadsRouteFile($inspector->callsIn($file))) {
-            $offenders[] = substr($file, strlen($root) + 1);
-        }
-    }
+it('detects a class that loads a route file', function (string $source): void {
+    $violations = new RouteFileLoadGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source);
 
-    expect($offenders)->toBe([]);
+    expect($violations)->toHaveCount(1)
+        ->and($violations[0])->toContain('register routes in the route files and in the bootstrap file');
+})->with('route file loads');
+
+it('accepts a class that mentions the call in a string or a comment, or loads something else', function (): void {
+    $guard = new RouteFileLoadGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app');
+
+    expect($guard->inSource("<?php\n// loadRoutesFrom(\$a)\n\$a = 'loadRoutesFrom';\n\$this->loadMigrationsFrom(\$path);\n"))->toBe([]);
 });
 
-test('dependencies come through the constructor or handle(), never through the container', function (): void {
-    $root = dirname(__DIR__, 2);
-    $inspector = new PhpFileInspector();
-    $calls = static fn (string $source): array => ArchChecks::containerCallLines($inspector->calls($source));
-    $offenders = [];
+it('reads the folder below a checkout under a dot directory', function (): void {
+    $root = SourceSandbox::create(['app/P.php' => "<?php\n\$this->loadRoutesFrom(\$p);\n", 'app/Q.php' => "<?php\n"], prefix: '.checkout-');
 
-    foreach ($inspector->phpFiles($root . '/app') as $file) {
-        $class = 'App\\' . str_replace('/', '\\', substr($file, strlen($root . '/app/'), -4));
-
-        if (str_starts_with($class, 'App\Providers\\')) {
-            continue;
-        }
-
-        $lines = ArchChecks::containerCallLines($inspector->callsIn($file));
-
-        if ($lines === []) {
-            continue;
-        }
-
-        foreach ($lines as $line) {
-            $method = ArchChecks::methodAtLine($file, $line);
-
-            $offenders[] = $class . '::' . ($method ?? 'outside a method') . ' line ' . $line;
-        }
+    try {
+        $violations = new RouteFileLoadGuard(new PhpFileInspector(), $root, 'app')->violations();
+    } finally {
+        SourceSandbox::remove($root);
     }
 
-    expect($offenders)->toBe([])
-        ->and($calls('<?php $a = resolve(Foo::class);'))->toHaveCount(1)
-        ->and($calls('<?php $a = app(Foo::class); $b = \app();'))->toHaveCount(2)
-        ->and($calls('<?php $a = App::make(Foo::class); $b = \Illuminate\Support\Facades\App::call($x);'))->toHaveCount(2)
-        ->and($calls('<?php $a = app()->make(Foo::class); $b = $this->container->make(Foo::class); $c = $container->make(Foo::class);'))->toHaveCount(3)
-        ->and($calls('<?php $a = Container::getInstance();'))->toHaveCount(1)
-        ->and($calls('<?php trait T { public function f(): void { resolve(Foo::class); } }'))->toHaveCount(1)
-        ->and($calls('<?php final class J { public function failed(): void { app(Foo::class)->handle(); } }'))->toHaveCount(1)
-        ->and($calls('<?php final class M extends Model { protected static function booted(): void { static::saved(static fn () => resolve(Foo::class)->forget()); } }'))->toHaveCount(1)
-        ->and($calls('<?php $a = App::environment(); $b = App::getLocale(); $c = Hash::make($x); $d = $this->resolve($x); $e = $factory->make();'))->toBe([]);
+    expect($violations)->toHaveCount(1)
+        ->and($violations[0])->toStartWith('app/P.php: line 2: a class loads a route file');
 });
 
-test('every scheduled task is a command that runs on one server', function (): void {
-    $tasks = static function (string $source): array {
-        $tokens = array_values(array_filter(
-            PhpToken::tokenize($source),
-            static fn (PhpToken $token): bool => ! $token->is([T_WHITESPACE, T_COMMENT, T_DOC_COMMENT]),
-        ));
-        $found = [];
-        $current = null;
-        $depth = 0;
+it('loads no route file from a class under app/', function (): void {
+    expect(new RouteFileLoadGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->violations())->toBe([]);
+});
 
-        foreach ($tokens as $index => $token) {
-            if ($current === null && $token->is(T_STRING) && $token->text === 'Schedule' && ($tokens[$index + 1] ?? null)?->is(T_DOUBLE_COLON) === true) {
-                $current = ['line' => $token->line, 'onOneServer' => false];
-            }
+dataset('container calls', [
+    'resolve()' => ['<?php $a = resolve(Foo::class);', 1],
+    'app() and a global app()' => ['<?php $a = app(Foo::class); $b = \app();', 2],
+    'the facade make and a qualified call' => ['<?php $a = App::make(Foo::class); $b = \Illuminate\Support\Facades\App::call($x);', 2],
+    'a held container' => ['<?php $a = app()->make(Foo::class); $b = $this->container->make(Foo::class); $c = $container->make(Foo::class);', 3],
+    'the container instance' => ['<?php $a = Container::getInstance();', 1],
+    'in a trait' => ['<?php trait T { public function f(): void { resolve(Foo::class); } }', 1],
+    'in the failed hook of a job' => ['<?php final class J { public function failed(): void { app(Foo::class)->handle(); } }', 1],
+    'in a closure of a boot hook' => ['<?php final class M extends Model { protected static function booted(): void { static::saved(static fn () => resolve(Foo::class)->forget()); } }', 1],
+]);
 
-            if ($current === null) {
-                continue;
-            }
+it('detects a dependency that comes through the container', function (string $source, int $count): void {
+    $violations = new ContainerCallGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', [], App::class)->inSource($source);
 
-            if ($token->is(T_STRING) && $token->text === 'onOneServer' && ($tokens[$index - 1] ?? null)?->is(T_OBJECT_OPERATOR) === true) {
-                $current['onOneServer'] = true;
-            }
+    expect($violations)->toHaveCount($count)
+        ->and($violations[0])->toContain('take the dependency as a constructor argument, or as an argument of handle()');
+})->with('container calls');
 
-            $depth += match ($token->text) {
-                '(', '[', '{' => 1,
-                ')', ']', '}' => -1,
-                default => 0,
-            };
+it('names the method of a container call and accepts a facade method that is not a call into the container', function (): void {
+    $guard = new ContainerCallGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', [], App::class);
 
-            if ($token->text === ';' && $depth === 0) {
-                $found[] = $current;
-                $current = null;
-            }
-        }
+    expect($guard->inSource('<?php final class J { public function failed(): void { app(Foo::class); } }')[0])->toStartWith('failed line 1: ')
+        ->and($guard->inSource('<?php $a = app();')[0])->toStartWith('outside a method line 1: ')
+        ->and($guard->inSource('<?php $a = App::environment(); $b = App::getLocale(); $c = Hash::make($x); $d = $this->resolve($x); $e = $factory->make();'))->toBe([]);
+});
 
-        return $found;
-    };
-    $offenders = [];
-    $scheduled = 0;
+it('skips the folders that wire the container and reads a checkout under a dot directory', function (): void {
+    $root = SourceSandbox::create(['app/Providers/P.php' => "<?php\n\$a = app(X::class);\n", 'app/Service.php' => "<?php\n\$a = app(X::class);\n"], prefix: '.checkout-');
 
-    foreach (Globs::of(dirname(__DIR__, 2) . '/routes' . '/*.php') as $file) {
-        if (preg_match('/Schedule::call\(/', (string) file_get_contents($file)) === 1) {
-            $offenders[] = basename($file) . ' schedules a closure';
-        }
-
-        foreach ($tasks((string) file_get_contents($file)) as $task) {
-            $scheduled++;
-
-            if (! $task['onOneServer']) {
-                $offenders[] = basename($file) . ' line ' . $task['line'];
-            }
-        }
+    try {
+        $violations = new ContainerCallGuard(new PhpFileInspector(), $root, 'app', ['app/Providers/'], App::class)->violations();
+    } finally {
+        SourceSandbox::remove($root);
     }
 
-    expect($scheduled)->toBeGreaterThan(0)
-        ->and($offenders)->toBe([])
-        ->and($tasks('<?php Schedule::command("a")->daily(); Schedule::command("b")->onOneServer()->daily();'))->toBe([['line' => 1, 'onOneServer' => false], ['line' => 1, 'onOneServer' => true]])
-        ->and($tasks('<?php Schedule::call(static function (): void { run(); })->hourly();'))->toBe([['line' => 1, 'onOneServer' => false]])
-        ->and($tasks('<?php Schedule::call(static function (): void { run(); })->hourly()->onOneServer();'))->toBe([['line' => 1, 'onOneServer' => true]]);
+    expect($violations)->toHaveCount(1)
+        ->and($violations[0])->toStartWith('app/Service.php: outside a method line 2');
 });
 
-test('a class of the application declares its own container binding with #[Scoped], #[Singleton] or #[Bind], not a provider', function (): void {
-    $root = dirname(__DIR__, 2);
-    $bindings = static function (string $source): array {
-        preg_match_all('/^use ([\w\\\\]+)(?: as (\w+))?;$/m', $source, $uses, PREG_SET_ORDER);
-        $imports = [];
+it('takes every dependency through the constructor or handle(), never through the container', function (): void {
+    expect(new ContainerCallGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', ['app/Providers/'], App::class)->violations())->toBe([]);
+});
 
-        foreach ($uses as $use) {
-            $imports[$use[2] ?? ArchChecks::lastSegment($use[1])] = $use[1];
-        }
+dataset('scheduled tasks that fail', [
+    'a command without one server' => ['<?php Schedule::command("a")->daily();', 'line 1: a scheduled task does not run on one server: end it with ->onOneServer()'],
+    'a closure' => ['<?php Schedule::call(static function (): void { run(); })->hourly()->onOneServer();', 'a closure is scheduled: make it a command'],
+    'the second of two' => ['<?php Schedule::command("a")->onOneServer(); Schedule::command("b")->daily();', 'does not run on one server'],
+]);
 
-        preg_match_all('/->(?:scoped|singleton|bind)\(\s*(\w+)::class\s*(?:,\s*(\w+)::class\s*)?\)/', $source, $calls, PREG_SET_ORDER);
+it('detects a scheduled task that runs on every server and a closure', function (string $source, string $words): void {
+    $violations = new ScheduledOneServerGuard(dirname(__DIR__, 2), 'routes')->inSource($source);
 
-        return array_values(array_filter(
-            array_map(static fn (array $call): string => $imports[$call[1]] ?? $call[1], $calls),
-            static fn (string $class): bool => str_starts_with($class, 'App\\'),
-        ));
-    };
-    $offenders = [];
+    expect($violations)->not->toBe([])
+        ->and($violations[0])->toContain($words);
+})->with('scheduled tasks that fail');
 
-    foreach (Globs::of($root . '/app' . '/Providers/*.php') as $file) {
-        foreach ($bindings((string) file_get_contents($file)) as $class) {
-            $offenders[] = basename($file) . ' binds ' . $class;
-        }
+it('accepts a task that ends in onOneServer, in any place of the chain', function (): void {
+    $guard = new ScheduledOneServerGuard(dirname(__DIR__, 2), 'routes');
+
+    expect($guard->inSource('<?php Schedule::command("b")->onOneServer()->daily();'))->toBe([])
+        ->and($guard->inSource('<?php Schedule::command("b")->daily()->onOneServer();'))->toBe([])
+        ->and($guard->inSource('<?php $schedule->call(fn () => 1); Other::call(fn () => 2);'))->toBe([]);
+});
+
+it('reads the route files below a checkout under a dot directory and fails on a folder with no task', function (): void {
+    $root = SourceSandbox::create(['routes/console.php' => "<?php\nSchedule::command('a')->daily();\n", 'empty/x.php' => "<?php\n"], prefix: '.checkout-');
+
+    try {
+        $violations = new ScheduledOneServerGuard($root, 'routes')->violations();
+        $empty = new ScheduledOneServerGuard($root, 'empty')->violations();
+    } finally {
+        SourceSandbox::remove($root);
     }
 
-    expect($offenders)->toBe([])
-        ->and($bindings("use App\\Modules\\Orders\\Services\\X;\n\$this->app->scoped(X::class);"))->toBe(['App\\Modules\\Orders\\Services\\X'])
-        ->and($bindings("use App\\Modules\\Orders\\Contracts\\I;\nuse App\\Modules\\Orders\\Services\\C;\n\$this->app->bind(I::class, C::class);"))->toBe(['App\\Modules\\Orders\\Contracts\\I'])
-        ->and($bindings("use Psr\\Clock\\ClockInterface;\nuse App\\Support\\SystemClock;\n\$this->app->singleton(ClockInterface::class, SystemClock::class);\n\$this->app->bind(App\\Modules\\Shipments\\Contracts\\LabelPrinter::class, static fn () => 1);"))->toBe([]);
+    expect($violations)->toHaveCount(1)
+        ->and($violations[0])->toStartWith('routes/console.php: line 2: a scheduled task does not run on one server')
+        ->and($empty)->toHaveCount(1)
+        ->and($empty[0])->toContain('no scheduled task was read');
 });
 
-test('listeners are found by discovery: no provider registers a listener of a module by hand', function (): void {
-    $offenders = [];
+it('runs every scheduled task as a command on one server', function (): void {
+    expect(new ScheduledOneServerGuard(dirname(__DIR__, 2), 'routes')->violations())->toBe([]);
+});
 
-    foreach (Globs::of(dirname(__DIR__, 2) . '/app/Providers/*.php') as $file) {
-        if (preg_match('/^use App\\\\Modules\\\\\\w+\\\\Listeners\\\\/m', (string) file_get_contents($file)) === 1) {
-            $offenders[] = basename($file);
-        }
+dataset('bindings that a class declares itself', [
+    'a scoped class of the application' => ["use App\\Modules\\Orders\\Services\\X;\n\$this->app->scoped(X::class);", 'App\\Modules\\Orders\\Services\\X'],
+    'an interface of the application bound to a class' => ["use App\\Modules\\Orders\\Contracts\\I;\nuse App\\Modules\\Orders\\Services\\C;\n\$this->app->bind(I::class, C::class);", 'App\\Modules\\Orders\\Contracts\\I'],
+    'a singleton under an alias' => ["use App\\Support\\Clock as AppClock;\n\$this->app->singleton(AppClock::class);", 'App\\Support\\Clock'],
+]);
+
+it('detects a binding of an application class in a provider', function (string $source, string $class): void {
+    $violations = new ContainerBindingGuard(dirname(__DIR__, 2), 'app/Providers', 'App\\')->inSource($source);
+
+    expect($violations)->toHaveCount(1)
+        ->and($violations[0])->toContain('binds ' . $class . ' in a provider', '#[Scoped], #[Singleton] or #[Bind]');
+})->with('bindings that a class declares itself');
+
+it('accepts the binding of a vendor class and of a closure', function (): void {
+    $guard = new ContainerBindingGuard(dirname(__DIR__, 2), 'app/Providers', 'App\\');
+    $source = "use Psr\\Clock\\ClockInterface;\nuse App\\Support\\SystemClock;\n\$this->app->singleton(ClockInterface::class, SystemClock::class);\n\$this->app->bind(App\\Modules\\Shipments\\Contracts\\LabelPrinter::class, static fn () => 1);";
+
+    expect($guard->inSource($source))->toBe([]);
+});
+
+it('reads the providers below a checkout under a dot directory and fails on a folder without one', function (): void {
+    $root = SourceSandbox::create(['providers/P.php' => "<?php\nuse App\\X;\n\$this->app->scoped(X::class);\n", 'empty/.gitkeep' => ''], prefix: '.checkout-');
+
+    try {
+        $violations = new ContainerBindingGuard($root, 'providers', 'App\\')->violations();
+        $empty = new ContainerBindingGuard($root, 'empty', 'App\\')->violations();
+    } finally {
+        SourceSandbox::remove($root);
     }
 
-    expect($offenders)->toBe([])
-        ->and(file_get_contents(dirname(__DIR__, 2) . '/bootstrap' . '/app.php'))->toContain("->withEvents(discover: [app_path('Modules/*/Listeners')])");
+    expect($violations)->toHaveCount(1)
+        ->and($violations[0])->toStartWith('providers/P.php: binds App\\X in a provider')
+        ->and($empty[0])->toContain('no provider was read');
 });
 
-test('the tenant middleware pair lives in one group', function (): void {
-    $source = (string) file_get_contents(dirname(__DIR__, 2) . '/bootstrap' . '/app.php');
+it('lets a class of the application declare its own binding, not a provider', function (): void {
+    expect(new ContainerBindingGuard(dirname(__DIR__, 2), 'app/Providers', 'App\\')->violations())->toBe([]);
+});
 
-    expect(substr_count($source, 'AbortIfNotTenantHost::class'))->toBe(1)
-        ->and(substr_count($source, 'NeedsTenant::class'))->toBe(1)
-        ->and($source)->toContain("\$middleware->group('tenant', [");
+dataset('registrations that fail', [
+    'a listener imported in a provider' => ['provider', "<?php\nuse App\\Modules\\Orders\\Listeners\\SendMail;\n", 'listeners are found by discovery'],
+    'a bootstrap file without discovery' => ['bootstrap', "<?php\n\$middleware->group('tenant', [A::class, B::class]);\n", 'the discovery of listeners is gone'],
+    'the pair named twice' => ['bootstrap', "<?php\n->withEvents(discover: [x])\n\$middleware->group('tenant', [A::class, B::class]);\n\$middleware->append(A::class);\n", 'A::class is named 2 times'],
+    'the pair in no group' => ['bootstrap', "<?php\n->withEvents(discover: [x])\n\$middleware->append(A::class);\n\$middleware->append(B::class);\n", 'the group tenant is gone'],
+]);
+
+it('detects a listener registered by hand and a tenant middleware pair that left its group', function (string $kind, string $source, string $words): void {
+    $guard = new BootstrapRegistrationGuard(dirname(__DIR__, 2), 'app/Providers', 'bootstrap/app.php', 'App\\\\Modules\\\\\w+\\\\Listeners\\\\', '->withEvents(discover: [x])', ['A::class', 'B::class'], 'tenant');
+    $violations = $kind === 'provider' ? $guard->providerInSource($source) : $guard->bootstrapInSource($source);
+
+    expect($violations)->not->toBe([])
+        ->and(implode("\n", $violations))->toContain($words);
+})->with('registrations that fail');
+
+it('accepts a provider that imports no listener and a bootstrap file with discovery and the pair once in one group', function (): void {
+    $guard = new BootstrapRegistrationGuard(dirname(__DIR__, 2), 'app/Providers', 'bootstrap/app.php', 'App\\\\Modules\\\\\w+\\\\Listeners\\\\', '->withEvents(discover: [x])', ['A::class', 'B::class'], 'tenant');
+
+    expect($guard->providerInSource("<?php\nuse App\\Modules\\Orders\\Models\\Order;\nuse App\\Listeners\\Other;\n"))->toBe([])
+        ->and($guard->bootstrapInSource("<?php\n->withEvents(discover: [x])\n\$middleware->group('tenant', [A::class, B::class]);\n"))->toBe([]);
+});
+
+it('reads the providers and the bootstrap file below a checkout under a dot directory', function (): void {
+    $root = SourceSandbox::create(['providers/P.php' => "<?php\nuse App\\Modules\\Orders\\Listeners\\L;\n", 'boot/app.php' => "<?php\n"], prefix: '.checkout-');
+
+    try {
+        $violations = new BootstrapRegistrationGuard($root, 'providers', 'boot/app.php', 'App\\\\Modules\\\\\w+\\\\Listeners\\\\', 'D', ['A::class'], 'tenant')->violations();
+        $missing = new BootstrapRegistrationGuard($root, 'providers', 'boot/none.php', 'X', 'D', [], 'tenant')->violations();
+    } finally {
+        SourceSandbox::remove($root);
+    }
+
+    expect($violations[0])->toStartWith('providers/P.php: a provider imports a listener of a module')
+        ->and($violations)->toContain('boot/app.php: the discovery of listeners is gone: add D, or a listener is never registered')
+        ->and($missing[count($missing) - 1])->toContain('the bootstrap file does not exist');
+});
+
+it('finds listeners by discovery and keeps the tenant middleware pair in one group', function (): void {
+    $guard = new BootstrapRegistrationGuard(dirname(__DIR__, 2), 'app/Providers', 'bootstrap/app.php', 'App\\\\Modules\\\\\w+\\\\Listeners\\\\', "->withEvents(discover: [app_path('Modules/*/Listeners')])", ['AbortIfNotTenantHost::class', 'NeedsTenant::class'], 'tenant');
+
+    expect($guard->violations())->toBe([]);
 });
