@@ -418,7 +418,3 @@ Read in a public starter kit for the same stack and deliberately not adopted:
 - **That kit's package manager and bundler.** Those are techniques; the kit prescribes patterns.
 - **The `strict` and `laravel` architecture presets, as whole presets.** `strict` forbids every abstract class and every protected method, which the framework's own extension points are made of; `laravel` pins classes to the stock folders, against the kit's module layout. A preset cannot be called in part, so neither is called, and the kit's own guards hold the assertions it adopts (`catalog/tests-database-ci-docs.md`, "What the presets assert").
 - **A third-party package that switches the framework's strictness on.** The switches are written out as calls in the application service provider, where a reader and a config test find them (`catalog/backend-laravel.md`, "Runtime strictness").
-
-## Another stack
-
-One committed formatter config and one codemod set per language. TypeScript, backend or frontend: the `.prettierrc` above. A language without a config here: the formatter of its tooling table (`catalog/other-stacks.md`, "Tooling in another stack") with the formatter's defaults, committed in step 2 and written back here when the run closes, so the next project of that stack copies it.

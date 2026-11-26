@@ -8,7 +8,7 @@ This file is for an agent that maintains this repository. If you are running the
 | --- | --- |
 | `00-START-PROMPT.md` to `10-hazards.md` | the method, in numbered files; the agent reads them in order |
 | `record-source-project.md` | lessons of earlier runs and the instruction each became |
-| `catalog/` | per task the one way, how to count the old way, the guard; `other-stacks.md` for any other stack |
+| `catalog/` | per task the one way, how to count the old way, the guard |
 | `templates/` | files the agent creates in a project |
 | `tools/` | the shell and node tools (`ci-ratchets.sh`, `debt-dashboard.sh`, ...); `tools/README.md` documents each |
 | `tools/proof/` | the proof suite: `proof.sh` plus `scenarios.d/` |

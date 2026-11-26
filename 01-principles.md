@@ -13,7 +13,7 @@ Two results, in this order:
 
 This is the one place that says it; other files point here.
 
-- **The kit decides code patterns and structure**: the one way per task, the layout, the limits, the strictness, the guards. Code that does it another way is debt, not a variant. Only techniques differ between projects: the database engine, the CI host, the language. Another technique gets the same pattern in its own terms (`catalog/other-stacks.md`).
+- **The kit decides code patterns and structure**: the one way per task, the layout, the limits, the strictness, the guards. Code that does it another way is debt, not a variant. Only techniques differ between projects: the database engine, the CI host, the tool a catalog row names.
 - **The repository decides its own business**: product rules, copy and wording, domain names, who reviews, what may run locally, the release process. A house rule about a code pattern or structure that differs from the catalog is a backlog row.
 - **The organisation above the repository decides what it manages for many repositories**: a formatter or linter config it hosts (often fetched from a URL), shared pipeline images, an autofix commit or a merge-back bot in the pipeline, the deployer, the release flow. These are not code patterns and the kit does not replace them. Where one conflicts with a kit rule, step 1 asks the owner (`02-step-1-discover.md` 1.1), with the kit's reasons, before any pull request; a measured "nothing changes if we swap" is not a reason to skip the question. What stays the kit's concern is that the check runs on the whole tree and blocks.
 - **The owner decides product and scope**: behavior that users or other systems notice, privacy, what is deleted, and exceptions to a kit rule. An exception is a decision row with its reason (`03-conventions.md` B4). Details are never asked (`03-conventions.md` B5): which guard to build, which tool and which threshold are the kit's or the lead's; which row may stay above zero is the owner's, as a decision row with an end date ("Shrink-only rows" below).
@@ -43,9 +43,9 @@ For the program, all true on the main development branch:
 
 **Structure**
 - Every class sits where the layout table says; the layout list is gone.
-- No file and no method over the kit's limits (`catalog/backend-laravel.md`, "Structure"; `catalog/frontend-react.md`, "Strictness"; for another stack `catalog/other-stacks.md`, "Structure").
+- No file and no method over the kit's limits (`catalog/backend-laravel.md`, "Structure"; `catalog/frontend-react.md`, "Strictness").
 - One module per domain; no duplicate or near-duplicate modules.
-- Every concrete class is closed for extension, and a parent class is abstract; a concrete class that stays open is a decision row. The formatter closes classes and the dashboard row `open-classes` counts what it left open (`catalog/backend-laravel.md`, "Final by default"). In a language that cannot close a class, no class extends a project class except an abstract base (`catalog/other-stacks.md`, "Final by default").
+- Every concrete class is closed for extension, and a parent class is abstract; a concrete class that stays open is a decision row. The formatter closes classes and the dashboard row `open-classes` counts what it left open (`catalog/backend-laravel.md`, "Final by default").
 - Every name that data depends on is in the register of stored names, and no alias of a moved class is left.
 
 **Static analysis and types**

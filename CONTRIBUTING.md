@@ -25,7 +25,6 @@ Thank you for helping. The kit is one standard for one kind of project (Laravel 
 
 ## Other contributions
 
-- Another stack: `catalog/other-stacks.md` maps rows on paper. Say plainly whether you ran it.
 - A real run: what the kit got wrong or missed on your project is the most useful report. Use the "Run report" issue template; remove anything private.
 - Typos and clarity fixes: send the pull request directly.
 

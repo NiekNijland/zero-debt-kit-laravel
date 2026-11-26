@@ -8,7 +8,7 @@ For the person who owns a repository and will hand the kit to an agent. The meth
 - A team where agents write or will write code, and where "the reviewer remembers the rule" is no longer a plan.
 - An owner who can sign a definition of clean and answer questions about product, scope and exceptions. The kit decides patterns and structure; you decide the rest (`01-principles.md`, "Who decides what").
 
-It is a poor fit for a greenfield repository with nothing to burn down (the guards still help, the ten steps mostly do not), and for a stack other than Laravel and React: the method transfers, but nothing outside Laravel and React has been run (`catalog/other-stacks.md` maps the rows on paper).
+It is a poor fit for a greenfield repository with nothing to burn down (the guards still help, the ten steps mostly do not), and for a stack other than Laravel and React, which is out of scope.
 
 ## Two ways in
 
