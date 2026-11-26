@@ -56,7 +56,14 @@ if [ "$MODE" = "--changed" ]; then
     done
     BASE="${BASE:-$DEFAULT_BASE_BRANCH}"
     # shellcheck disable=SC2086
-    CHANGED=$(git -c core.quotePath=false diff --no-renames --name-only --diff-filter=AM "$REMOTE/$BASE"...HEAD -- $MUTATION_SOURCE_FOLDERS | { grep -E -e "$MUTATION_FILE_PATTERN" || true; } | { grep -v -E -e "$MUTATION_EXCLUDE_PATTERN" || true; } | tr '\n' ',' | sed 's/,$//')
+    CHANGED_FILES=$(git -c core.quotePath=false diff --no-renames --name-only --diff-filter=AM "$REMOTE/$BASE"...HEAD -- $MUTATION_SOURCE_FOLDERS)
+    # An explicit loop, not a grep whose failure is forced to success: such a tail reads as a skipped step to the ci-skipped-steps ratchet.
+    while IFS= read -r file; do
+        [ -n "$file" ] || continue
+        grep -q -E -e "$MUTATION_FILE_PATTERN" <<< "$file" || continue
+        if grep -q -E -e "$MUTATION_EXCLUDE_PATTERN" <<< "$file"; then continue; fi
+        CHANGED="${CHANGED:+$CHANGED,}$file"
+    done <<< "$CHANGED_FILES"
     if [ -z "$CHANGED" ]; then
         echo "Mutation: this pull request changes no source file; nothing to mutate."
         exit 0
@@ -72,10 +79,8 @@ fi
 run_stryker() {
     local output status
     output=$(mktemp)
-    set +e
-    MUTATION_FLOOR="$FLOOR" npx stryker run "$@" 2>&1 | tee "$output"
-    status=${PIPESTATUS[0]}
-    set -e
+    # pipefail is on: the pipeline's status is stryker's, and the if keeps a failure from stopping the script before the check below.
+    if MUTATION_FLOOR="$FLOOR" npx stryker run "$@" 2>&1 | tee "$output"; then status=0; else status=$?; fi
     if ! grep -q -E "(breaking|break) threshold $FLOOR( |,|$)" "$output"; then
         rm -f "$output"
         [ "$status" -eq 0 ] || exit "$status"

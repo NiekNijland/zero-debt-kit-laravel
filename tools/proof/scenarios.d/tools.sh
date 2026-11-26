@@ -1,3 +1,4 @@
+# proof-needs: main
 # Scenarios TX*: the defects the audit of the tools found (findings B-01 to B-27 and D-026, E-003). Sourced by proof.sh with its
 # helpers in scope (check, check_php, branch, commit, edit, big_file, dashboard, commits, ROOT, KIT, SHELL_BIN).
 # Each scenario builds its own scratch repository under "$ROOT" or uses a branch of the fixture; the cwd is left as it was found.
@@ -69,6 +70,7 @@ git checkout -q -- scripts/debt-dashboard.sh
 command rm -f fixtures/two.txt
 
 branch tx-lowered
+check_php TX17b "G-11: the gate (no --final) prints the lowered goal too, not only --final" 0 '^ratchet +coverage-floor +80 +80 +held \(only goes up\) \(goal lowered: the kit holds 95' "$SHELL_BIN" -c 'bash scripts/debt-dashboard.sh --offline; exit 0'
 check_php TX17 "dashboard --final: a min goal below the kit's number (a hosted formatter config) passes and says so" 0 '^ratchet +coverage-floor +80 +80 +ok \(goal lowered: the kit holds 95; needs a decision row' "$SHELL_BIN" -c 'bash scripts/debt-dashboard.sh --final --offline; exit 0'
 
 # A shallow clone: --final must not skip docs-older-than-limit without a signal; the gate says why it skips.
@@ -91,6 +93,10 @@ check TX22b "keyed-baseline: the baseline file is untouched after that refusal" 
 check TX23 "keyed-baseline: a tsc start-up error with no position is no finding: --write fails and keeps the file" fail 'failed \(exit 1\) without a finding' bash "$KIT/tools/keyed-baseline.sh" "$KB/base.txt" --write --format tsc -- bash -c "echo \"error TS5058: The specified path does not exist: 'x'.\"; exit 1"
 check TX23b "keyed-baseline: the file still holds the two real lines" 0 '^2$' "$SHELL_BIN" -c "wc -l < '$KB/base.txt' | tr -d ' '"
 check TX24 "keyed-baseline: --write drops a fixed line" 0 'rewritten, 1 lines' bash "$KIT/tools/keyed-baseline.sh" "$KB/base.txt" --write --format tsc -- cat "$KB/one.out"
+check TX24b "G-12: --write on a baseline file that does not exist refuses (a missing file is the empty set: every finding is growth)" fail 'would add findings that are not in' bash "$KIT/tools/keyed-baseline.sh" "$KB/missing.txt" --write --format tsc -- cat "$KB/two.out"
+: > "$KB/empty.txt"
+check TX24c "G-12: --write on an empty baseline file refuses too, and leaves it empty" fail 'would add findings that are not in' bash "$KIT/tools/keyed-baseline.sh" "$KB/empty.txt" --write --format tsc -- cat "$KB/two.out"
+check TX24d "G-12: the refused files were not written" 0 '^0 0$' "$SHELL_BIN" -c "echo \$(wc -c < '$KB/empty.txt' | tr -d ' ') \$([ -e '$KB/missing.txt' ] && echo 1 || echo 0)"
 printf '%s\n' 'npm warn exec The following package was not found and will be installed: knip@5.0.0' 'Excellent, Knip found no issues.' > "$KB/knip-clean.out"
 printf '%s\n' 'npm warn exec noise' 'Unused exports (1)' 'src/a.ts:3:1  foo' > "$KB/knip-one.out"
 check TX25 "keyed-baseline: knip lines before a heading are not findings (a clean run is zero findings)" 0 '0 findings, the same as' bash "$KIT/tools/keyed-baseline.sh" "$KB/knip-base.txt" --format knip -- cat "$KB/knip-clean.out"

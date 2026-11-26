@@ -417,7 +417,10 @@ if [ -n "$RATCHETS" ]; then
                 do_this "$name"
             fi
         elif [ "$direction" = "min" ]; then
-            print_row ratchet "$name" "$value" "$(min_target "$name" || echo -)" "held (only goes up)"
+            goal=$(min_target "$name" || echo -)
+            note=""
+            [[ "$goal" =~ ^[0-9]+$ ]] && note=$(lowered_note "$name" "$goal")
+            print_row ratchet "$name" "$value" "$goal" "held (only goes up)$note"
         elif [ "$FINAL" -eq 0 ]; then
             print_row ratchet "$name" "$value" "-" "held"
         elif [ "$value" -eq 0 ]; then
@@ -502,13 +505,24 @@ elif [ -z "$DOCS_PATHS" ]; then
     measured_row docs "docs-older-than-limit" 0
 else
     CUT=$(($(date +%s) - DOCS_MAX_AGE_DAYS * 86400))
-    DOCS_TRACKED=$(git -c core.quotePath=false ls-files -- $DOCS_PATHS)
-    DOCS_OLD=$(git -c core.quotePath=false log --name-only --no-renames --format='@%ct' -- $DOCS_PATHS | awk -v cut="$CUT" '
-        FILENAME == ARGV[1] { known[$0] = 1; next }
-        /^@/ { time = substr($0, 2) + 0; next }
-        $0 != "" && !($0 in seen) { seen[$0] = 1; if (time < cut && ($0 in known)) print $0 }' <(printf '%s\n' "$DOCS_TRACKED") - | sort)
-    measured_row docs "docs-older-than-limit" "$(count_lines "$DOCS_OLD")"
-    detail "Docs whose last change is older than $DOCS_MAX_AGE_DAYS days: update, move to the archive folder or delete" "$DOCS_OLD"
+    # An invalid pathspec makes git fail: the row is UNKNOWN then, never 0.
+    DOCS_STATUS=0
+    DOCS_TRACKED=$(git -c core.quotePath=false ls-files -- $DOCS_PATHS 2> /dev/null) || DOCS_STATUS=1
+    DOCS_LOG=""
+    if [ "$DOCS_STATUS" -eq 0 ]; then
+        DOCS_LOG=$(git -c core.quotePath=false log --name-only --no-renames --format='@%ct' -- $DOCS_PATHS 2> /dev/null) || DOCS_STATUS=1
+    fi
+    if [ "$DOCS_STATUS" -ne 0 ]; then
+        MEASURED="$MEASURED""docs-older-than-limit "
+        fixed_row docs "docs-older-than-limit" "?" 0 "?" "DOCS_PATHS is not a valid pathspec list"
+    else
+        DOCS_OLD=$(awk -v cut="$CUT" '
+            FILENAME == ARGV[1] { known[$0] = 1; next }
+            /^@/ { time = substr($0, 2) + 0; next }
+            $0 != "" && !($0 in seen) { seen[$0] = 1; if (time < cut && ($0 in known)) print $0 }' <(printf '%s\n' "$DOCS_TRACKED") <(printf '%s\n' "$DOCS_LOG") | sort)
+        measured_row docs "docs-older-than-limit" "$(count_lines "$DOCS_OLD")"
+        detail "Docs whose last change is older than $DOCS_MAX_AGE_DAYS days: update, move to the archive folder or delete" "$DOCS_OLD"
+    fi
 fi
 
 for entry in ${COMMAND_ROWS[@]+"${COMMAND_ROWS[@]}"}; do
