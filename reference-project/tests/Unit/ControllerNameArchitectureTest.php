@@ -20,8 +20,14 @@ it('detects a controller that is not named <Verb>Controller in a folder of what 
     expect($guard->inType($type))->toContain($words);
 })->with('controller names that fail');
 
-it('accepts a verb controller in a folder, and names a verb that no controller carries and a folder with no controller', function (): void {
-    $guard = new ControllerNameGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app/Http/Controllers', ['Show', 'Store'], 'App\Http\Controllers');
+it('accepts a verb controller in a folder', function (): void {
+    $guard = new ControllerNameGuard(new PhpFileInspector(), sys_get_temp_dir(), 'app/Http/Controllers', ['Show', 'Store'], 'App\Http\Controllers');
+
+    expect($guard->inType('App\Http\Controllers\Order\ShowController'))->toBeNull()
+        ->and($guard->inType('App\Http\Controllers\Order\Nested\StoreController'))->toBeNull();
+});
+
+it('names a verb that no controller carries and a folder with no controller', function (): void {
     $root = SourceSandbox::create([
         'c/Order/ShowController.php' => "<?php\nnamespace App\\Http\\Controllers\\Order;\nfinal class ShowController {}\n",
         'empty/.gitkeep' => '',
@@ -34,8 +40,7 @@ it('accepts a verb controller in a folder, and names a verb that no controller c
         SourceSandbox::remove($root);
     }
 
-    expect($guard->inType('App\Http\Controllers\Order\ShowController'))->toBeNull()
-        ->and($stale)->toBe(['the verb Store is on the list and no controller carries it: remove it from the list'])
+    expect($stale)->toBe(['the verb Store is on the list and no controller carries it: remove it from the list'])
         ->and($empty[0])->toContain('no controller was read');
 });
 

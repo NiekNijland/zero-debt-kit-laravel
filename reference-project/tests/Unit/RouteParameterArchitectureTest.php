@@ -19,10 +19,13 @@ it('detects a route parameter that is not camelCase', function (string $source, 
     'a broadcast channel' => ["<?php\nBroadcast::channel('stock-level.{stock-level}', static fn (): bool => true);\n", '2: the route parameter {stock-level} is not camelCase: name it {stockLevel}'],
 ]);
 
-it('names every route parameter in camelCase', function (): void {
-    $guard = new RouteParameterGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'routes');
+it('accepts camelCase parameters, a binding field and a pattern that holds braces', function (): void {
+    $guard = new RouteParameterGuard(new PhpFileInspector(), sys_get_temp_dir(), 'routes');
     $accepted = "<?php\nRoute::get('/orders/{order}/lines/{line:uuid}/{variantId?}', Order\\ShowController::class)->where('line', '[a-z]{2,8}');\nRoute::get('shipments/track/{code}', Shipments\\ShowController::class);\n";
 
-    expect($guard->inSource($accepted))->toBe([])
-        ->and($guard->violations())->toBe([]);
+    expect($guard->inSource($accepted))->toBe([]);
+});
+
+it('names every route parameter in camelCase', function (): void {
+    expect(new RouteParameterGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'routes')->violations())->toBe([]);
 });

@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Tests\Support\Architecture;
+namespace Tests\Support\Ci;
 
 use LogicException;
+use Tests\Support\Architecture\CiContractGuard;
 
 final class CiExamples
 {

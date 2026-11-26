@@ -30,8 +30,8 @@ it('reads the named files and fails on a file that does not exist', function ():
 
     try {
         $guard = new ImportSpellingGuard($root, 'App\Http\Controllers');
-        $violations = $guard->controllerImports($guard->files('routes/*.php'));
-        $missing = fn (): array => $guard->controllerImports(['routes/renamed.php']);
+        $violations = $guard->violations($guard->files('routes/*.php'));
+        $missing = fn (): array => $guard->violations(['routes/renamed.php']);
         expect($missing)->toThrow(RuntimeException::class, 'does not exist');
     } finally {
         SourceSandbox::remove($root);
@@ -44,5 +44,5 @@ it('reads the named files and fails on a file that does not exist', function ():
 it('imports a controller folder in the route files and the bootstrap file', function (): void {
     $guard = new ImportSpellingGuard(dirname(__DIR__, 2), 'App\Http\Controllers');
 
-    expect($guard->controllerImports([...$guard->files('routes/*.php'), 'bootstrap/app.php']))->toBe([]);
+    expect($guard->violations([...$guard->files('routes/*.php'), 'bootstrap/app.php']))->toBe([]);
 });

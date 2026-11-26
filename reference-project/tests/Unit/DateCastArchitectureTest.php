@@ -8,21 +8,28 @@ use Tests\Support\SourceSandbox;
 
 uses()->group('arch');
 
-dataset('date casts', [
-    'datetime cast' => ['<?php return [\'at\' => \'datetime\'];', true],
-    'date cast with a format' => ['<?php return [\'at\' => \'date:Y-m-d\'];', true],
-    'immutable cast' => ['<?php return [\'at\' => \'immutable_datetime\'];', false],
-    'immutable date with a format' => ['<?php return [\'at\' => \'immutable_date:Y-m-d\'];', false],
-    'a rule list that names date' => ['<?php return [\'required\', \'date\'];', false],
-    'a rule string' => ['<?php return [\'at\' => \'date|required\'];', false],
+dataset('mutable date casts', [
+    'datetime cast' => ['<?php return [\'at\' => \'datetime\'];'],
+    'date cast with a format' => ['<?php return [\'at\' => \'date:Y-m-d\'];'],
 ]);
 
-it('detects a mutable date cast and accepts the immutable ones and a validation rule', function (string $source, bool $mutable): void {
+it('detects a mutable date cast', function (string $source): void {
     $violations = new DateCastGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app/Models')->inSource($source);
 
-    expect($violations !== [])->toBe($mutable)
-        ->and($mutable ? $violations[0] : '')->toContain($mutable ? 'cast it as immutable_datetime or immutable_date' : '');
-})->with('date casts');
+    expect($violations)->toHaveCount(1)
+        ->and($violations[0])->toContain('cast it as immutable_datetime or immutable_date');
+})->with('mutable date casts');
+
+dataset('casts and rules that are no mutable date cast', [
+    'immutable cast' => ['<?php return [\'at\' => \'immutable_datetime\'];'],
+    'immutable date with a format' => ['<?php return [\'at\' => \'immutable_date:Y-m-d\'];'],
+    'a rule list that names date' => ['<?php return [\'required\', \'date\'];'],
+    'a rule string' => ['<?php return [\'at\' => \'date|required\'];'],
+]);
+
+it('accepts the immutable casts and a validation rule that names date', function (string $source): void {
+    expect((new DateCastGuard(new PhpFileInspector(), sys_get_temp_dir(), 'app/Models'))->inSource($source))->toBe([]);
+})->with('casts and rules that are no mutable date cast');
 
 it('reads the model folder below a checkout under a dot directory', function (): void {
     $root = SourceSandbox::create(['app/Models/A.php' => "<?php\nreturn ['at' => 'datetime'];\n", 'app/Models/B.php' => "<?php\nreturn ['at' => 'immutable_datetime'];\n"], prefix: '.checkout-');

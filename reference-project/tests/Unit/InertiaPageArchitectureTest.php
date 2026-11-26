@@ -21,10 +21,13 @@ it('detects an Inertia page without a file', function (string $source, string $r
     'a page named by a built string' => ["<?php\nuse Inertia\\Inertia;\nreturn Inertia::render('Order/' . \$view, ['a' => 1]);\n", '3: an Inertia page that is not named by a string'],
 ]);
 
-it('renders only Inertia pages that have a file', function (): void {
-    $guard = new InertiaPageGuard(new PhpFileInspector(), dirname(__DIR__, 2), ['app', 'bootstrap', 'routes'], 'resources/js/Pages');
-    $accepted = "<?php\nuse Inertia\\Inertia;\nInertia::render('Dashboard');\nInertia::flash('success', 'x');\n\$view->render('Missing');\ninertia()->share('a', 1);\n\$route->defaults('props', []);\n";
+it('accepts a flash, a render on something else and a share', function (): void {
+    $guard = new InertiaPageGuard(new PhpFileInspector(), sys_get_temp_dir(), ['app', 'bootstrap', 'routes'], 'resources/js/Pages');
+    $accepted = "<?php\nuse Inertia\\Inertia;\nInertia::flash('success', 'x');\n\$view->render('Missing');\ninertia()->share('a', 1);\n\$route->defaults('props', []);\n";
 
-    expect($guard->inSource($accepted))->toBe([])
-        ->and($guard->violations())->toBe([]);
+    expect($guard->inSource($accepted))->toBe([]);
+});
+
+it('renders only Inertia pages that have a file', function (): void {
+    expect(new InertiaPageGuard(new PhpFileInspector(), dirname(__DIR__, 2), ['app', 'bootstrap', 'routes'], 'resources/js/Pages')->violations())->toBe([]);
 });

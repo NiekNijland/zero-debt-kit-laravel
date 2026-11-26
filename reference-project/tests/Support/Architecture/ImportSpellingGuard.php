@@ -26,7 +26,7 @@ final readonly class ImportSpellingGuard
      * @param list<string> $files the route files and the bootstrap file, relative to the root
      * @return list<string>
      */
-    public function controllerImports(array $files): array
+    public function violations(array $files): array
     {
         $violations = [];
 

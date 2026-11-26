@@ -18,9 +18,12 @@ it('detects an enum that is not backed by a string', function (string $source, s
     'an integer enum' => ["<?php\nnamespace App;\nenum Level: int { case LOW = 1; }\n", 'App\\Level is backed by int'],
 ]);
 
-it('backs every enum in app by a string', function (): void {
-    $guard = new StringBackedEnumGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app');
+it('accepts an enum backed by a string and a class that is only called Enum', function (): void {
+    $guard = new StringBackedEnumGuard(new PhpFileInspector(), sys_get_temp_dir(), 'app');
 
-    expect($guard->inSource("<?php\nnamespace App;\nenum Status: string { case PLACED = 'placed'; }\nfinal class Enum {}\n"))->toBe([])
-        ->and($guard->violations())->toBe([]);
+    expect($guard->inSource("<?php\nnamespace App;\nenum Status: string { case PLACED = 'placed'; }\nfinal class Enum {}\n"))->toBe([]);
+});
+
+it('backs every enum in app by a string', function (): void {
+    expect(new StringBackedEnumGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->violations())->toBe([]);
 });
