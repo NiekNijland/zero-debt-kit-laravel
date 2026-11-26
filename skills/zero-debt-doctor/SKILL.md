@@ -7,7 +7,7 @@ argument-hint: "[kit path, default: the plugin root]"
 
 # zero-debt: doctor
 
-The doctor script is `${CLAUDE_PLUGIN_ROOT}/tools/doctor.sh`. A kit release that predates it does not have the file: if it is missing, say so and stop.
+The doctor script is `${CLAUDE_PLUGIN_ROOT}/tools/doctor.sh`. A kit release that predates it does not have the file: if it is missing, say so and stop. The line that names the kit version and commit needs a git clone of the kit; from the plugin cache it is absent.
 
 Run it from the root of the target repository, with the kit path as `--kit`:
 

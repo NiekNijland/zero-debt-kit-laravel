@@ -6,7 +6,7 @@ Mandatory for the lead, in full. A builder works from `08-builder-rules.md` and 
 
 | Role | Does | Never |
 | --- | --- | --- |
-| Lead | picks the next theme, briefs builders, commits each builder's finished theme from its commit plan, merges the builder branches into the integration branch, runs installs, pushes once per round, opens PRs, handles comments and conflicts, adds guards and rows in steps 4 to 9, keeps the hand-off files current | has two move branches open at once; force pushes |
+| Lead | picks the next theme, briefs builders, commits each builder's finished theme from its commit plan, merges the builder branches into the integration branch, runs installs, pushes once per round, opens PRs, handles comments and conflicts, adds guards and rows in step 3 and, for what a later step finds, in steps 4 to 9, keeps the hand-off files current | has two move branches open at once; force pushes |
 | Builder | builds one theme in its own worktree, self-checks, writes its part of the PR description, reports with a commit plan | commits, pushes, opens, merges, approves or comments on a PR; touches files outside its theme. The one exception: a builder whose brief says it owns a separate PR's branch commits on that branch, and still never pushes |
 | Reviewer (agent) | reads the integration branch cold with the rubric, breaks a sample of the changed tests, reports findings | edits the branch, pushes, comments, approves |
 | Auditor | answers "what does no counter show?" at the start, at the end of each step and at the end (`06-lock-and-audit.md` E2) | builds; sees the builders' conclusions |

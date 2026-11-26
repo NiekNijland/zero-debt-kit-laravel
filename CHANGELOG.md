@@ -4,9 +4,17 @@ All notable changes to the kit. The format follows [Keep a Changelog](https://ke
 [Semantic Versioning](https://semver.org/): a change to a script's behaviour or to the config block's keys is at least a minor
 version, and every release says which scripts changed, because a project's copies are guarded files (UPGRADING.md).
 
-The versions before 0.9.0 were not tagged; they are reconstructed from the history of the repository and are grouped by theme.
+No version is tagged yet; v0.10.0 will be the first tag. The versions before 0.9.0 are reconstructed from the history of the repository and are grouped by theme.
 
 ## [Unreleased]
+
+### Changed
+- Docs: the opening claims say what the guards enforce (a counter only goes down; an override is a tagged commit that a code owner
+  reads); the at-zero rule is stated once, with its `OVERRIDE_AT_ZERO` exceptions; the mutation tools are described as verified.
+- The plugin manifest has a version, the marketplace a description; the proof scenario `DOCX01` to `DOCX07` checks the numbers the
+  docs claim.
+
+## [0.10.0] - 2026-11-26
 
 The audit-fix round: the tools were reviewed again, their defects fixed and proven, and the kit got an upgrade path.
 

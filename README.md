@@ -7,9 +7,9 @@ Green CI does not mean a codebase has a shape. You can have high coverage and PH
 This kit makes CI the quality gate for structure. It does that with two mechanisms:
 
 - **Architecture tests** decide, per task, the one allowed way: where a class lives, what it may depend on, how a controller or a test is shaped. Code that does it another way fails the build, with a message that says what to do instead.
-- **Ratchets** are counters for everything that is still wrong: old violations, suppressions, skips, oversized files, baselines. A counter may only go down. Nothing can be added to make a build green, and at zero the list is deleted and CI fails if it comes back.
+- **Ratchets** are counters for everything that is still wrong: old violations, suppressions, skips, oversized files, baselines. A counter may only go down. A rise needs a commit with a tag and a reason that a code owner reads, and at zero the list is deleted and CI fails if it comes back.
 
-Together they are the guards. The result: anyone, including an agent working unattended, can contribute, and when CI is green the code fits your design patterns. The old way cannot come back, and the rules do not depend on a reviewer remembering them.
+Together they are the guards. The result: anyone, including an agent working unattended, can contribute, and when CI is green the code fits the patterns the guards check. A guard only checks what its tests show it can see, and review covers the rest.
 
 ## What the gate looks like
 
@@ -22,14 +22,14 @@ A class sits in <Domain>/<Folder>/[<Subdomain>/]<Class>.php, never in the module
 table does not name, as the table says.
 ```
 
-A suppression added to make a static-analysis error go away. The ratchet row is at zero, so the build fails, and a row at zero takes no override (two rows are named exceptions, below):
+A suppression added to make a static-analysis error go away. The ratchet row is at zero, so the build fails, and a row at zero takes no override (three rows are named exceptions, below):
 
 ```text
 ratchet                                 may    base    head  change  result
 analyser-baseline                      down       0       0      +0  ok
 analyser-ignore                        down       0       1      +1  FAILS
 
-A ratchet moved the wrong way, or a row was redefined or removed. A row that is at 0 never takes an override: fix the entries. Other rows can be explained in a commit that touches that row's files, or this script for a redefined or removed row:
+A ratchet moved the wrong way, or a row was redefined or removed. A row that is at 0 takes no override, except the rows of OVERRIDE_AT_ZERO: fix the entries. Other rows can be explained in a commit that touches that row's files, or this script for a redefined or removed row:
   [ratchet: <name>] <reason>
 ```
 
@@ -129,7 +129,7 @@ The reference holds the Bitbucket reader, plus GitHub and GitLab readers that ar
 
 ## Every ratchet
 
-A ratchet row is a name, a direction and a method that counts something in the tree. `tools/ci-ratchets.sh` counts every row at the merge base (with the base's own definition) and at the head. A `max` row may only go down, a `min` row only up. A wrong-way move fails unless a commit that touches the row's files carries `[ratchet: <name>] <reason>`; a `max` row at 0 never takes that override, except the rows named in `OVERRIDE_AT_ZERO` of the script (default `comments,cap-dependencies-majors-behind`). A row that is new in a pull request passes, which is how a guard arrives with its counted list. The start set below, 23 names plus one `cap-<key>` row per key of the caps file, is the same in every project (`04-guards.md` C2, `tools/README.md`, "The rows that ship"); `--self-test` runs 224 cases that prove every regex row counts the spellings it must and ignores the near misses.
+A ratchet row is a name, a direction and a method that counts something in the tree. `tools/ci-ratchets.sh` counts every row at the merge base (with the base's own definition) and at the head. A `max` row may only go down, a `min` row only up. A wrong-way move fails unless a commit that touches the row's files carries `[ratchet: <name>] <reason>`; a `max` row at 0 takes no override, except the rows named in `OVERRIDE_AT_ZERO` of the script (default `comments,cap-dependencies-majors-behind,audit-exceptions`). A row that is new in a pull request passes, which is how a guard arrives with its counted list. The start set below, 23 names plus one `cap-<key>` row per key of the caps file, is the same in every project (`04-guards.md` C2, `tools/README.md`, "The rows that ship"); `--self-test` runs 224 cases that prove every regex row counts the spellings it must and ignores the near misses.
 
 ### Rows that ship (the start set)
 
@@ -144,7 +144,7 @@ A ratchet row is a name, a direction and a method that counts something in the t
 | `formatter-rules` | min | strictness rules of the formatter that are on (21) | A rule removed or set to false must fail. |
 | `advisory-block` | min | 1 when the manifest requires the advisory-blocking package | A vulnerable version cannot be installed. |
 | `audit-ignore` | max | advisories the package manager is told to ignore | An ignored advisory is an unfixed one. |
-| `audit-exceptions` | max | lines of the dated audit-exceptions file | Each line is time-boxed to 7 days and never renewed. |
+| `audit-exceptions` | max | lines of the dated audit-exceptions file | Each line is time-boxed to 7 days and never renewed. It takes the override at 0. |
 | `test-skip` | max | skipped, todo and incomplete tests in the backend test framework | A skipped test is a test that does not run. |
 | `test-doubles` | max | mocking-library doubles of the project's own classes | A test with a double of the project's class tests the double. Shrink-only, so a rise needs the override tag. |
 | `event-fake-all` | max | event fakes with no list of events | It silences every listener. Shrink-only. |
@@ -216,7 +216,7 @@ Same name in every project (`tools/README.md`, "Adding a row"; `04-guards.md` C2
 
 ### Caps, the end state and the guarded files
 
-- **Caps.** A row that cannot be at zero yet gets a cap in `debt-caps.json`, one key per row, never a number inside a script. A cap only goes down; raising one needs `[ratchet: cap-<key>] <reason>`. The lead lowers every cap to its row at the end of every step, and `--final` fails a cap above its row.
+- **Caps.** A row that cannot be at zero yet gets a cap in `debt-caps.json`, one key per row, never a number inside a script. A cap only goes down. A cap at 0 is never raised, except `cap-dependencies-majors-behind` (an `OVERRIDE_AT_ZERO` row); above 0, raising one needs `[ratchet: cap-<key>] <reason>`, so new debt of a kind whose cap is 0 is fixed, not capped. The lead lowers every cap to its row at the end of every step, and `--final` fails a cap above its row.
 - **`--final`, the end state.** `debt-dashboard.sh --final` is the exit of step 10 and the scheduled run after it: every row at zero, no cap above its row, `analyser-switches` at its target, and every `min` row with a goal at its number (coverage at 95, 19 refactoring sets, 21 formatter rules, the advisory block). The only rows that may stay above zero are the shrink-only rows: `comments`, `test-doubles`, `event-fake-all`, and rows the owner approved as a dated decision row.
 - **Guarded files and the override tag.** The other scripts, `kit-config.sh`, the pipeline files of the three hosts and `.gitattributes` are guarded files: a change needs `[ratchet: script] <reason>`, and `ci/checks.sh` first runs the base's copy of the ratchet script, so a pull request cannot rewrite its own gate.
 - **The code-owners rule.** The tag is written by the author, so only a person can tell a real reason from one written to get past a guard. The files that carry the guards are covered by a code-owners rule that names a person or a team, and the host requires that review (`ci/CODEOWNERS.example`, `04-guards.md` C2 and C4 point 22, `07-process.md` section 12). The setting itself is the owner's and lives on the host, not in the repository.
@@ -239,7 +239,7 @@ Then, in the target repository:
 | `/zero-debt:zero-debt-review <branch, PR or guard>` | cold review with `09-reviewer-brief.md` |
 | `/zero-debt:zero-debt-doctor` | run `tools/doctor.sh` against a kit checkout and explain the result |
 
-The plugin files validate locally with `claude plugin validate .`; installing from the marketplace has not been tested yet. The skills are plain `SKILL.md` files, so another agent can read them from `skills/`. Without a plugin, give the agent the folder path and paste `00-START-PROMPT.md` as "How to use it" says. Plugin instructions run with your agent's privileges: pin to a release tag and read what you install (`SECURITY.md`).
+The plugin files validate locally with `claude plugin validate .`; installing from the marketplace has not been tested yet. The skills are plain `SKILL.md` files, so another agent can read them from `skills/`. Without a plugin, give the agent the folder path and paste `00-START-PROMPT.md` as "How to use it" says. Plugin instructions run with your agent's privileges: pin to a release tag (v0.10.0 once tagged) or a commit hash and read what you install (`SECURITY.md`).
 
 ## How to use it
 
@@ -266,12 +266,12 @@ More: `docs/adoption-guide.md` (who it is for, what to prepare, what the three g
 
 ## What is proven and what is not
 
-- **The scripts are proven by a proof suite.** `tools/proof/proof.sh` builds scratch repositories and runs 423 scenarios against the scripts in `tools/` and `ci/` (it counts scenarios, not features), and `ci-ratchets.sh --self-test` runs 224 regex cases. The proof runs no real analyser, formatter, refactoring tool, coverage tool, unused-code tool or CI host; it replaces the secret scan by `true`.
-- **The program has been run on three Laravel applications, all hosted on Bitbucket.** The Bitbucket skeleton ran in real pipelines there, and the lessons of each run are written back into the kit. What the three runs measured is not published here.
-- **GitHub Actions is pending.** The GitHub skeleton and its contract reader are written and proved on examples; a run on a real GitHub repository is still to come.
+- **The scripts are proven by a proof suite.** `tools/proof/proof.sh` builds scratch repositories and runs more than 450 scenarios against the scripts in `tools/` and `ci/` (it counts scenarios, not features), and `ci-ratchets.sh --self-test` runs 224 regex cases. The proof runs no real analyser, formatter, refactoring tool, coverage tool, unused-code tool or CI host; it replaces the secret scan by `true`.
+- **The program has been run on three Laravel applications, all hosted on Bitbucket.** The Bitbucket skeleton ran in real pipelines there, and the lessons of each run are written back into the kit. Only a few measured figures appear in the method files, each marked as one run; the rest of what the runs measured is not published here.
+- **GitHub Actions is unverified.** The GitHub skeleton and its contract reader are written and proved on examples; a run on a real GitHub repository is in progress. Until it finishes, treat the GitHub skeleton as unverified (`docs/adoption-guide.md`, "GitHub first-run notes").
 - **GitLab is untested.** The skeleton exists and is checked against examples only.
 - **Other stacks have not been run.** `catalog/other-stacks.md` maps every row to another stack on paper.
-- **Mutation tools.** The Pest form was run on a sample of files (two of its options were read from the plugin's source and not run); the Infection and Stryker forms are written from the tools' documentation and are unverified (`tools/README.md`, "Mutation").
+- **Mutation tools.** The Pest, Infection and Stryker forms were run on scratch projects on 2026-11-26 (Pest 5.3.7, Infection 0.35.12, Stryker 10.1.1); the versions and the recorded outputs are in `tools/README.md`, "Mutation". The proof replays those outputs with a fake `npx` and fake `vendor/bin` scripts. Only the Pest form was also run on a sample of a real application. Not verified: Infection with Xdebug or phpdbg, a Stryker path that holds a comma, and a Stryker runner other than vitest.
 - **The reference project is an anonymized extract**, not a runnable application and not a product; its `README.md` lists where it falls short of the kit.
 
 ## About the reference project

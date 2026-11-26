@@ -1,5 +1,5 @@
 # The kit's OWN CI: it runs in the kit repository and is not a template for a project (the project's skeleton is ci/github-actions.yml).
-# It lints every script and runs the proof suite (tools/proof/proof.sh, about 440 scenarios) on Linux and on macOS, where /bin/bash
+# It lints every script and runs the proof suite (tools/proof/proof.sh) on Linux and on macOS, where /bin/bash
 # is bash 3.2: the tools must run there.
 #
 # Action pins: every action is pinned to a full commit sha with its release in a comment. The three shas below were looked up
