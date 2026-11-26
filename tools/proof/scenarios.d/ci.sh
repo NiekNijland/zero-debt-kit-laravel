@@ -84,9 +84,55 @@ fi
 if [ -f "$KIT/ci/github-actions.yml" ]; then
     check CX20 "github-actions.yml: merge-first, no CHECK_HEAD and no checkout ref outside a comment" 0 '^0$' "$SHELL_BIN" -c "grep -v -E '^[[:space:]]*#' '$KIT/ci/github-actions.yml' | grep -c -E 'CHECK_HEAD|^[[:space:]]+ref:'; exit 0"
     check CX21 "github-actions.yml: a concurrency group that cancels pull requests only, and the aggregate required check" 0 '^2$' "$SHELL_BIN" -c "grep -c -E \"^  cancel-in-progress: .*== 'pull_request'|^  checks-result:\" '$KIT/ci/github-actions.yml'"
-    check CX22 "github-actions.yml: every database service has its password variable and a health check (3 services)" 0 '^3 3$' "$SHELL_BIN" -c "echo \"\$(grep -c 'POSTGRES_PASSWORD: ci' '$KIT/ci/github-actions.yml') \$(grep -c -e '--health-cmd' '$KIT/ci/github-actions.yml')\""
+    check CX22 "github-actions.yml: every database service has its password variable and a health check (3 services, comments left out)" 0 '^3 3$' "$SHELL_BIN" -c "grep -v -E '^[[:space:]]*#' '$KIT/ci/github-actions.yml' > '$ROOT/cx-skeleton-code.yml'; echo \"\$(grep -c 'POSTGRES_PASSWORD: ci' '$ROOT/cx-skeleton-code.yml') \$(grep -c -e '--health-cmd' '$ROOT/cx-skeleton-code.yml')\""
     check CX23 "github-actions.yml: every checkout has the full history (6 checkouts, 6 fetch-depth lines)" 0 '^6 6$' "$SHELL_BIN" -c "echo \"\$(grep -c -E '^      - uses: actions/checkout@' '$KIT/ci/github-actions.yml') \$(grep -c -E '^          fetch-depth: 0' '$KIT/ci/github-actions.yml')\""
     check CX24 "github-actions.yml: the file is not a copy for the existing workflow: it names itself kit-checks.yml" 0 '[Cc]opy this file to \.github/workflows/kit-checks\.yml' "$SHELL_BIN" -c "tr '\n' ' ' < '$KIT/ci/github-actions.yml' | sed -E 's/#//g; s/  +/ /g' | grep -o -i 'copy this file to .github/workflows/kit-checks.yml'"
+fi
+
+# The skeleton with its placeholders filled is the example that the contract test reads (CiHostExamples::githubWorkflow()): a line
+# edited in one and not in the other leaves the test green against a stale copy. Comments and blank lines are left out of both.
+cx_fill_github() {
+    local zero=0000000000000000000000000000000000000000000000000000000000000000
+    sed -E \
+        -e "s/<main branch>/main/; s/<other deploying branch>/develop/" \
+        -e "s/<cron expression[^>]*>/17 3 * * */" \
+        -e "s/<maximum minutes>/20/" \
+        -e "s#image: <image name>@sha256:<digest>.*#image: php:8.4@sha256:$zero#" \
+        -e "s/<40-character commit sha of the release the project pins> # <release, for example v[0-9.]+>/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # v7.0.1/" \
+        -e "s/<install dependencies from the lock file>/composer install/" \
+        -e "s/GITLEAKS_VERSION: <.*/GITLEAKS_VERSION: 8.30.1/" \
+        -e "s/GITLEAKS_SHA256: <.*/GITLEAKS_SHA256: $zero/" \
+        -e "s/GH_VERSION: <.*/GH_VERSION: 2.106.0/" \
+        -e "s/GH_SHA256: <.*/GH_SHA256: $zero/" \
+        -e "s#<the image of DATABASE_IMAGE in scripts/kit-config.sh>#postgres:17#" \
+        -e "s/<backend test command, writing a clover coverage report>/composer test:unit/" \
+        -e "s#<path of the clover report>#coverage/clover.xml#" \
+        -e "s/<frontend test command.*/npm test/" \
+        -e "s/<boot the stack with seeded data.*/php artisan serve --env=ci \&/" \
+        -e "s/<smoke suite command.*/npx playwright test/" \
+        "$KIT/ci/github-actions.yml" | grep -v -E '^[[:space:]]*#' | grep -v -E '^[[:space:]]*$' | sed -E 's/ # (the part that holds|holds the coverage).*$//'
+}
+cx_github_example() {
+    printf '%s\n' '<?php' 'require $argv[1];' 'echo Tests\Support\Architecture\CiHostExamples::githubWorkflow();' > "$ROOT/cx-example.php"
+    php "$ROOT/cx-example.php" "$KIT/reference-project/tests/Support/Architecture/CiHostExamples.php" | grep -v -E '^[[:space:]]*$'
+}
+cx_skeleton_vs_example() {
+    cx_fill_github > "$ROOT/cx-skeleton-filled.yml"
+    cx_github_example > "$ROOT/cx-example.yml"
+    if grep -q '<' "$ROOT/cx-skeleton-filled.yml"; then
+        echo "a placeholder is left after the fill:"
+        grep -n '<' "$ROOT/cx-skeleton-filled.yml"
+        return 1
+    fi
+    diff "$ROOT/cx-skeleton-filled.yml" "$ROOT/cx-example.yml" && echo same
+}
+if [ -f "$KIT/ci/github-actions.yml" ] && [ -f "$KIT/reference-project/tests/Support/Architecture/CiHostExamples.php" ]; then
+    check_php CX27 "github-actions.yml with its placeholders filled equals the example of the contract test, line for line" 0 '^same$' cx_skeleton_vs_example
+fi
+if [ -f "$KIT/ci/github-actions.yml" ]; then
+    check CX28 "github-actions.yml: the three database engines are named with their variable and health tool, and a private image with its credentials" 0 '^yes$' "$SHELL_BIN" -c "for word in POSTGRES_PASSWORD MYSQL_ROOT_PASSWORD MARIADB_ROOT_PASSWORD pg_isready mysqladmin healthcheck.sh 'packages: read' 'credentials:'; do grep -q -e \"\$word\" '$KIT/ci/github-actions.yml' || { echo \"missing: \$word\"; exit 1; }; done; echo yes"
+    check CX29 "github-actions.yml and proof.yml: no pin of a node20 action (checkout v4, setup-node v4, setup-php 2.32) outside a comment" 0 '^0$' "$SHELL_BIN" -c "cat '$KIT/ci/github-actions.yml' '$KIT/.github/workflows/proof.yml' | grep -v -E '^[[:space:]]*#' | grep -c -E '11bd71901bbe5b1630ceea73d27597364c9af683|49933ea5288caeca8642d1e84afbd3f7d6820020|9e72090525849c5e82e596468b86eb55e9cc5401|# v4\.[0-9.]+'; exit 0"
+    check CX30 "github-actions.yml: the nightly job sets GH_TOKEN and GH_REPO and installs gh with a checked download" 0 '^yes$' "$SHELL_BIN" -c "for word in '^      GH_TOKEN: ' '^      GH_REPO: ' 'GH_SHA256}  gh.tgz'; do grep -q -e \"\$word\" '$KIT/ci/github-actions.yml' || { echo \"missing: \$word\"; exit 1; }; done; echo yes"
 fi
 if [ -f "$KIT/ci/gitlab-ci.yml" ]; then
     check CX25 "gitlab-ci.yml: a branch rule of the workflow starts a pipeline for the push source only" 0 '^0$' "$SHELL_BIN" -c "grep -E 'if: \\\$CI_COMMIT_BRANCH' '$KIT/ci/gitlab-ci.yml' | grep -v -c 'CI_PIPELINE_SOURCE == \"push\"'; exit 0"

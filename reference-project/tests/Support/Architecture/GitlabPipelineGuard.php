@@ -16,15 +16,15 @@ final readonly class GitlabPipelineGuard
 
     /**
      * @param list<string> $deployBranches the branches that deploy; the first one may be written as `$CI_DEFAULT_BRANCH`
-     * @param list<string> $parts          the parts of the checks step (`scripts/checks.sh --list-parts`)
+     * @param string       $checksScript   the project's checks script, whose PARTS table names the parts
      * @param list<string> $writingLines   run lines an owner exception allows to write
      */
     public function __construct(
         private string $pipelineFile,
+        private string $checksScript,
         private array $deployBranches,
         private string $backendTestCommand,
-        private array $parts = ['gate', 'static', 'guards', 'repo'],
-        private string $databaseImage = 'postgres:17',
+        private string $databaseImage,
         private array $writingLines = [],
     ) {
     }
@@ -38,22 +38,27 @@ final readonly class GitlabPipelineGuard
             return ['the pipeline file does not exist: copy ci/gitlab-ci.yml to .gitlab-ci.yml'];
         }
 
-        return $this->inPipeline((string) file_get_contents($this->pipelineFile));
+        if (! is_file($this->checksScript)) {
+            return ['the checks script ' . $this->checksScript . ' does not exist: the parts of the checks step are read from it'];
+        }
+
+        return $this->inPipeline((string) file_get_contents($this->pipelineFile), (string) file_get_contents($this->checksScript));
     }
 
     /**
      * @return list<string>
      */
-    public function inPipeline(string $yaml): array
+    public function inPipeline(string $yaml, string $checksText): array
     {
         $pipeline = Yaml::parse($yaml);
         $pipeline = is_array($pipeline) ? $pipeline : [];
         $jobs = self::jobs($pipeline);
+        $parts = ChecksParts::of($checksText);
 
         return array_values(array_unique([
             ...$this->workflowRules($pipeline),
-            ...$this->checksRules($jobs),
-            ...$this->mainRules($jobs),
+            ...$this->checksRules($jobs, $parts),
+            ...$this->mainRules($jobs, $parts),
             ...$this->scheduledRules($jobs),
             ...$this->testRules($jobs),
             ...$this->jobRules($pipeline, $jobs),
@@ -86,9 +91,10 @@ final readonly class GitlabPipelineGuard
 
     /**
      * @param array<string, array<mixed>> $jobs
+     * @param list<string> $parts
      * @return list<string>
      */
-    private function checksRules(array $jobs): array
+    private function checksRules(array $jobs, array $parts): array
     {
         $carrying = array_filter($jobs, static fn (array $job): bool => in_array(CiContractGuard::CHECKS . ' --part $PART', self::lines($job), true));
 
@@ -103,8 +109,8 @@ final readonly class GitlabPipelineGuard
                 $violations[] = 'job `' . $id . '` has another rule than `$CI_PIPELINE_SOURCE == "merge_request_event"`: a changes filter or a condition narrows the checks';
             }
 
-            if (! self::matrixIs($job, $this->parts)) {
-                $violations[] = 'the matrix of job `' . $id . '` is not exactly the parts of PARTS (' . implode(', ', $this->parts) . ')';
+            if (! self::matrixIs($job, $parts)) {
+                $violations[] = 'the matrix of job `' . $id . '` is not exactly the parts of PARTS (' . implode(', ', $parts) . ')';
             }
 
             if (($job['variables']['CHECK_BASE'] ?? null) !== '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME') {
@@ -121,9 +127,10 @@ final readonly class GitlabPipelineGuard
 
     /**
      * @param array<string, array<mixed>> $jobs
+     * @param list<string> $parts
      * @return list<string>
      */
-    private function mainRules(array $jobs): array
+    private function mainRules(array $jobs, array $parts): array
     {
         $carrying = array_filter($jobs, static fn (array $job): bool => in_array(CiContractGuard::CHECKS . ' --main --part $PART', self::lines($job), true));
 
@@ -146,8 +153,8 @@ final readonly class GitlabPipelineGuard
                 }
             }
 
-            if (! self::matrixIs($job, $this->parts)) {
-                $violations[] = 'the matrix of job `' . $id . '` is not exactly the parts of PARTS (' . implode(', ', $this->parts) . ')';
+            if (! self::matrixIs($job, $parts)) {
+                $violations[] = 'the matrix of job `' . $id . '` is not exactly the parts of PARTS (' . implode(', ', $parts) . ')';
             }
         }
 
@@ -242,6 +249,8 @@ final readonly class GitlabPipelineGuard
     private function serviceRules(string $where, array $job, array $variables): array
     {
         $violations = [];
+        $engine = DatabaseEngine::of($this->databaseImage);
+        $keys = $engine === '' ? array_filter(array_keys($variables), static fn (int|string $key): bool => str_contains((string) $key, 'PASSWORD')) : array_filter(DatabaseEngine::passwordKeys($engine), static fn (string $key): bool => isset($variables[$key]));
 
         foreach (is_array($job['services'] ?? null) ? $job['services'] : [] as $service) {
             $image = is_array($service) ? $service['name'] ?? '' : $service;
@@ -250,8 +259,8 @@ final readonly class GitlabPipelineGuard
                 $violations[] = $where . ' has a service image that is not DATABASE_IMAGE of kit-config.sh (`' . $this->databaseImage . '`)';
             }
 
-            if (array_filter(array_keys($variables), static fn (int|string $key): bool => str_contains((string) $key, 'PASSWORD')) === []) {
-                $violations[] = $where . ' has a database service and no password variable: the official image exits without one';
+            if ($keys === []) {
+                $violations[] = $where . ' has a database service and no password variable of its engine (' . ($engine === '' ? 'any' : $engine . ': ' . implode(', ', DatabaseEngine::passwordKeys($engine))) . '): the official image exits without one';
             }
         }
 

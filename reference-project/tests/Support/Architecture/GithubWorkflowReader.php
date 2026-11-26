@@ -104,6 +104,46 @@ final class GithubWorkflowReader
     }
 
     /**
+     * Every string value of a parsed document, keys left out: where a placeholder or a secret can hide, a comment cannot.
+     *
+     * @return list<string>
+     */
+    public static function strings(mixed $value): array
+    {
+        if (is_string($value)) {
+            return [$value];
+        }
+
+        $strings = [];
+
+        foreach (is_array($value) ? $value : [] as $item) {
+            array_push($strings, ...self::strings($item));
+        }
+
+        return $strings;
+    }
+
+    /**
+     * @param array<mixed> $job
+     * @return list<string>
+     */
+    public static function needs(array $job): array
+    {
+        $needs = $job['needs'] ?? [];
+
+        return array_values(array_filter(is_array($needs) ? $needs : [$needs], 'is_string'));
+    }
+
+    /**
+     * @param array<mixed> $job
+     * @return list<array<mixed>>
+     */
+    public static function steps(array $job): array
+    {
+        return array_values(array_filter(is_array($job['steps'] ?? null) ? $job['steps'] : [], 'is_array'));
+    }
+
+    /**
      * @param array<mixed> $job
      * @return array<mixed>
      */
