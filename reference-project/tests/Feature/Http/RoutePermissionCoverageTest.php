@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 use App\Modules\Roles\Enums\Permission;
 use App\Modules\Roles\Enums\PermissionArea;
-use Illuminate\Auth\Middleware\Authenticate;
-use Illuminate\Auth\Middleware\Authorize;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\Gate;
 use Tests\Concerns\GuardsAgainstDatabaseAccess;
@@ -13,12 +11,6 @@ use Tests\Support\Feature\Http\RoutePermissionCoverageHelpers;
 use Tests\Support\Narrow;
 
 uses(GuardsAgainstDatabaseAccess::class);
-
-const ROUTE_PERMISSION_IN_SCOPE = [Authenticate::class];
-
-const ROUTE_PERMISSION_AREA_GATES = [Authorize::class . ':' . Permission::BACKOFFICE_OPEN->value];
-
-const ROUTE_PERMISSION_PACKAGE_NAMESPACES = ['Laravel\\Pulse\\'];
 
 it('checks a permission or a policy on the route itself for every route behind Authenticate', function (): void {
     expect(RoutePermissionCoverageHelpers::permissionUncoveredRoutes())->toBe([]);

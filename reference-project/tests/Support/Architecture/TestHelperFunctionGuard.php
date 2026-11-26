@@ -40,6 +40,8 @@ final class TestHelperFunctionGuard
 
     /**
      * Named functions that are not a method: top level, inside a Pest closure, behind a function_exists guard or inside a method body.
+     * A global constant is the same hazard (Pest loads every test file into one process, so a second file with the same name is a
+     * fatal error): `const NAME = ...` outside a class is listed as `const NAME`, `define('NAME', ...)` as `define NAME`.
      *
      * @return list<string>
      */
@@ -71,6 +73,18 @@ final class TestHelperFunctionGuard
                 $classOpensAt = null;
             } elseif ($token->text === '}') {
                 array_pop($braces);
+            } elseif ($token->is(T_CONST) && $previous?->is(T_USE) !== true) {
+                $name = $tokens[$index + 1] ?? null;
+
+                if ($name?->is(T_STRING) === true && ($braces === [] || end($braces) === false)) {
+                    $functions[] = 'const ' . $name->text;
+                }
+            } elseif ($token->is(T_STRING) && mb_strtolower($token->text) === 'define' && ($tokens[$index + 1] ?? null)?->text === '(' && $previous?->is([T_OBJECT_OPERATOR, T_NULLSAFE_OBJECT_OPERATOR, T_DOUBLE_COLON, T_FUNCTION, T_NEW]) !== true) {
+                $name = $tokens[$index + 2] ?? null;
+
+                if ($name?->is(T_CONSTANT_ENCAPSED_STRING) === true && ($braces === [] || end($braces) === false)) {
+                    $functions[] = 'define ' . trim($name->text, '\'"');
+                }
             } elseif ($token->is(T_FUNCTION) && $previous?->is(T_USE) !== true) {
                 $name = $tokens[$index + 1] ?? null;
                 $name = $name?->text === '&' ? ($tokens[$index + 2] ?? null) : $name;

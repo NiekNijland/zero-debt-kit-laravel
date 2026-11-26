@@ -50,17 +50,17 @@ final readonly class ClosedClassGuard
             }
 
             foreach (new NodeFinder()->findInstanceOf($statements, Class_::class) as $class) {
+                // An anonymous class that extends a concrete class keeps that class open as much as a named one does.
+                if ($class->extends instanceof Name) {
+                    $extended[$class->extends->toString()] = true;
+                }
+
                 if (! $class->namespacedName instanceof Name) {
                     continue;
                 }
 
                 $name = $class->namespacedName->toString();
-
-                if ($class->extends instanceof Name) {
-                    $extended[$class->extends->toString()] = true;
-                }
-
-                $tag = str_contains((string) $class->getDocComment(), '@final');
+                $tag = preg_match('/@final(?![A-Za-z0-9_])/', (string) $class->getDocComment()) === 1;
 
                 if (! $class->isAbstract()) {
                     $concrete[$name] = $class->isFinal();

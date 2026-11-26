@@ -16,6 +16,14 @@ use ReflectionFunction;
 
 final class RouteRateLimitCoverageHelpers
 {
+    /** @var array<string, array{reason: string, routes: list<string>}> */
+    public const array DEDICATED_LIMITERS = [
+    'newsletter' => ['reason' => 'the sign-up form of the newsletter keeps its own limit per address', 'routes' => ['newsletter.subscribe']],
+    ];
+
+    /** @var list<string> */
+    public const array OUT_OF_SCOPE_SOURCES = ['tests'];
+
     public static function rateLimitOutOfScope(RoutingRoute $route): bool
     {
         $uses = $route->getAction('uses');
@@ -26,7 +34,7 @@ final class RouteRateLimitCoverageHelpers
             default => false,
         };
 
-        return is_string($source) && array_any(RATE_LIMIT_OUT_OF_SCOPE_SOURCES, static fn (string $directory): bool => str_starts_with($source, base_path($directory)));
+        return is_string($source) && array_any(self::OUT_OF_SCOPE_SOURCES, static fn (string $directory): bool => str_starts_with($source, base_path($directory)));
     }
 
     public static function rateLimitNamedRoute(string $name): RoutingRoute
@@ -83,8 +91,8 @@ final class RouteRateLimitCoverageHelpers
             return null;
         }
 
-        if (array_key_exists($own[0], RATE_LIMIT_DEDICATED_LIMITERS)) {
-            return collect(RATE_LIMIT_DEDICATED_LIMITERS[$own[0]]['routes'])->contains(static fn (string $pattern): bool => Str::is($pattern, self::rateLimitRouteIdentifier($route)))
+        if (array_key_exists($own[0], self::DEDICATED_LIMITERS)) {
+            return collect(self::DEDICATED_LIMITERS[$own[0]]['routes'])->contains(static fn (string $pattern): bool => Str::is($pattern, self::rateLimitRouteIdentifier($route)))
                 ? null
                 : 'uses the dedicated limiter ' . $own[0] . ' outside the routes it is meant for';
         }

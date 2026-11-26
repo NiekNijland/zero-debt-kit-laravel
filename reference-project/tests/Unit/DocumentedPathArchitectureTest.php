@@ -85,6 +85,8 @@ it('names the guide relative to the root when the checkout sits under a dot dire
 it('names only paths that exist in AGENTS.md, DESIGN.md and the review rubric', function () use ($roots, $guides): void {
     $root = dirname(__DIR__, 2);
 
-    expect(DocumentedPathGuard::pathsIn((string) file_get_contents($root . '/AGENTS.md')))->not->toBe([])
-        ->and(new DocumentedPathGuard($root, $roots, $guides, 'AGENTS.md')->violations())->toBe([]);
+    $guard = new DocumentedPathGuard($root, $roots, $guides, 'AGENTS.md');
+
+    expect($guard->pathsInGuide('AGENTS.md'))->not->toBe([])
+        ->and($guard->violations())->toBe([]);
 });

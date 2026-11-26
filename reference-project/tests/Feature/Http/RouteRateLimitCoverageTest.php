@@ -9,12 +9,6 @@ use Tests\Support\Feature\Http\RouteRateLimitCoverageHelpers;
 
 uses(GuardsAgainstDatabaseAccess::class);
 
-const RATE_LIMIT_DEDICATED_LIMITERS = [
-    'newsletter' => ['reason' => 'the sign-up form of the newsletter keeps its own limit per address', 'routes' => ['newsletter.subscribe']],
-];
-
-const RATE_LIMIT_OUT_OF_SCOPE_SOURCES = ['tests'];
-
 it('gives every route a category or a dedicated limiter, by the default reads and writes limiters of the web groups or its own', function (): void {
     $problems = collect(Route::getRoutes()->getRoutes())
         ->reject(static fn (RoutingRoute $route): bool => RouteRateLimitCoverageHelpers::rateLimitOutOfScope($route))

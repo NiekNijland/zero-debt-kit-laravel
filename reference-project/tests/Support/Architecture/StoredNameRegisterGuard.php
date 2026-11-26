@@ -17,6 +17,7 @@ use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\NodeFinder;
+use RuntimeException;
 
 final readonly class StoredNameRegisterGuard
 {
@@ -181,6 +182,22 @@ final readonly class StoredNameRegisterGuard
         }
 
         return $root instanceof StaticCall && $root->class instanceof Name && $root->class->toString() === Bus::class;
+    }
+
+    /**
+     * The lines of the register of one kind (`<folder>/<kind>.txt`); a register file that does not exist is an error.
+     *
+     * @return list<string>
+     */
+    public function registered(string $kind): array
+    {
+        $file = "{$this->folder}/{$kind}.txt";
+
+        if (! is_file($this->root . '/' . $file)) {
+            throw new RuntimeException("the register {$file} does not exist under the root");
+        }
+
+        return $this->lines($file);
     }
 
     /**

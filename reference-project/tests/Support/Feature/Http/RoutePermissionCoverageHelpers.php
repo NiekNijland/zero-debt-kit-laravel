@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Support\Feature\Http;
 
+use App\Modules\Roles\Enums\Permission;
 use Closure;
+use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Auth\Middleware\Authorize;
 use Illuminate\Contracts\Routing\UrlRoutable;
 use Illuminate\Routing\Route as RoutingRoute;
@@ -20,6 +22,15 @@ use Tests\Support\Narrow;
 
 final class RoutePermissionCoverageHelpers
 {
+    /** @var list<string> */
+    public const array IN_SCOPE = [Authenticate::class];
+
+    /** @var list<string> */
+    public const array AREA_GATES = [Authorize::class . ':' . Permission::BACKOFFICE_OPEN->value];
+
+    /** @var list<string> */
+    public const array PACKAGE_NAMESPACES = ['Laravel\\Pulse\\'];
+
     public static function permissionRegisteredByATest(RoutingRoute $route): bool
     {
         $uses = $route->getAction('uses');
@@ -32,7 +43,7 @@ final class RoutePermissionCoverageHelpers
     {
         $controller = $route->getControllerClass();
 
-        return $controller !== null && array_any(ROUTE_PERMISSION_PACKAGE_NAMESPACES, static fn (string $namespace): bool => str_starts_with($controller, $namespace));
+        return $controller !== null && array_any(self::PACKAGE_NAMESPACES, static fn (string $namespace): bool => str_starts_with($controller, $namespace));
     }
 
     public static function permissionRouteIdentifier(RoutingRoute $route): string
@@ -52,7 +63,7 @@ final class RoutePermissionCoverageHelpers
 
     public static function permissionRouteIsInScope(RoutingRoute $route): bool
     {
-        return collect(self::permissionMiddleware($route))->contains(static fn (string $middleware): bool => in_array(Str::before($middleware, ':'), ROUTE_PERMISSION_IN_SCOPE, true));
+        return collect(self::permissionMiddleware($route))->contains(static fn (string $middleware): bool => in_array(Str::before($middleware, ':'), self::IN_SCOPE, true));
     }
 
     /**
@@ -62,7 +73,7 @@ final class RoutePermissionCoverageHelpers
     {
         return array_values(collect(self::permissionMiddleware($route))
             ->filter(static fn (string $middleware): bool => str_contains($middleware, ':') && in_array(Str::before($middleware, ':'), [Authorize::class, PermissionMiddleware::class], true))
-            ->reject(static fn (string $middleware): bool => in_array($middleware, ROUTE_PERMISSION_AREA_GATES, true))
+            ->reject(static fn (string $middleware): bool => in_array($middleware, self::AREA_GATES, true))
             ->all());
     }
 

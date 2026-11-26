@@ -15,6 +15,7 @@ use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\NameResolver;
 use PhpParser\ParserFactory;
 use ReflectionClass;
+use ReflectionMethod;
 
 /**
  * The classes, interfaces and traits of a set of sources, with what a rule about lineage needs: the parent, the
@@ -33,6 +34,7 @@ use ReflectionClass;
  *     parents: list<string>,
  *     uses: list<string>,
  *     methods: list<string>,
+ *     callable: list<string>,
  *     properties: array<string, 'default'|'instance'>,
  *     attributes: list<string>,
  * }
@@ -92,19 +94,28 @@ final class ClassGraph
 
     /**
      * Whether the type, a parent class or a trait it uses (at any depth) declares the method. A method that an
-     * interface only declares does not count: the class must carry it.
+     * interface only declares does not count: the class must carry it. With `$callable` the method must also be one that code
+     * outside the class can call (public, not static, not abstract): the form a framework calls on a queued job.
      *
      * @param Info $info
      */
-    public function hasMethod(array $info, string $method): bool
+    public function hasMethod(array $info, string $method, bool $callable = false): bool
     {
         foreach ($this->lineage($info) as $name => $type) {
-            if ($type !== null && in_array(strtolower($method), $type['methods'], true)) {
+            if ($type !== null && in_array(strtolower($method), $type[$callable ? 'callable' : 'methods'], true)) {
                 return true;
             }
 
             if ($type === null && (class_exists($name) || trait_exists($name)) && method_exists($name, $method)) {
-                return true;
+                if (! $callable) {
+                    return true;
+                }
+
+                foreach (new ReflectionClass($name)->getMethods(ReflectionMethod::IS_PUBLIC) as $public) {
+                    if (strcasecmp($public->getName(), $method) === 0 && ! $public->isStatic() && ! $public->isAbstract()) {
+                        return true;
+                    }
+                }
             }
         }
 
@@ -288,6 +299,7 @@ final class ClassGraph
             'parents' => $parents,
             'uses' => $uses,
             'methods' => $type instanceof Interface_ ? [] : array_map(static fn (ClassMethod $method): string => $method->name->toLowerString(), $type->getMethods()),
+            'callable' => $type instanceof Interface_ ? [] : array_values(array_map(static fn (ClassMethod $method): string => $method->name->toLowerString(), array_filter($type->getMethods(), static fn (ClassMethod $method): bool => $method->isPublic() && ! $method->isStatic() && ! $method->isAbstract()))),
             'properties' => $properties,
             'attributes' => $attributes,
         ];
