@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Support\Architecture;
 
 use PhpParser\Node;
+use PhpParser\Node\Arg;
+use PhpParser\Node\ArrayItem;
 use PhpParser\Node\Expr\Assign;
 use PhpParser\Node\Expr\BinaryOp\Coalesce;
 use PhpParser\Node\Expr\BinaryOp\Concat;
@@ -29,13 +31,14 @@ final readonly class QueueNameGuard
 {
     private const array QUEUE_SETTERS = ['onqueue', 'allonqueue', 'pushon', 'lateron'];
 
-    private const string ONE_WAY = 'name the queue with a case of App\Modules\Observability\Enums\Queue (Queue::X), which has a Horizon worker in %s';
+    private const string ONE_WAY = 'name the queue with a case of %s (Queue::X), which has a worker in %s';
 
     public function __construct(
         private PhpFileInspector $inspector,
         private string $root,
         private string $source,
         private string $workerConfig,
+        private string $queueEnum,
     ) {
     }
 
@@ -48,7 +51,7 @@ final readonly class QueueNameGuard
 
         foreach ($this->inspector->phpFiles($this->root . '/' . $this->source) as $file) {
             foreach ($this->inSource((string) file_get_contents($file)) as $violation) {
-                $violations[] = substr($file, strlen($this->root) + 1) . ':' . $violation;
+                $violations[] = mb_substr($file, mb_strlen($this->root) + 1) . ':' . $violation;
             }
         }
 
@@ -60,7 +63,7 @@ final readonly class QueueNameGuard
      */
     public function inSource(string $source): array
     {
-        $statements = (new ParserFactory())->createForHostVersion()->parse($source) ?? [];
+        $statements = new ParserFactory()->createForHostVersion()->parse($source) ?? [];
         $finder = new NodeFinder();
         $violations = [];
 
@@ -71,28 +74,28 @@ final readonly class QueueNameGuard
 
             $first = $call->args[0] ?? null;
 
-            if (in_array($call->name->toLowerString(), self::QUEUE_SETTERS, true) && $first instanceof Node\Arg && self::isLiteral($first->value)) {
-                $violations[$call->getStartLine() . ' a'] = $call->getStartLine() . ': ' . $call->name->toString() . '() with a queue name as text: ' . sprintf(self::ONE_WAY, $this->workerConfig);
+            if (in_array($call->name->toLowerString(), self::QUEUE_SETTERS, true) && $first instanceof Arg && self::isLiteral($first->value)) {
+                $violations[$call->getStartLine() . ' a'] = $call->getStartLine() . ': ' . $call->name->toString() . '() with a queue name as text: ' . $this->oneWay();
             }
         }
 
         foreach ($finder->findInstanceOf($statements, Property::class) as $property) {
             foreach ($property->props as $declared) {
                 if ($declared->name->toString() === 'queue' && self::isLiteral($declared->default)) {
-                    $violations[$declared->getStartLine() . ' b'] = $declared->getStartLine() . ': $queue with a queue name as text: call $this->onQueue(Queue::X) in the constructor; ' . sprintf(self::ONE_WAY, $this->workerConfig);
+                    $violations[$declared->getStartLine() . ' b'] = $declared->getStartLine() . ': $queue with a queue name as text: call $this->onQueue(Queue::X) in the constructor; ' . $this->oneWay();
                 }
             }
         }
 
         foreach ($finder->findInstanceOf($statements, Param::class) as $parameter) {
             if ($parameter->flags !== 0 && $parameter->var instanceof Variable && $parameter->var->name === 'queue' && self::isLiteral($parameter->default)) {
-                $violations[$parameter->getStartLine() . ' e'] = $parameter->getStartLine() . ': a promoted $queue with a queue name as text: call $this->onQueue(Queue::X) in the constructor; ' . sprintf(self::ONE_WAY, $this->workerConfig);
+                $violations[$parameter->getStartLine() . ' e'] = $parameter->getStartLine() . ': a promoted $queue with a queue name as text: call $this->onQueue(Queue::X) in the constructor; ' . $this->oneWay();
             }
         }
 
         foreach ($finder->findInstanceOf($statements, Assign::class) as $assign) {
             if ($assign->var instanceof PropertyFetch && $assign->var->name instanceof Identifier && $assign->var->name->toString() === 'queue' && self::isLiteral($assign->expr)) {
-                $violations[$assign->getStartLine() . ' c'] = $assign->getStartLine() . ': ->queue set to a queue name as text: ' . sprintf(self::ONE_WAY, $this->workerConfig);
+                $violations[$assign->getStartLine() . ' c'] = $assign->getStartLine() . ': ->queue set to a queue name as text: ' . $this->oneWay();
             }
         }
 
@@ -101,9 +104,9 @@ final readonly class QueueNameGuard
                 continue;
             }
 
-            foreach ($finder->findInstanceOf($method->stmts ?? [], Node\ArrayItem::class) as $item) {
+            foreach ($finder->findInstanceOf($method->stmts ?? [], ArrayItem::class) as $item) {
                 if (self::isLiteral($item->value)) {
-                    $violations[$item->getStartLine() . ' d'] = $item->getStartLine() . ': viaQueues() with a queue name as text: ' . sprintf(self::ONE_WAY, $this->workerConfig);
+                    $violations[$item->getStartLine() . ' d'] = $item->getStartLine() . ': viaQueues() with a queue name as text: ' . $this->oneWay();
                 }
             }
         }
@@ -113,10 +116,6 @@ final readonly class QueueNameGuard
         return array_values($violations);
     }
 
-    /**
-     * Text, text joined to something (`'exports-' . $tenant`) and a choice between values of which one is text
-     * (`$x ? 'a' : 'b'`, `$x ?? 'a'`, a `match` arm).
-     */
     private static function isLiteral(?Node $value): bool
     {
         return match (true) {
@@ -126,5 +125,10 @@ final readonly class QueueNameGuard
             $value instanceof Match_ => array_any($value->arms, static fn (MatchArm $arm): bool => self::isLiteral($arm->body)),
             default => false,
         };
+    }
+
+    private function oneWay(): string
+    {
+        return sprintf(self::ONE_WAY, $this->queueEnum, $this->workerConfig);
     }
 }

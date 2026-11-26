@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Modules\Observability\Enums\Queue;
 use Tests\Support\Architecture\PhpFileInspector;
 use Tests\Support\Architecture\QueueNameGuard;
+use Tests\Support\SourceSandbox;
 
 uses()->group('arch');
 
@@ -27,11 +29,11 @@ dataset('queue names written as text', [
 ]);
 
 it('detects a queue that is named with text', function (string $source, string $reason): void {
-    $violations = new QueueNameGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', 'config/horizon.php')->inSource($source);
+    $violations = new QueueNameGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', 'config/horizon.php', Queue::class)->inSource($source);
 
     expect($violations)->toHaveCount(1)
         ->and($violations[0])->toContain($reason)
-        ->and($violations[0])->toContain('Queue::X', 'config/horizon.php');
+        ->and($violations[0])->toContain('Queue::X', 'config/horizon.php', Queue::class);
 })->with('queue names written as text');
 
 it('accepts a queue named by the enum and a variable that happens to be called queue', function (): void {
@@ -55,9 +57,22 @@ it('accepts a queue named by the enum and a variable that happens to be called q
         }
         PHP;
 
-    expect(new QueueNameGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', 'config/horizon.php')->inSource($source))->toBe([]);
+    expect(new QueueNameGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', 'config/horizon.php', Queue::class)->inSource($source))->toBe([]);
+});
+
+it('reads a tree under a dot directory and names the file relative to the root', function (): void {
+    $root = SourceSandbox::create(['app/Pushes.php' => "<?php\n\$job->onQueue('exports');\n", 'app/Clean.php' => "<?php\n"], prefix: '.checkout-');
+
+    try {
+        $violations = new QueueNameGuard(new PhpFileInspector(), $root, 'app', 'config/horizon.php', Queue::class)->violations();
+    } finally {
+        SourceSandbox::remove($root);
+    }
+
+    expect($violations)->toHaveCount(1)
+        ->and($violations[0])->toStartWith('app/Pushes.php:2: onQueue() with a queue name as text');
 });
 
 it('names every queue in app with a case of the Queue enum', function (): void {
-    expect(new QueueNameGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', 'config/horizon.php')->violations())->toBe([]);
+    expect(new QueueNameGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', 'config/horizon.php', Queue::class)->violations())->toBe([]);
 });
