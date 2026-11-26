@@ -1,0 +1,46 @@
+# Code owners for the files that carry the guards (04-guards.md C2 and C4, point 22).
+#
+# Why: the override tag [ratchet: <name>] is written in a commit message, and the author of a pull request writes the commit
+# messages. Nothing in the pipeline can tell a tag written for a real reason from one written to get past a guard. A review by
+# a person who owns these files can. Every file the guards, the caps and the pipeline live in is listed here, and the file
+# lists itself, so a pull request cannot drop its own review by editing this file.
+#
+# Copy to .github/CODEOWNERS (GitHub) or CODEOWNERS or .gitlab/CODEOWNERS (GitLab). Replace <owner> with one or more people or
+# teams, never with a bot or an automation account (GitHub: @user, @org/team; GitLab: @user, @group, or [Section] blocks):
+# the owner is the person who reads the reason of every override (09-reviewer-brief.md).
+# The last matching rule wins, so a rule below must not name fewer owners than the rule above it.
+# Bitbucket Cloud has no such file: default reviewers on the repository and the merge checks "minimum number of approvals"
+# and "minimum number of default reviewers" do the same, and the profile names them (07-process.md section 12).
+#
+# This file does nothing until the host enforces it, and that setting is not in the repository:
+#   GitHub: Settings, Branches, the rule of the main branch and of every other deploying branch, "Require a pull request before
+#           merging", "Require review from Code Owners", and "Do not allow bypassing the above settings" (an admin who can
+#           bypass can merge without the review).
+#   GitLab: Settings, Repository, Protected branches, "Require approval from code owners" on the main branch and every other
+#           deploying branch (a feature of paid tiers: where the plan lacks it, Settings, Merge requests, approval rules
+#           with the owners as approvers and "Prevent editing approval rules in merge requests").
+# A pull request that only touches other files is not held up: the rules below name the guard files only.
+
+# The scripts: the ratchet script and its table, the dashboard, the checks script, kit-config.sh, the commit-message check,
+# the audit gate, the caps file (scripts/debt-caps.json), the floors, prepush.sh.
+/scripts/ <owner>
+
+# The pipeline files of the host the project uses, and the workflow directory as a whole.
+/.github/workflows/ <owner>
+/.gitlab-ci.yml <owner>
+/bitbucket-pipelines.yml <owner>
+
+# The guards: the detector classes and the thin tests of the guard group (PHP: tests/Support/Architecture and the architecture
+# tests of tests/Unit; another stack: the guard folder its tooling table names).
+/tests/Support/Architecture/ <owner>
+/tests/Unit/*ArchitectureTest.php <owner>
+
+# The format commits that blame skips, the dependency bot's config and the move tool of the program.
+/.git-blame-ignore-revs <owner>
+/renovate.json <owner>
+/tools/codemods/ <owner>
+
+# This file itself.
+/.github/CODEOWNERS <owner>
+/CODEOWNERS <owner>
+/.gitlab/CODEOWNERS <owner>

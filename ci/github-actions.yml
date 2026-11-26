@@ -1,69 +1,130 @@
-# Skeleton for GitHub Actions. Replace every <placeholder>.
-# A repository without a workflow copies this file to .github/workflows/ci.yml. A repository that has one keeps its
-# file and adds these jobs and triggers to it; every deploy, service and cache definition stays (05-program.md, step 2).
+# Skeleton for GitHub Actions. Replace every <placeholder>. Copy this file to .github/workflows/kit-checks.yml: it is a file of its
+# own, always. The on: block belongs to the whole file and a job runs on every event of that file, so a project's existing
+# workflow is never edited: adding pull_request and schedule to its ci.yml would run its deploy job on every pull request and
+# every night, with the secrets a same-repository pull request can read. The existing workflow keeps its push trigger and its
+# deploy; its own test jobs move into this file (a suite runs once per trigger, 04-guards.md C4, point 19). A deploy that must
+# wait for these jobs is a workflow with on: workflow_run (workflows: [Kit checks], types: [completed]) whose jobs carry
+# if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' and a branch check on
+# github.event.workflow_run.head_branch; or it is a job in this file with needs: [checks-main, backend-tests, frontend-tests,
+# smoke] and if: github.event_name == 'push'. Never check out and run pull-request code from a workflow_run or
+# pull_request_target workflow: they run with secrets.
+#
 # The checks job is a matrix over the parts of PARTS in scripts/checks.sh (bash scripts/checks.sh --list-parts): one entry per part.
 # The pull_request trigger has no path filter: the checks job runs on every pull request, a docs-only one too.
 # A path filter may go on a test job, never on the checks job. No job commits or pushes.
-# Every runner image is a fixed version, every action a commit sha, every job has a maximum time.
-# Full history (fetch-depth 0) only where a run compares with a base or reads history: checks, backend-tests (for
-# the mutation run of step 9) and scheduled. A project without a database leaves the services blocks out.
-# Step 9 of the program adds one step to backend-tests, on pull requests only: the mutation tool on the files
-# the pull request changes, with the committed minimum score. That job fetches the full history for it.
+#
+# Merge-first, as on Bitbucket: a pull_request run checks out GitHub's merge ref (the pull request merged into the base as it is
+# when the run starts), so HEAD is that merge, the ratchets compare it with the base, and CHECK_HEAD is never set here. Every
+# job checks out the same ref, so one pull request is judged on one tree. The merge ref is made when the event fires and is not
+# made again when the base moves later: the repository setting "Require branches to be up to date before merging" (or a merge
+# queue, which this file does not support: no merge_group trigger) is what makes the last merge the one that was tested. A push
+# to a deploying branch checks out that branch, which is what --main wants.
+# The retarget of a stacked pull request (07-process.md section 9) fires "edited" with changes.base: the type is listed, and the
+# concurrency group cancels the run it replaces. An edit of the title or the description starts a run too; that is the price.
+# Do not set persist-credentials: false on the checkout: checks.sh fetches the base with the credentials the checkout leaves.
+# Do not add secrets to the env of the checks job: the job runs the pull request's own scripts.
+#
+# Required status checks (Settings, Branches, the rule of the main branch and of every other deploying branch): require
+# checks-result, backend-tests, frontend-tests and smoke, not the four "checks (<part>)" names. A new part of PARTS is then
+# required without anyone editing the rule, and a name can be picked only after it ran once (open a draft pull request first).
+# Everything runs inside one image pinned by digest (container:), as on the other hosts, so baselines and analyser results
+# do not move with the runner image; the label ubuntu-24.04 only names the machine that starts the container. The image needs
+# bash, git, curl and tar. A service of a container job is reached by its name: DB_HOST=database (GitLab: the same alias).
+# The scheduled run: schedule fires only from the default branch's copy of this file, in UTC, and can start late at the top of
+# the hour (hence the odd minute); in a public repository GitHub switches it off after 60 days without activity, and the
+# person who last edited the cron is notified of a failed run. There is no manual trigger: "Re-run jobs" in the UI is the way.
+# Pin every action to a full commit sha with a comment of its release (# v4.2.2); the dependency bot keeps them current
+# (templates/tool-configs.md). Full history (fetch-depth: 0) on every checkout: the guard group reads history too (point 6).
+# Step 9 of the program adds to backend-tests, on pull requests only: bash scripts/mutation.sh --changed (CHECK_BASE is set).
+# A project without a database leaves the services blocks and DB_HOST out.
 
 # Speed (04-guards.md C4, "CI speed"): cache the dependency directories and downloaded tools by the hash of the lock file,
 # keep the analyser's result cache between builds (not the type-aware lint cache), run independent jobs side by side, and
 # switch the package manager's process timeout off for the long scripts (Composer: Composer\Config::disableProcessTimeout).
 # A formatter config that the organisation hosts as a URL stays a URL: download it once per run (cached), never commit it.
 # Every branch that deploys gets the "on a deploying branch" runs, not only the main branch, and each suite runs once per
-# trigger before the deploy step (where this pipeline is the deploy pipeline, the smoke job sits in front of the deploy).
+# trigger before the deploy step.
 # The audit of a deploying branch covers production dependencies only (--omit=dev); the pull request and the scheduled run
 # audit everything.
 # Dependency cache: an actions/cache step (pinned by commit sha) keyed by the hash of the lock file, before the install step.
-# Step 9 of the program adds, to backend-tests on pull requests: bash scripts/mutation.sh --changed (with fetch-depth 0).
 
-name: CI
+name: Kit checks
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: ['<main branch>', '<other deploying branch>']
   schedule:
-    - cron: '<cron expression: once a day>'
+    - cron: '<cron expression: once a day, at an odd minute, for example 17 3>'
+
+concurrency:
+  group: kit-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   checks:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: <maximum minutes>
+    container:
+      image: <image with bash, git, curl, tar and the project's toolchain, pinned by digest>
     strategy:
       fail-fast: false
       matrix:
         part: [gate, static, guards, repo]
     env:
       CHECK_BASE: ${{ github.base_ref }}
-      CHECK_HEAD: ${{ github.event.pull_request.head.sha }}
     steps:
-      - uses: actions/checkout@<commit sha of the release the project pins>
+      - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v4.2.2>
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
       - run: <install dependencies from the lock file>
-      - run: <install gitleaks at a pinned version, checked against its checksum>
+      - name: Install gitleaks
+        if: matrix.part == 'repo'
+        env:
+          GITLEAKS_VERSION: <version, for example 8.30.1>
+          GITLEAKS_SHA256: <sha256 of the linux_x64 tarball, copied from checksums.txt of that release>
+        run: |
+          curl -sSfL -o gitleaks.tgz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tgz" | sha256sum -c -
+          tar -xzf gitleaks.tgz gitleaks
+          install -m 0755 gitleaks /usr/local/bin/gitleaks
+          rm gitleaks.tgz gitleaks
       - run: bash scripts/checks.sh --part ${{ matrix.part }}
+
+  checks-result:
+    if: always() && github.event_name == 'pull_request'
+    needs: [checks]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Every part of the checks run passed
+        env:
+          RESULT: ${{ needs.checks.result }}
+        run: test "$RESULT" = success
 
   checks-main:
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
     timeout-minutes: <maximum minutes>
+    container:
+      image: <image with bash, git, curl, tar and the project's toolchain, pinned by digest>
     strategy:
       fail-fast: false
       matrix:
         part: [gate, static, guards, repo]
     steps:
-      - uses: actions/checkout@<commit sha of the release the project pins>
+      - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v4.2.2>
+        with:
+          fetch-depth: 0
       - run: <install dependencies from the lock file>
       - run: bash scripts/checks.sh --main --part ${{ matrix.part }}
 
@@ -71,11 +132,21 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     timeout-minutes: <maximum minutes>
+    container:
+      image: <image with bash, git, curl, tar and the project's toolchain, pinned by digest>
+    env:
+      CHECK_BASE: ${{ github.base_ref }}
+      DB_HOST: database
     services:
       database:
         image: <the image of DATABASE_IMAGE in scripts/kit-config.sh>
+        env:
+          POSTGRES_PASSWORD: ci
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
-      - uses: actions/checkout@<commit sha of the release the project pins>
+      - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v4.2.2>
         with:
           fetch-depth: 0
       - run: <install dependencies from the lock file>
@@ -85,8 +156,12 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     timeout-minutes: <maximum minutes>
+    container:
+      image: <image with bash, git, curl, tar and the project's toolchain, pinned by digest>
     steps:
-      - uses: actions/checkout@<commit sha of the release the project pins>
+      - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v4.2.2>
+        with:
+          fetch-depth: 0
       - run: <install dependencies from the lock file>
       - run: <frontend test command, with coverage held at the committed floor (tools/README.md, "Coverage")>
 
@@ -94,11 +169,22 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     timeout-minutes: <maximum minutes>
+    container:
+      image: <image with bash, git, curl, tar and the project's toolchain, pinned by digest>
+    env:
+      DB_HOST: database
     services:
       database:
         image: <the image of DATABASE_IMAGE in scripts/kit-config.sh>
+        env:
+          POSTGRES_PASSWORD: ci
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
-      - uses: actions/checkout@<commit sha of the release the project pins>
+      - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v4.2.2>
+        with:
+          fetch-depth: 0
       - run: <install dependencies from the lock file>
       - run: <boot the stack with seeded data and the production drivers (cache store, queue, database engine)>
       - run: <smoke suite command, in a browser where the project has a frontend, after installing that browser at a pinned version>
@@ -107,8 +193,24 @@ jobs:
     if: github.event_name == 'schedule'
     runs-on: ubuntu-24.04
     timeout-minutes: <maximum minutes>
+    container:
+      image: <image with bash, git, curl, tar and the project's toolchain, pinned by digest>
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      DB_HOST: database
+    services:
+      database:
+        image: <the image of DATABASE_IMAGE in scripts/kit-config.sh>
+        env:
+          POSTGRES_PASSWORD: ci
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
-      - uses: actions/checkout@<commit sha of the release the project pins>
+      - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v4.2.2>
         with:
           fetch-depth: 0
       - run: <install dependencies from the lock file>

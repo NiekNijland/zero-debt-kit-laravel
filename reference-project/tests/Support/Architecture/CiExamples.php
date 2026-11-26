@@ -117,4 +117,19 @@ final class CiExamples
 
         return str_replace($from, $to, $source);
     }
+
+    /**
+     * Changes the first `$from` that comes after `$marker`: one job of a workflow, where the same line sits in several jobs.
+     */
+    public static function changeAfter(string $source, string $marker, string $from, string $to): string
+    {
+        $at = strpos($source, $marker);
+        $in = $at === false ? false : strpos($source, $from, $at);
+
+        if ($in === false) {
+            throw new LogicException('The example does not hold the text it should change after ' . $marker . ': ' . $from);
+        }
+
+        return substr($source, 0, $in) . $to . substr($source, $in + strlen($from));
+    }
 }

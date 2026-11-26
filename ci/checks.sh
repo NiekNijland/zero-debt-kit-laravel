@@ -61,46 +61,71 @@ SHARED_CONFIG="$HERE/kit-config.sh"
 }
 . "$SHARED_CONFIG"
 
-RUN="${1:-}"
+usage() {
+    echo "Usage: bash scripts/checks.sh [--main | --scheduled | --coverage CLOVER_FILE] [--part NAME]   or   --list-parts" >&2
+    echo "  --part goes with a pull-request run or with --main only; --list-parts, --scheduled and --coverage stand alone" >&2
+    exit 64
+}
+part_names() {
+    local part
+    for part in "${PARTS[@]}"; do
+        printf '%s ' "${part%%::*}"
+    done
+}
+
+RUN=""
 PART=""
-if [ "$RUN" = "--list-parts" ]; then
+PART_GIVEN=0
+LIST=0
+REPORT=""
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --list-parts) LIST=1 ;;
+        --main | --scheduled)
+            [ -z "$RUN" ] || usage
+            RUN="$1"
+            ;;
+        --coverage)
+            [ -z "$RUN" ] || usage
+            RUN="$1"
+            REPORT="${2:-}"
+            [ "$#" -lt 2 ] || shift
+            ;;
+        --part)
+            [ "$PART_GIVEN" -eq 0 ] || usage
+            PART_GIVEN=1
+            PART="${2:-}"
+            [ "$#" -lt 2 ] || shift
+            ;;
+        *) usage ;;
+    esac
+    shift
+done
+
+if [ "$LIST" -eq 1 ]; then
+    [ -z "$RUN" ] && [ "$PART_GIVEN" -eq 0 ] || usage
     for part in "${PARTS[@]}"; do
         echo "${part%%::*}"
     done
     exit 0
 fi
-if [ "$RUN" = "--part" ]; then
-    PART="${2:-}"
-    RUN=""
-elif [ "${2:-}" = "--part" ]; then
-    PART="${3:-}"
-fi
-if [ "$RUN" = "" ] || [ "$RUN" = "--main" ]; then
-    if [ "${1:-}" = "--part" ] || [ "${2:-}" = "--part" ]; then
-        [ -n "$PART" ] || {
-            echo "Checks: --part needs a name: $(bash "${BASH_SOURCE[0]}" --list-parts | tr '\n' ' ')" >&2
-            exit 64
-        }
-        KNOWN=0
-        for part in "${PARTS[@]}"; do
-            [ "${part%%::*}" != "$PART" ] || KNOWN=1
-        done
-        [ "$KNOWN" -eq 1 ] || {
-            echo "Checks: no part \"$PART\". The parts are: $(bash "${BASH_SOURCE[0]}" --list-parts | tr '\n' ' ')" >&2
-            exit 64
-        }
-    fi
-fi
-case "$RUN" in
-    "" | --main | --scheduled | --coverage) ;;
-    *)
-        echo "Usage: bash scripts/checks.sh [--main | --scheduled | --coverage CLOVER_FILE | --list-parts] [--part NAME]" >&2
+if [ "$PART_GIVEN" -eq 1 ]; then
+    [ -z "$RUN" ] || [ "$RUN" = "--main" ] || usage
+    [ -n "$PART" ] || {
+        echo "Checks: --part needs a name: $(part_names)" >&2
         exit 64
-        ;;
-esac
+    }
+    KNOWN=0
+    for part in "${PARTS[@]}"; do
+        [ "${part%%::*}" != "$PART" ] || KNOWN=1
+    done
+    [ "$KNOWN" -eq 1 ] || {
+        echo "Checks: no part \"$PART\". The parts are: $(part_names)" >&2
+        exit 64
+    }
+fi
 
 if [ "$RUN" = "--coverage" ]; then
-    REPORT="${2:-}"
     [ -r "$REPORT" ] || {
         echo "Coverage: cannot read the clover report \"$REPORT\". FAILS: the test command writes it, and this line names it" >&2
         exit 1
@@ -147,7 +172,19 @@ if [ -z "$RUN" ]; then
     fi
     export CHECK_BASE="$BASE"
 
-    if ! git fetch -q "$REMOTE" "+refs/heads/$BASE:refs/remotes/$REMOTE/$BASE"; then
+    # Only the parts that read the base fetch it: the gate (guard and ratchets) and a part that holds the commit-message check or
+    # the secret scan. A transient fetch failure then cannot fail static or guards, which never look at the base.
+    NEEDS_BASE=1
+    if [ -n "$PART" ] && [ "$PART" != "gate" ]; then
+        NEEDS_BASE=0
+        for part in "${PARTS[@]}"; do
+            [ "${part%%::*}" = "$PART" ] || continue
+            case "|${part#*::}|" in
+                *"|Commit messages|"* | *"|Secret scan|"*) NEEDS_BASE=1 ;;
+            esac
+        done
+    fi
+    if [ "$NEEDS_BASE" -eq 1 ] && ! git fetch -q "$REMOTE" "+refs/heads/$BASE:refs/remotes/$REMOTE/$BASE"; then
         echo "Checks: cannot fetch $REMOTE/$BASE, so the script guard cannot run. FAILS: nothing was checked" >&2
         exit 1
     fi
@@ -198,9 +235,28 @@ fi
 if [ -z "$RUN" ]; then
     TASKS+=(
         "Commit messages::bash scripts/ci-commit-messages.sh"
-        "Secret scan::gitleaks git --redact --no-banner --log-opts=$REMOTE/$BASE..HEAD"
+        "Secret scan::gitleaks git --redact --no-banner --log-opts=$REMOTE/$BASE..${CHECK_HEAD:-HEAD}"
     )
 fi
+
+# Every name in PARTS is a task of this file, so a typo in a part cannot leave a task out of it unseen.
+TASK_NAMES="|"
+for task in "${TASKS[@]}" "Commit messages::" "Secret scan::"; do
+    TASK_NAMES="$TASK_NAMES${task%%::*}|"
+done
+for part in "${PARTS[@]}"; do
+    [ -n "${part#*::}" ] || continue
+    IFS='|' read -r -a names <<< "${part#*::}"
+    for name in "${names[@]}"; do
+        case "$TASK_NAMES" in
+            *"|$name|"*) ;;
+            *)
+                echo "Checks: the part \"${part%%::*}\" of PARTS names \"$name\", which is no task of this file. FAILS" >&2
+                exit 1
+                ;;
+        esac
+    done
+done
 
 # Every task is in exactly one part, so no check can fall out of a split pipeline.
 for task in "${TASKS[@]}" "Commit messages::" "Secret scan::"; do
