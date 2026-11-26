@@ -1463,7 +1463,7 @@ printf '#!/bin/sh\necho "pest $*"\n' > "$MUT_DIR/vendor/bin/pest"
 chmod +x "$MUT_DIR/vendor/bin/pest"
 (
     cd "$MUT_DIR" && git init -q -b main && echo a > app/a.php && git add -A && git commit -q -m "PROJ-1 chore: base" &&
-        git update-ref refs/remotes/origin/main HEAD && echo b > app/b.php && git add -A && git commit -q -m "PROJ-1 chore: change"
+        git checkout -q -b change && echo b > app/b.php && git add -A && git commit -q -m "PROJ-1 chore: change"
 ) > /dev/null 2>&1
 check MU01 "mutation.sh: the whole tree runs the tool with the committed floor" 0 '^pest --mutate --everything --parallel --processes=4 --min=70$' "$SHELL_BIN" -c "cd '$MUT_DIR' && bash scripts/mutation.sh"
 check MU02 "mutation.sh --changed: only the files the branch changes, with the same floor" 0 '^pest --mutate --parallel --processes=4 --path=app/b\.php --min=70$' "$SHELL_BIN" -c "cd '$MUT_DIR' && CHECK_BASE=main bash scripts/mutation.sh --changed"

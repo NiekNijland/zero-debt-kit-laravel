@@ -40,7 +40,7 @@ printf 'a\n' > "$VXM/src/[id].ts"
 printf 'a\n' > "$VXM/src/(grp)/page.tsx"
 printf 'a\n' > "$VXM/src/keep.ts"
 (
-    cd "$VXM" && git init -q -b main && git add -A && git commit -q -m "PROJ-1 chore: base" && git update-ref refs/remotes/origin/main HEAD &&
+    cd "$VXM" && git init -q -b main && git add -A && git commit -q -m "PROJ-1 chore: base" && git remote add origin file:///no-such-remote && git update-ref refs/remotes/origin/main HEAD &&
         printf 'b\n' >> src/a.ts && printf 'b\n' >> src/a.test.ts && printf 'b\n' >> src/styles.css && printf 'b\n' >> "src/[id].ts" && printf 'b\n' >> "src/(grp)/page.tsx" &&
         git add -A && git commit -q -m "PROJ-1 chore: change"
 ) > /dev/null 2>&1

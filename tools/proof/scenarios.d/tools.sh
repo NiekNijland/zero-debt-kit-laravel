@@ -114,7 +114,7 @@ chmod +x "$MU/vendor/bin/pest" "$MU/bin/npx"
 UMLAUT=$(printf 'app/\303\234n\303\257.php')
 (
     cd "$MU" && git init -q -b main && printf 'a\nb\nc\nd\ne\nf\n' > app/Old.php && printf 'a\nb\nc\nd\ne\nf\n' > app/Other.php && printf 'x\n' > app/keep.php &&
-        git add -A && git commit -q -m "PROJ-1 chore: base" && git update-ref refs/remotes/origin/main HEAD &&
+        git add -A && git commit -q -m "PROJ-1 chore: base" && git remote add origin file:///no-such-remote && git update-ref refs/remotes/origin/main HEAD &&
         git mv app/Old.php app/New.php && printf 'g\n' >> app/New.php && printf 'z\n' > "$UMLAUT" && git add -A && git commit -q -m "PROJ-1 chore: rename and add"
 ) > /dev/null 2>&1
 check TX27 "mutation.sh --changed: a renamed and edited file is mutated (it was dropped, and the run said nothing to mutate)" 0 '--path=app/New\.php' "$SHELL_BIN" -c "cd '$MU' && CHECK_BASE=main bash scripts/mutation.sh --changed"
