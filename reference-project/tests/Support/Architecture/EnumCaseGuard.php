@@ -30,7 +30,7 @@ final readonly class EnumCaseGuard
             $enums += $this->enumCount($source);
 
             foreach ($this->inSource($source) as $message) {
-                $violations[] = substr($file, strlen($this->root) + 1) . ': ' . $message;
+                $violations[] = mb_substr($file, mb_strlen($this->root) + 1) . ': ' . $message;
             }
         }
 
@@ -51,8 +51,8 @@ final readonly class EnumCaseGuard
         foreach (new NodeFinder()->findInstanceOf($this->statements($source), EnumCase::class) as $case) {
             $name = $case->name->toString();
 
-            if ($name !== strtoupper($name)) {
-                $violations[] = 'line ' . $case->getStartLine() . ': the enum case ' . $name . ' is not UPPER_CASE: write it as ' . strtoupper((string) preg_replace('/(?<=[a-z0-9])(?=[A-Z])/', '_', $name));
+            if ($name !== mb_strtoupper($name)) {
+                $violations[] = 'line ' . $case->getStartLine() . ': the enum case ' . $name . ' is not UPPER_CASE: write it as ' . mb_strtoupper((string) preg_replace('/(?<=[a-z0-9])(?=[A-Z])/', '_', $name));
             }
         }
 

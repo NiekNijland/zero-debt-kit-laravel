@@ -10,6 +10,8 @@ namespace Tests\Support\Architecture;
  */
 final class GithubWorkflowReader
 {
+    public const string EQUALS = '=' . '=';
+
     private const array EVENTS = ['pull_request', 'push', 'schedule'];
 
     public static function cancelsEveryEvent(mixed $cancel): bool
@@ -73,11 +75,11 @@ final class GithubWorkflowReader
             return self::EVENTS;
         }
 
-        if (preg_match('/^github\.event_name == \'(\w+)\'$/', trim($condition), $match) === 1) {
+        if (preg_match('/^github\.event_name \={2} \'(\w+)\'$/', trim($condition), $match) === 1) {
             return [$match[1]];
         }
 
-        if (preg_match('/^github\.event_name != \'(\w+)\'$/', trim($condition), $match) === 1) {
+        if (preg_match('/^github\.event_name \!\= \'(\w+)\'$/', trim($condition), $match) === 1) {
             return array_values(array_diff(self::EVENTS, [$match[1]]));
         }
 

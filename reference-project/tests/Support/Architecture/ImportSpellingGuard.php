@@ -58,6 +58,6 @@ final readonly class ImportSpellingGuard
      */
     public function files(string $pattern): array
     {
-        return array_map(fn (string $file): string => substr($file, strlen($this->root) + 1), Globs::of($this->root . '/' . $pattern));
+        return array_map(fn (string $file): string => mb_substr($file, mb_strlen($this->root) + 1), Globs::of($this->root . '/' . $pattern));
     }
 }

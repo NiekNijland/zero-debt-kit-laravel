@@ -77,7 +77,7 @@ final readonly class StoredClassNameGuard
 
         foreach (Globs::of($this->root . '/' . $this->source . '/' . $this->modules . '/*/' . self::KINDS[$kind]['folder']) as $folder) {
             foreach ($this->inspector->phpFiles($folder) as $file) {
-                $classes[] = $this->namespace . '\\' . str_replace('/', '\\', substr($file, strlen($this->root . '/' . $this->source . '/'), -4));
+                $classes[] = $this->namespace . '\\' . str_replace('/', '\\', mb_substr($file, mb_strlen($this->root . '/' . $this->source . '/'), -4));
             }
         }
 

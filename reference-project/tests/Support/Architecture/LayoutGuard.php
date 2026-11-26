@@ -134,7 +134,7 @@ final readonly class LayoutGuard
 
         foreach (RecursiveFiles::in($this->path($folder)) as $file) {
             if ($file->getExtension() === 'php') {
-                $files[] = substr($file->getPathname(), strlen($this->root) + 1);
+                $files[] = mb_substr($file->getPathname(), mb_strlen($this->root) + 1);
             }
         }
 

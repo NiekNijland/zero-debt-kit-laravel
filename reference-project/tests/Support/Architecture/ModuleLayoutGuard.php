@@ -35,7 +35,7 @@ final readonly class ModuleLayoutGuard
         $violations = [];
 
         foreach ($this->inspector->phpFiles($this->root . '/' . $moduleRoot) as $file) {
-            $relative = substr($file, strlen($this->root . '/' . $moduleRoot) + 1);
+            $relative = mb_substr($file, mb_strlen($this->root . '/' . $moduleRoot) + 1);
 
             if (preg_match('#^' . self::WORD . '/(' . self::WORD . ')(?:/' . self::WORD . ')?/(' . self::WORD . ')\.php$#', $relative, $match) !== 1 || ! isset($rules[$match[1]])) {
                 $violations[] = 'place ' . $moduleRoot . '/' . $relative;

@@ -48,7 +48,7 @@ final readonly class BroadcastChannelGuard
 
         foreach ($this->inspector->phpFiles($this->root . '/' . $this->source) as $file) {
             foreach (self::channelsIn((string) file_get_contents($file)) as $line => $prefix) {
-                $where = substr($file, strlen($this->root) + 1) . ':' . $line;
+                $where = mb_substr($file, mb_strlen($this->root) + 1) . ':' . $line;
 
                 if ($prefix === null) {
                     $violations[] = $where . ': a broadcast channel whose name does not start with text: start it with the prefix of a channel in ' . $this->registry . ", as in new PrivateChannel('warehouse.' . \$warehouse->getRouteKey())";

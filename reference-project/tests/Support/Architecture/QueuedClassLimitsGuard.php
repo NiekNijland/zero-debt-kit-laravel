@@ -33,7 +33,7 @@ final readonly class QueuedClassLimitsGuard
         $sources = [];
 
         foreach ($this->inspector->phpFiles($this->root . '/' . $this->source) as $file) {
-            $sources[substr($file, strlen($this->root) + 1)] = (string) file_get_contents($file);
+            $sources[mb_substr($file, mb_strlen($this->root) + 1)] = (string) file_get_contents($file);
         }
 
         return $this->check($sources);

@@ -186,7 +186,7 @@ The sets are the pattern; the paths are the project's. Worked example of the fil
 
 ```php
 return RectorConfig::configure()
-    ->withPaths([/* every folder the analyser reads except the route files: the source, bootstrap, config, database, public, the tests */])
+    ->withPaths([/* every folder the analyser reads except the route files: the source, config, database, public, the tests, and the two files `bootstrap/app.php` and `bootstrap/providers.php`: never the folder, because `bootstrap/cache` holds generated files that Rector rewrites */])
     ->withImportNames(removeUnusedImports: true)
     ->withComposerBased(laravel: true)
     ->withSets([
@@ -231,9 +231,11 @@ includes:
 parameters:
     paths:
         - app
-        - bootstrap
+        - bootstrap/app.php
+        - bootstrap/providers.php
         - config
         - database
+        - lang
         - routes
 
     level: 10
@@ -252,6 +254,8 @@ parameters:
 ```
 
 The two includes the row counts are `conf/bleedingEdge.neon` (the checks of the next major, today) and the date library's `extension.neon`; the other three includes and the `level` are not counted by this row. A baseline file and an `ignoreErrors` entry stay absent (`catalog/backend-laravel.md`, "Types").
+
+The `paths` list names every source folder that exists, and only those: the analyser stops on a path that is absent, and the contract test (`04-guards.md` C4, point 15) fails a folder it does not list. `lang` is in the block for a project that has the folder (a Laravel 11 or later skeleton has none until `lang:publish`): a project without it deletes the line, a project with it keeps the line, and both are checked by the same test. The two `bootstrap` files, not the folder, for the reason the Rector section gives: the generated files in `bootstrap/cache` fail the analyser (`classConstant.internalClass`).
 
 **The analyser config for the tests** (`phpstan-tests.neon`) includes the file above, so it has every switch too, and adds the test paths, the Pest extensions and the dead-code detector. It sets one toggle off, because the bleeding-edge include turns it on and it fails every Pest expectation as a call on an internal class (`method.internalClass`):
 
