@@ -1,0 +1,84 @@
+[32m14:48:23 (54317) INFO ProjectReader[39m Found 1 of 8 file(s) to be mutated.
+[32m14:48:23 (54317) INFO Instrumenter[39m Instrumented 1 source file(s) with 19 mutant(s)
+[32m14:48:23 (54317) INFO ConcurrencyTokenProvider[39m Creating 11 test runner process(es).
+[32m14:48:23 (54317) INFO DryRunExecutor[39m Starting initial test run (vitest test runner with "perTest" coverage analysis). This may take a while.
+[32m14:48:23 (54317) INFO DryRunExecutor[39m Initial test run succeeded. Ran 4 tests in 0 seconds (net 1.64304199999998 ms, overhead 100.35695800000002 ms).
+
+All tests/math.test.ts
+  ✓ add [line 4] (killed 2)
+  ✓ adult [line 5] (killed 3)
+  ✓ sign [line 6] (killed 4)
+  ✘ double [line 7] (covered 0)
+
+[NoCoverage] ConditionalExpression
+src/math.ts:9:7
+-     if (n < 0) return "neg";
++     if (true) return "neg";
+
+[NoCoverage] ConditionalExpression
+src/math.ts:9:7
+-     if (n < 0) return "neg";
++     if (false) return "neg";
+
+[NoCoverage] EqualityOperator
+src/math.ts:9:7
+-     if (n < 0) return "neg";
++     if (n <= 0) return "neg";
+
+[NoCoverage] EqualityOperator
+src/math.ts:9:7
+-     if (n < 0) return "neg";
++     if (n >= 0) return "neg";
+
+[NoCoverage] StringLiteral
+src/math.ts:9:21
+-     if (n < 0) return "neg";
++     if (n < 0) return "";
+
+[NoCoverage] StringLiteral
+src/math.ts:10:10
+-     return "zero";
++     return "";
+
+[Survived] ConditionalExpression
+src/math.ts:5:10
+-     return age >= 18;
++     return true;
+Tests ran:
+    adult
+
+
+[Survived] EqualityOperator
+src/math.ts:5:10
+-     return age >= 18;
++     return age > 18;
+Tests ran:
+    adult
+
+
+[Survived] ConditionalExpression
+src/math.ts:8:7
+-     if (n > 0) return "pos";
++     if (true) return "pos";
+Tests ran:
+    sign
+
+
+[Survived] EqualityOperator
+src/math.ts:8:7
+-     if (n > 0) return "pos";
++     if (n >= 0) return "pos";
+Tests ran:
+    sign
+
+
+Ran 0.68 tests per mutant on average.
+----------|------------------|----------|-----------|------------|----------|----------|
+          | % Mutation score |          |           |            |          |          |
+File      |  total | covered | # killed | # timeout | # survived | # no cov | # errors |
+----------|--------|---------|----------|-----------|------------|----------|----------|
+All files |  47.37 |   69.23 |        9 |         0 |          4 |        6 |        0 |
+ math.ts  |  47.37 |   69.23 |        9 |         0 |          4 |        6 |        0 |
+----------|--------|---------|----------|-----------|------------|----------|----------|
+[32m14:48:24 (54317) INFO MutationTestReportHelper[39m Final mutation score of 47.37 is greater than or equal to break threshold 40
+[32m14:48:24 (54317) INFO MutationTestExecutor[39m Done in 1 second.

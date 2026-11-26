@@ -7,6 +7,11 @@ MUTATION_TOOL="<pest, infection or stryker>"
 MUTATION_FLOOR_FILE="scripts/mutation-floor.txt"
 # The tracked source folders a pull request's changed files are taken from, separated by spaces.
 MUTATION_SOURCE_FOLDERS="<source folders>"
+# Of the changed files only those are mutated that match the first extended regular expression and not the second. Stryker stops
+# with an error on a file it cannot parse (a .css or .json in the source folder) and mutates a test file it is named (the score
+# of a test file is no score of the code), so the defaults keep source files of PHP and TypeScript/JavaScript and drop test files.
+MUTATION_FILE_PATTERN='\.(php|ts|tsx|js|jsx|mjs|cjs|mts|cts)$'
+MUTATION_EXCLUDE_PATTERN='(\.(test|spec)\.[a-z]+$|/__tests__/|Test\.php$)'
 # <<< config
 
 SHARED_CONFIG="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/kit-config.sh"
@@ -51,22 +56,40 @@ if [ "$MODE" = "--changed" ]; then
     done
     BASE="${BASE:-$DEFAULT_BASE_BRANCH}"
     # shellcheck disable=SC2086
-    CHANGED=$(git -c core.quotePath=false diff --no-renames --name-only --diff-filter=AM "$REMOTE/$BASE"...HEAD -- $MUTATION_SOURCE_FOLDERS | tr '\n' ',' | sed 's/,$//')
+    CHANGED=$(git -c core.quotePath=false diff --no-renames --name-only --diff-filter=AM "$REMOTE/$BASE"...HEAD -- $MUTATION_SOURCE_FOLDERS | { grep -E -e "$MUTATION_FILE_PATTERN" || true; } | { grep -v -E -e "$MUTATION_EXCLUDE_PATTERN" || true; } | tr '\n' ',' | sed 's/,$//')
     if [ -z "$CHANGED" ]; then
         echo "Mutation: this pull request changes no source file; nothing to mutate."
         exit 0
     fi
 fi
 
-# Stryker has no command-line option for the break threshold: stryker.config.mjs reads the floor from the environment variable
-# MUTATION_FLOOR that this script sets (thresholds: { break: Number(process.env.MUTATION_FLOOR) }), so the floor file stays the
-# one place of the number. Stryker and Infection are not run for this kit: verify both lines in step 2.
+# Stryker (10.1.1) has no command-line option for the break threshold ("unknown option '--thresholds.break'"): stryker.config.mjs
+# reads the floor from the environment variable MUTATION_FLOOR that this script sets (thresholds: { break:
+# Number(process.env.MUTATION_FLOOR) }), so the floor file stays the one place of the number. A config that ignores the variable
+# would hold no floor and exit 0 below it, so the run's output must name the floor: "break threshold <N>" (passed) or "breaking
+# threshold <N>" (failed). Stryker reads --mutate as globs: a path with [ ] ( ) { } * ! (a Next.js route) matches nothing, even
+# escaped, so those characters become the single-character wildcard ?.
+run_stryker() {
+    local output status
+    output=$(mktemp)
+    set +e
+    MUTATION_FLOOR="$FLOOR" npx stryker run "$@" 2>&1 | tee "$output"
+    status=${PIPESTATUS[0]}
+    set -e
+    if ! grep -q -E "(breaking|break) threshold $FLOOR( |,|$)" "$output"; then
+        rm -f "$output"
+        [ "$status" -eq 0 ] || exit "$status"
+        fail "the Stryker run does not name the floor $FLOOR: stryker.config.mjs must hold thresholds: { break: Number(process.env.MUTATION_FLOOR) }, and the run must have mutated something"
+    fi
+    rm -f "$output"
+    exit "$status"
+}
 case "$MUTATION_TOOL:$MODE" in
     pest:) vendor/bin/pest --mutate --everything --parallel --min="$FLOOR" ;;
     pest:--changed) vendor/bin/pest --mutate --parallel --path="$CHANGED" --min="$FLOOR" ;;
     infection:) vendor/bin/infection --threads=max --min-msi="$FLOOR" ;;
     infection:--changed) vendor/bin/infection --threads=max --min-msi="$FLOOR" --git-diff-filter=AMR --git-diff-base="$REMOTE/$BASE" ;;
-    stryker:) MUTATION_FLOOR="$FLOOR" npx stryker run ;;
-    stryker:--changed) MUTATION_FLOOR="$FLOOR" npx stryker run --mutate "$CHANGED" ;;
+    stryker:) run_stryker ;;
+    stryker:--changed) run_stryker --mutate "$(printf '%s' "$CHANGED" | sed 's/[][(){}*!]/?/g')" ;;
     *) fail "MUTATION_TOOL is \"$MUTATION_TOOL\": it is one of pest, infection, stryker" ;;
 esac
