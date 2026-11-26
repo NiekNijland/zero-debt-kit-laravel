@@ -17,7 +17,7 @@ dataset('migrations out of shape', [
 
 it('detects a migration that cannot roll back or leaves a choice of the schema open', function (string $members, string $reason): void {
     $source = "<?php\nuse Illuminate\\Database\\Migrations\\Migration;\nreturn new class() extends Migration\n{\n" . $members . "\n};\n";
-    $violations = new MigrationShapeGuard(dirname(__DIR__, 2))->inSource($source);
+    $violations = new MigrationShapeGuard(dirname(__DIR__, 2), 'database/migrations')->inSource($source);
 
     expect($violations)->toHaveCount(1)
         ->and($violations[0])->toContain($reason);
@@ -59,12 +59,12 @@ it('accepts a migration that undoes its schema change and one that changes rows 
             }
         };
         PHP;
-    $guard = new MigrationShapeGuard(dirname(__DIR__, 2));
+    $guard = new MigrationShapeGuard(dirname(__DIR__, 2), 'database/migrations');
 
     expect($guard->inSource($schema))->toBe([])
         ->and($guard->inSource($rows))->toBe([]);
 });
 
 it('keeps every migration dated 2025-01-01 or later in shape', function (): void {
-    expect(new MigrationShapeGuard(dirname(__DIR__, 2))->violations())->toBe([]);
+    expect(new MigrationShapeGuard(dirname(__DIR__, 2), 'database/migrations')->violations())->toBe([]);
 });

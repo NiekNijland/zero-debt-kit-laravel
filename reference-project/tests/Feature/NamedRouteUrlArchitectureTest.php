@@ -30,7 +30,7 @@ it('finds a request to the hard-coded URL of a named route', function (string $p
     $root = SourceSandbox::create([$path => $source]);
 
     try {
-        $violations = (new NamedRouteUrlGuard(new PhpFileInspector(), $root, NamedRouteUrlArchitectureHelpers::sampleRoutes()))->violations();
+        $violations = (new NamedRouteUrlGuard(new PhpFileInspector(), $root, 'tests', NamedRouteUrlArchitectureHelpers::sampleRoutes()))->violations();
 
         expect($violations)->toHaveKey($path)
             ->and($violations[$path])->toHaveCount(1)
@@ -59,7 +59,7 @@ it('allows a URL that no named route has, or that is written out on purpose', fu
     $root = SourceSandbox::create([$path => $source]);
 
     try {
-        expect((new NamedRouteUrlGuard(new PhpFileInspector(), $root, NamedRouteUrlArchitectureHelpers::sampleRoutes()))->violations())->toBe([]);
+        expect((new NamedRouteUrlGuard(new PhpFileInspector(), $root, 'tests', NamedRouteUrlArchitectureHelpers::sampleRoutes()))->violations())->toBe([]);
     } finally {
         SourceSandbox::remove($root);
     }
@@ -70,5 +70,5 @@ it('reads the named routes of the application', function (): void {
 });
 
 it('sends every request to a named route through route()', function (): void {
-    expect((new NamedRouteUrlGuard(new PhpFileInspector(), dirname(__DIR__, 2), NamedRouteUrlArchitectureHelpers::namedRoutes()))->violations())->toBe([]);
+    expect((new NamedRouteUrlGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'tests', NamedRouteUrlArchitectureHelpers::namedRoutes()))->violations())->toBe([]);
 });

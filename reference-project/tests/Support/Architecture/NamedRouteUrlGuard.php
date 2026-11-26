@@ -46,6 +46,7 @@ final readonly class NamedRouteUrlGuard
     public function __construct(
         private PhpFileInspector $inspector,
         private string $root,
+        private string $tests,
         private array $routes,
     ) {
     }
@@ -57,7 +58,7 @@ final readonly class NamedRouteUrlGuard
     {
         $violations = [];
 
-        foreach ($this->inspector->phpFiles($this->root . '/tests') as $file) {
+        foreach ($this->inspector->phpFiles($this->root . '/' . $this->tests) as $file) {
             $found = $this->inSource((string) file_get_contents($file));
 
             if ($found !== []) {
