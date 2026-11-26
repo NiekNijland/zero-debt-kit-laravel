@@ -175,6 +175,9 @@ parameters:
                 - database/*
                 - routes/*
         -
+            method: 'Illuminate\Support\Facades\Config::get()'
+            message: 'read config with Config::string(), Config::integer(), Config::boolean(), Config::float() or Config::array()'
+        -
             method: 'Carbon\Carbon::*()'
             message: 'dates are immutable (Date::use(CarbonImmutable::class)): take the current time with now() and read a date with CarbonImmutable::parse()'
             allowExceptIn:
