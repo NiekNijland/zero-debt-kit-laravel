@@ -10,8 +10,10 @@ upgrade without touching what the project decided.
 |---|---|---|
 | The body (everything outside the three parts below) | the kit | replaced by the kit's new body |
 | The config block (`# >>> config` to `# <<< config`) | the project | kept: the project's values go back in |
-| The ratchet table of `ci-ratchets.sh` (`cat <<'TABLE'`) | the project | kept; the rows the kit added are listed, not copied |
-| The task commands of `checks.sh` (`"Name::command"` lines) | the project | kept |
+| The ratchet table of `ci-ratchets.sh` (`cat <<'TABLE'`) | the project | kept; the rows the kit added are listed, not copied; a row the kit changed since the project took it (the project's row equals an older kit row) is listed and carried |
+| The task commands of `checks.sh` (`"Name::command"` lines) | the project | kept, with the task lines the project added; a command the kit changed since (the project's line equals an older kit line, for example an unfilled placeholder) is the kit's again |
+
+A config value is the project's too, except one that equals an older kit default: the kit changed it, the project did not decide it, and the upgrade brings the kit's. Without a git history of the kit (a copy of the folder, a shallow clone) the doctor cannot tell a kit change from a project edit: it lists the rows that differ from the kit's and keeps them.
 
 A row is added to the table, or a config key is set, by a decision in a pull request; an upgrade never makes it silently.
 
@@ -28,6 +30,8 @@ A row is added to the table, or a config key is set, by a decision in a pull req
      was a need.
    - `config keys only in the kit`: B added a key; the script needs a value (the kit's default is used until you set it).
    - `missing`: a script the kit has and the project has not; the optional ones are only listed.
+   - `ratchet rows the kit changed`, `config values the kit changed`, `task lines the kit changed`: the project's value is an older kit value, not a decision; `--apply` carries the kit's (until then the self-test fails on the new cases). Exit 1 until it is done.
+   - `ratchet rows that differ from the kit's and equal no kit commit's`: the project's own edit, or no kit history to tell; kept. Compare each with the kit's row and make the self-test pass.
    - `ratchet rows of the kit that the project does not have`: decide per row (a new row is a pull request with its own cap).
 3. `bash scripts/doctor.sh --kit <kit> --upgrade-plan` prints the steps and changes nothing. Add `--apply` to carry them out: the
    kit's body, with the project's config values, table rows and task commands put back, is written under `scripts/` only (a
