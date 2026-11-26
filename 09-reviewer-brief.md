@@ -20,7 +20,7 @@ Focus on:
 - middleware that wraps the next handler (`10-hazards.md`, "A test with exception handling off");
 - classes closed for extension: the doubles and subclasses a text search cannot see (`05-program.md` D8);
 - a new or changed guard: try the other spellings of its construct against the detector (the standing blind-side list in `04-guards.md` C1). Each spelling without a failing example in the guard's test is a finding; a counted list: read every added line (a swap leaves the count unchanged);
-- the pipeline file itself, not only its contract test: a shallow clone that a history-reading task outgrows, a suite run twice on one trigger, a local base branch that differs from the pipeline's, a full audit on a deploying branch (`04-guards.md` C4, points 18 to 21);
+- the pipeline file itself, not only its contract test: a shallow clone that a history-reading task outgrows, a suite run twice on one trigger, a local base branch that differs from the pipeline's, a full audit on a deploying branch (`04-guards.md` C4, points 18 to 21, and point 22 for who reviews the files that carry the guards);
 - a sentence in the guides that says a guard fails on something: find the failing example. A claim the guard does not make true is a finding;
 - missed references: `git grep` the whole repository for every old name;
 - what will break CI: analyser, refactoring tool, linter, type checker, guard tests, the ratchets;

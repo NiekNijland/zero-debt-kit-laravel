@@ -42,7 +42,7 @@ The verification policy is in the project profile; the owner set it. Follow it e
 - Run what the policy allows before you report: at least the static checks on your files and, where allowed, the affected test files.
 - When you delete or rename anything, a scoped analysis misses references elsewhere: `git grep` every deleted or renamed symbol over the whole repository, docs and guard lists included.
 - The ratchet script counts commits, not your working tree, so the lead runs it after committing your part. Before you report, count the rows your brief names yourself, each with its own expression and paths from the table in `scripts/ci-ratchets.sh`: `git grep --untracked -I -h -o -E -e '<expression>' -- <paths> | wc -l`. Report the number before and after: every row +0 or lower. A builder that owns its branch commits and runs `bash scripts/checks.sh`. Never add to an allowlist, baseline, suppression or ignore list, and never add a guard or a row: the lead does.
-- Before the first push run the whole of `bash scripts/prepush.sh` (every part of the checks script side by side), not the parts you think you touched: a pipeline that fails in a minute on the refactoring tool's dry run was a part nobody ran.
+- Before you report (and before the first push, where your brief gives you a branch to push) run the whole of `bash scripts/prepush.sh` (every part of the checks script side by side), not the parts you think you touched: a pipeline that fails in a minute on the refactoring tool's dry run was a part nobody ran.
 - Run the same formatter and refactoring tool CI runs; CI only checks, it does not fix, and it checks the whole tree: a branch that started before the check landed still holds files in the old format, so once the lead has merged the base into your branch, and the worktree is yours alone, run the formatter on the whole tree, not on your changed files. Closing order, after your last removal: the refactoring tool (a deletion exposes unused variables and parameters), then the formatter, because the two can disagree on a file, then the analyser, then the formatter's check on the whole tree.
 - New code and new tests carry zero findings. Never regenerate a baseline: the lead does, once, and only to drop fixed entries.
 - Clear the analyser's result cache after a change to a service provider, an analyser extension or the analyser config, or stale errors remain.
@@ -60,7 +60,7 @@ The verification policy is in the project profile; the owner set it. Follow it e
 
   Either way the change goes under "Behavior that changes on purpose" in your PR description part, with before, after and why.
 - A new test that finds an oddity in the code gets its own test and its own commit for the fix: one small commit per kind, each test broken on purpose after the fix to see it fail.
-- A test seam that only a test calls counts as a dead member (the row `test-only-members`): make a loader an invokable that a test removes with the language's own unregister, not a method of its own.
+- A test seam that only a test calls counts as a dead member (`catalog/tests-database-ci-docs.md`, "Dead code", row "Test-only routes and methods"): make a loader an invokable that a test removes with the language's own unregister, not a method of its own.
 - Technical names in English.
 - Never change the formatter config or any other tool config that is not your theme.
 
