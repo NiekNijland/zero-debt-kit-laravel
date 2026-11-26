@@ -9,13 +9,6 @@ use PhpParser\Node\Stmt\Namespace_;
 use PhpParser\Node\Stmt\Use_;
 use PhpParser\ParserFactory;
 
-/**
- * A file without a namespace gains nothing from `use Name;`: PHP ignores the import of a global class there and warns. The guard
- * fails the file. It reads the parsed statements, so a comment after the line, an indent, a line break of any kind, a digit in
- * the name, several names in one `use`, a leading backslash and a `namespace { ... }` block are one spelling each, and a word
- * `namespace` in a string, a heredoc or a comment is not a namespace. A function or constant import of a bare name is as
- * ineffective as a class import (PHP warns for all three); an aliased import and a qualified name keep their effect and pass.
- */
 final readonly class GlobalImportGuard
 {
     private const string MESSAGE = 'imports a global class by its bare name in a file without a namespace, which PHP ignores: delete the use line and write the class as it is, or declare a namespace';
@@ -60,9 +53,6 @@ final readonly class GlobalImportGuard
     }
 
     /**
-     * The statements that sit in the global namespace: the top level of a file with no namespace declaration, or the body of
-     * a `namespace { ... }` block. A file with a named namespace has none.
-     *
      * @param array<Stmt> $statements
      * @return array<Stmt>
      */

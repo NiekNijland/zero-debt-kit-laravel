@@ -19,7 +19,6 @@ use PhpParser\Node\Identifier;
 use PhpParser\Node\IntersectionType;
 use PhpParser\Node\Name;
 use PhpParser\Node\NullableType;
-use PhpParser\Node\Param;
 use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\ClassLike;
 use PhpParser\Node\Stmt\ClassMethod;
@@ -29,17 +28,6 @@ use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitorAbstract;
 use WeakMap;
 
-/**
- * The receivers of a method call that hold an object of a type by declaration: a parameter or a property typed with one
- * of the names (the type must be resolved by the name resolver first; a nullable, union or intersection type counts when
- * one member is a name), a plain variable assigned from such a receiver (`$d = $this->db`), and the container string form
- * `app('db')`. It is how a guard reads "an injected dispatcher / logger / connection" without a booted application.
- *
- * A name is read in its own scope: a typed parameter holds in its function (and in a closure that `use`s it or an arrow
- * function inside it), a typed property holds in its class, so an untyped `$d` of another class of the same file is not
- * read. Blind spots (the guide sentence of a rule names them): a receiver that is untyped, a property declared in a parent
- * class, a getter such as `$this->getConnection()`, and an alias made by anything but a plain assignment.
- */
 final readonly class TypedReceivers
 {
     /**
@@ -64,7 +52,7 @@ final readonly class TypedReceivers
         $held = new WeakMap();
         $reader = new self($types, $held, $containerKeys);
 
-        (new NodeTraverser(new class($reader, $held, $types) extends NodeVisitorAbstract
+        new NodeTraverser(new class($reader, $held, $types) extends NodeVisitorAbstract
         {
             /** @var list<list<string>> property names that hold the type, one entry per class on the way down */
             private array $properties = [];
@@ -119,22 +107,44 @@ final readonly class TypedReceivers
             private function holds(Expr $receiver): bool
             {
                 return match (true) {
-                    $receiver instanceof Variable => is_string($receiver->name) && in_array($receiver->name, $this->variables[array_key_last($this->variables)], true),
+                    $receiver instanceof Variable => is_string($receiver->name) && in_array($receiver->name, $this->currentVariables(), true),
                     $receiver instanceof PropertyFetch => $receiver->var instanceof Variable && $receiver->var->name === 'this'
                         && $receiver->name instanceof Identifier && $this->properties !== []
-                        && in_array($receiver->name->toString(), $this->properties[array_key_last($this->properties)], true),
+                        && in_array($receiver->name->toString(), $this->currentProperties(), true),
                     default => $this->reader->holds($receiver),
                 };
             }
 
             private function assign(string $name, Expr $value): void
             {
-                $depth = array_key_last($this->variables);
-                $this->variables[$depth] = array_values(array_diff($this->variables[$depth], [$name]));
+                $names = array_values(array_diff($this->currentVariables(), [$name]));
 
                 if (($value instanceof Variable || $value instanceof PropertyFetch || $value instanceof FuncCall) && $this->holds($value)) {
-                    $this->variables[$depth][] = $name;
+                    $names[] = $name;
                 }
+
+                array_pop($this->variables);
+                $this->variables[] = $names;
+            }
+
+            /**
+             * @return list<string>
+             */
+            private function currentVariables(): array
+            {
+                $names = end($this->variables);
+
+                return $names === false ? [] : $names;
+            }
+
+            /**
+             * @return list<string>
+             */
+            private function currentProperties(): array
+            {
+                $names = end($this->properties);
+
+                return $names === false ? [] : $names;
             }
 
             /**
@@ -168,7 +178,7 @@ final readonly class TypedReceivers
              */
             private function variablesOf(FunctionLike $function): array
             {
-                $outer = $this->variables[array_key_last($this->variables)];
+                $outer = $this->currentVariables();
                 $names = $function instanceof ArrowFunction ? $outer : [];
 
                 if ($function instanceof Closure) {
@@ -180,29 +190,21 @@ final readonly class TypedReceivers
                 }
 
                 foreach ($function->getParams() as $parameter) {
-                    if ($parameter instanceof Param && TypedReceivers::typeHolds($parameter->type, $this->types) && $parameter->var instanceof Variable && is_string($parameter->var->name)) {
+                    if (TypedReceivers::typeHolds($parameter->type, $this->types) && $parameter->var instanceof Variable && is_string($parameter->var->name)) {
                         $names[] = $parameter->var->name;
                     }
                 }
 
                 return $names;
             }
-        }))->traverse($statements);
+        })->traverse($statements);
 
         return $reader;
     }
 
-    public function holds(Expr $receiver): bool
-    {
-        return match (true) {
-            $receiver instanceof Variable, $receiver instanceof PropertyFetch => isset($this->held[$receiver]),
-            $receiver instanceof FuncCall => $receiver->name instanceof Name && $receiver->name->toLowerString() === 'app' && $this->resolvesFromContainer(($receiver->getArgs()[0] ?? null)?->value),
-            default => false,
-        };
-    }
-
     /**
      * @param list<string> $types
+     *
      * @internal for the visitor of this class
      */
     public static function typeHolds(?Node $type, array $types): bool
@@ -215,9 +217,15 @@ final readonly class TypedReceivers
         };
     }
 
-    /**
-     * `app('events')` (a key the caller lists) and `app(Dispatcher::class)` (a type the caller lists).
-     */
+    public function holds(Expr $receiver): bool
+    {
+        return match (true) {
+            $receiver instanceof Variable, $receiver instanceof PropertyFetch => isset($this->held[$receiver]),
+            $receiver instanceof FuncCall => $receiver->name instanceof Name && $receiver->name->toLowerString() === 'app' && $this->resolvesFromContainer(($receiver->getArgs()[0] ?? null)?->value),
+            default => false,
+        };
+    }
+
     private function resolvesFromContainer(?Expr $argument): bool
     {
         return match (true) {
