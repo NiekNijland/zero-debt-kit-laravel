@@ -1,0 +1,5 @@
+Configuration hints (4)
+@types/node  Remove from knip.json → ignoreDependencies
+typescript   Remove from knip.json → ignoreDependencies
+knip         Remove from knip.json → ignoreDependencies
+ghost        Remove from knip.json → ignoreDependencies

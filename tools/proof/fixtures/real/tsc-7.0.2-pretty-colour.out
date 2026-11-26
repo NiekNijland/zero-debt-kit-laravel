@@ -1,0 +1,40 @@
+[96msrc/index.ts[0m:[93m5[0m:[93m7[0m - [91merror[0m[90m TS2322: [0mType 'number | undefined' is not assignable to type 'number'.
+  Type 'undefined' is not assignable to type 'number'.
+
+[7m5[0m const x: number = arr[0];
+[7m [0m [91m      ~[0m
+
+[96msrc/more.ts[0m:[93m1[0m:[93m16[0m - [91merror[0m[90m TS2591: [0mCannot find name 'node:fs'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.
+
+[7m1[0m import fs from "node:fs";
+[7m [0m [91m               ~~~~~~~~~[0m
+
+[96msrc/more.ts[0m:[93m2[0m:[93m19[0m - [91merror[0m[90m TS2307: [0mCannot find module 'dayjs' or its corresponding type declarations.
+
+[7m2[0m import dayjs from "dayjs";
+[7m [0m [91m                  ~~~~~~~[0m
+
+[96msrc/more.ts[0m:[93m3[0m:[93m22[0m - [91merror[0m[90m TS2307: [0mCannot find module './missing' or its corresponding type declarations.
+
+[7m3[0m import { nope } from "./missing";
+[7m [0m [91m                     ~~~~~~~~~~~[0m
+
+[96msrc/orphan.ts[0m:[93m3[0m:[93m14[0m - [91merror[0m[90m TS2322: [0mType 'number | undefined' is not assignable to type 'number'.
+  Type 'undefined' is not assignable to type 'number'.
+
+[7m3[0m export const bad: number = o.a;
+[7m [0m [91m             ~~~[0m
+
+[96msrc/orphan.ts[0m:[93m4[0m:[93m14[0m - [91merror[0m[90m TS2322: [0mType 'number' is not assignable to type 'string'.
+
+[7m4[0m export const bad2: string = 5;
+[7m [0m [91m             ~~~~[0m
+
+
+Found 6 errors in 3 files.
+
+Errors  Files
+     1  src/index.ts[90m:5[0m
+     3  src/more.ts[90m:1[0m
+     2  src/orphan.ts[90m:3[0m
+
