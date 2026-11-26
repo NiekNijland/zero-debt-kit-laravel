@@ -10,7 +10,7 @@ What the kit adds is not a better dependency checker. It is the program around t
 
 ## Why not Betterer?
 
-Betterer is a ratchet for JavaScript and TypeScript projects: it commits a results file and fails when results get worse; `betterer merge` resolves conflicts in that file (from its documentation). The kit's ratchet is the same idea with another mechanism: it counts every row at the merge base (with the base's own definition) and at the head, so there is no results file to conflict. It counts PHP, config files, JSON and CI files too, and an increase needs a tagged commit unless the row is at zero, where it takes none. The cost: it is a shell script you copy and adapt, not a package you install, and it has no editor integration. Not verified: how Betterer behaves on a very large repository compared with the script.
+Betterer is a ratchet for JavaScript and TypeScript projects: it commits a results file and fails when results get worse; `betterer merge` resolves conflicts in that file (from its documentation). The kit's ratchet is the same idea with another mechanism: it counts every row at the merge base (with the base's own definition) and at the head, so there is no results file to conflict. It counts PHP, config files, JSON and CI files too, and an increase needs a tagged commit unless the row is at zero, where it takes none (three named rows excepted). The cost: it is a shell script you copy and adapt, not a package you install, and it has no editor integration. Not verified: how Betterer behaves on a very large repository compared with the script.
 
 ## Why not SonarQube "clean as you code"?
 
