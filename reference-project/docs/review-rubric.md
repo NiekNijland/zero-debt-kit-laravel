@@ -51,41 +51,41 @@ Every row of the one-pattern table in `AGENTS.md`, in the same order. A row with
 | Banned call | PHPStan with the disallowed-calls rules in `phpstan.neon` | Whether a new `allowIn` has a reason |
 | Broadcast channel | `BroadcastChannelArchitectureTest`: every channel an event sends on is registered, and every registered channel has its `<Prefix>ChannelTest.php` | The authorization closure of the channel |
 | Catch an exception | `EmptyCatchArchitectureTest` | That the named exception is the one expected |
-| Config | `ArchMigrationsConfigTest`: config is read through the typed accessors |  |
-| Container | `ArchContainerTest`: dependencies come through the constructor or `handle()`; a class of the application binds itself with an attribute |  |
-| Controller | `ArchHttpTest`, `ThinControllersArchitectureTest` | The check is on the route, not in the controller |
+| Config | `ConfigAccessArchitectureTest`: config is read through the typed accessors |  |
+| Container | `ContainerCallArchitectureTest`, `ContainerBindingArchitectureTest`: dependencies come through the constructor or `handle()`; a class of the application binds itself with an attribute |  |
+| Controller | `ControllerNameArchitectureTest`, `ControllerAuthorizationArchitectureTest`, `ThinControllersArchitectureTest` | The check is on the route, not in the controller |
 | Current time | PHPStan bans `Carbon\Carbon`, `time()`, `CarbonImmutable::now()` and `Date::now()` |  |
-| Data for the frontend | `FrontendDataNamingArchitectureTest`; `ArchClassShapeTest`: the `Data` suffix, a TypeScript type named after its class; `TestTierArchitectureTest`: a model only inside `from*` | camelCase keys of an array a controller builds |
+| Data for the frontend | `FrontendDataNamingArchitectureTest`; `ArchClassShapeTest`: the `Data` suffix; `TypeScriptAttributeArchitectureTest`: a TypeScript type named after its class; `TestTierArchitectureTest`: a model only inside `from*` | camelCase keys of an array a controller builds |
 | Dispatch an event | PHPStan bans `event()`; `EventDispatchArchitectureTest`; `AuditEventTest`: an audit event implements `ShouldDispatchAfterCommit` | An event dispatched inside a transaction that is not an audit event |
-| Enum | `ArchClassShapeTest` with `StringBackedEnumGuard` | Whether a case value is readable where it is stored or sent |
+| Enum | `StringBackedEnumArchitectureTest`, `EnumCaseArchitectureTest` | Whether a case value is readable where it is stored or sent |
 | Existence and uniqueness rules | `DatabaseRuleArchitectureTest` with `DatabaseRuleGuard` (model class, no string form, `tenant_id` in the chain of a scoped model; no list) | A closure that only mentions `tenant_id` in an `orWhere` |
 | File size | Backend: `FileSizeTest`. Frontend: ESLint `max-lines` | How a class is split |
 | Flash message | `FlashMessageArchitectureTest` (key, one translated line); ESLint `toasts/no-success-toast` |  |
 | Foreign key and index | `ForeignKeyIndexTest`, `TenantForeignKeyTest`, `ConcurrentIndexMigrationTest` |  |
 | JSON (backend) | PHPStan bans `json_decode()` and `json_encode()` without `JSON_THROW_ON_ERROR` | Whether the `...OrNull()` helpers are used only where a failure is expected |
-| JSON endpoint | `ArchJsonEndpointsTest` | The wrapper and status |
+| JSON endpoint | `JsonEndpointArchitectureTest`, `BareDataReturnArchitectureTest` | The wrapper and status |
 | Layout | `LayoutTest` with `LayoutGuard`; `OneModulePerDomainArchitectureTest` |  |
-| Lock | `ArchModelsTest`: only the lock classes take a lock | Whether the expiry fits the work |
+| Lock | `TenantRowLockArchitectureTest`: only the lock classes take a lock | Whether the expiry fits the work |
 | Log line | `LogMessageArchitectureTest`, `ReportNotLogArchitectureTest`; `ArchClassShapeTest`: Sentry's facade only in the provider | The domain exception wraps the caught `Throwable` |
 | Middleware around the next handler |  | Each such middleware has a test with a real request to a route that throws |
-| Migration | `ArchMigrationsConfigTest`, `MigrationShapeArchitectureTest`, `ColumnTypeTest` | Whether `down()` really undoes `up()`; whether cascade, null or restrict is the right choice |
-| Model | `ArchModelsTest`, `NoObserversArchitectureTest`, `NoRawTableArchitectureTest` |  |
+| Migration | `MigrationClassArchitectureTest`, `MigrationShapeArchitectureTest`, `ColumnTypeTest` | Whether `down()` really undoes `up()`; whether cascade, null or restrict is the right choice |
+| Model | `ModelConventionArchitectureTest`, `ModelMagicStaticCallArchitectureTest`, `DateCastArchitectureTest`, `NoObserversArchitectureTest`, `NoRawTableArchitectureTest` |  |
 | Narrow a type (backend) | PHPStan at level 10; `NoInlineVarCastArchitectureTest` |  |
 | Per-tenant runtime state | `PerTenantStateArchitectureTest` |  |
 | Queued class | `QueueNameArchitectureTest`, `QueuedClassLimitsArchitectureTest`, `UniqueJobArchitectureTest` | Whether the `$timeout` stays under the supervisor timeout of its queue; whether `uniqueId()` returns the right key |
 | Rate limit | `RouteRateLimitCoverageTest` (no allowlist), `RateLimiterArchitectureTest` | The numbers in `config/rate_limiting.php` |
 | Registry and its implementers | `RegistryArchitectureTest` |  |
-| Route | PHPStan bans `Route::resource`, `apiResource`, `singleton`, `any` and `match`; `ArchHttpTest` | The props the controller sends match the props of the page |
-| Route permission | `RoutePermissionCoverageTest` (no allowlist), `ArchAuthorizationTest` | The rule in the policy itself |
-| Rows of another shop | `ArchModelsTest`: the tenant scope is bypassed in one trait |  |
-| Scheduled task | `ArchContainerTest`, `ScheduledTaskArchitectureTest` | Whether the expiry fits the interval and the longest honest run of the task |
+| Route | PHPStan bans `Route::resource`, `apiResource`, `singleton`, `any` and `match`; `RouteParameterArchitectureTest`, `RedirectArchitectureTest`, `ImportSpellingArchitectureTest` | The props the controller sends match the props of the page |
+| Route permission | `RoutePermissionCoverageTest` (no allowlist), `ObjectLevelAccessTest`, `RoleNameArchitectureTest`, `RoleAssignmentArchitectureTest` | The rule in the policy itself |
+| Rows of another shop | `TenantScopeBypassArchitectureTest`: the tenant scope is bypassed in one trait |  |
+| Scheduled task | `ScheduledOneServerArchitectureTest`, `ScheduledTaskArchitectureTest` | Whether the expiry fits the interval and the longest honest run of the task |
 | Search typed text | `LikeSearchArchitectureTest` | A case-sensitive `'like'` with a variable pattern |
 | Soft-deleted rows | `SoftDeletePruningTest` | Whether a model that stays unpruned is really still read |
 | Stored class name | `StoredClassNameArchitectureTest`, `MorphMapTest` | A changed or removed line comes with its data migration or its alias (finding 4) |
 | Test | `BannedTestCallArchitectureTest`, `NamedRouteUrlArchitectureTest`, `TestTierArchitectureTest`, `TestHelperMirrorArchitectureTest`, `TestAssertionArchitectureTest`, `TestFolderMirrorsAppArchitectureTest`, `NoSharedTestFixturesArchitectureTest`; ratchets `test-doubles` and `event-fake-all` | The lowest honest tier; whether the assertion can fail |
 | Transaction | `ManualTransactionArchitectureTest` |  |
 | UI string | `FrontendTranslationKeysTest`, `CopyWordingArchitectureTest` | The wording in each language |
-| Validation | `FormRequestArchitectureTest`, `ValidatedInputArchitectureTest`, `ArchHttpTest` | An `authorize()` kept with `#[Override]` really switches off a check of a parent request |
+| Validation | `FormRequestArchitectureTest`, `ValidatedInputArchitectureTest`, `RequestValidationArchitectureTest` | An `authorize()` kept with `#[Override]` really switches off a check of a parent request |
 | Frontend | ESLint on the whole tree with `--max-warnings 0`, the settled rule groups in `eslint.config.js`; `npm run types`; ratchets `eslint-disable`, `ts-suppressions`, `vitest-skip` | Whether a test asserts the behavior it names |
 
 House rules without a row:
