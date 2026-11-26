@@ -33,6 +33,9 @@ final readonly class GithubWorkflowGuard
      * @param list<string> $allowedTriggers    owner exceptions: triggers of the kit's file that are no check (`workflow_run`, `workflow_dispatch`)
      * @param list<string> $writingLines       run lines an owner exception allows to write
      * @param list<string> $hardenedWorkflows  other workflow files (by name) whose jobs and hazards the owner has the guard read
+     * @param int          $maxTimeoutMinutes  the longest `timeout-minutes` a job may ask for
+     * @param list<string> $auxiliaryWorkflows other workflow files (by name) that run the checks script on purpose and are no kit file (a nightly canary, a sync run, a manual trigger): their jobs and hazards are read, but they need no pull_request or push trigger, no aggregate job and no matrix, and may have `workflow_dispatch`
+     * @param string       $backendTestScript  the text of the script behind `$backendTestCommand` (the Composer script); give it when the coverage line `bash scripts/checks.sh --coverage <report>` ends that script and not the job
      */
     public function __construct(
         private string $workflowDirectory,
@@ -47,6 +50,8 @@ final readonly class GithubWorkflowGuard
         private array $writingLines = [],
         private array $hardenedWorkflows = [],
         private int $maxTimeoutMinutes = 120,
+        private string $backendTestScript = '',
+        private array $auxiliaryWorkflows = [],
     ) {
     }
 
@@ -82,10 +87,11 @@ final readonly class GithubWorkflowGuard
         foreach ($yamlByFile as $name => $yaml) {
             $workflow = Yaml::parse($yaml);
             $workflow = is_array($workflow) ? $workflow : [];
-            $isKit = $name === $this->kitWorkflow || GithubWorkflowReader::runsChecks($workflow);
+            $isAuxiliary = in_array($name, $this->auxiliaryWorkflows, true) && $name !== $this->kitWorkflow;
+            $isKit = ! $isAuxiliary && ($name === $this->kitWorkflow || GithubWorkflowReader::runsChecks($workflow));
             $kitFiles += $isKit ? 1 : 0;
 
-            $violations = [...$violations, ...array_map(static fn (string $line): string => $name . ': ' . $line, $this->inWorkflow($workflow, $isKit, in_array($name, $this->hardenedWorkflows, true), $checksText))];
+            $violations = [...$violations, ...array_map(static fn (string $line): string => $name . ': ' . $line, $this->inWorkflow($workflow, $isKit, $isAuxiliary || in_array($name, $this->hardenedWorkflows, true), $checksText))];
 
             foreach (GithubWorkflowReader::jobs($workflow) as $job) {
                 if (in_array($this->backendTestCommand, GithubWorkflowReader::lines($job), true)) {
@@ -121,7 +127,7 @@ final readonly class GithubWorkflowGuard
             return $hardened ? [...$jobRules->inWorkflow($workflow), ...GithubWorkflowRules::hazards($workflow)] : [];
         }
 
-        $checks = new GithubChecksRules(ChecksParts::of($checksText), $this->backendTestCommand, $this->databaseImage, $this->frontend, $this->smokeBrowser);
+        $checks = new GithubChecksRules(ChecksParts::of($checksText), $this->backendTestCommand, $this->databaseImage, $this->frontend, $this->smokeBrowser, $this->backendTestScript);
 
         return [
             ...$jobRules->inWorkflow($workflow),

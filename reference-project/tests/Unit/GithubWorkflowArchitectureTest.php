@@ -106,6 +106,44 @@ it('accepts the GitHub skeleton with its placeholders filled, for each engine an
         ->and(implode("\n", $guard->inWorkflows(['deploy.yml' => $deploy], CiExamples::checks())))->toContain('no workflow runs `bash scripts/checks.sh`');
 });
 
+dataset('GitHub workflows on the runner that break the owner exception', [
+    'a service reached by its name from a job on the runner' => [fn (): string => CiExamples::change(CiHostVariants::githubWorkflowOnRunner(), 'DB_HOST: 127.0.0.1', 'DB_HOST: database'), CiHostVariants::RUNNER_TEST_SCRIPT, 'a job on the runner reaches a service through its published port'],
+    'a service on another host from a job on the runner' => [fn (): string => CiExamples::change(CiHostVariants::githubWorkflowOnRunner(), 'DB_HOST: 127.0.0.1', 'DB_HOST: db.example.test'), CiHostVariants::RUNNER_TEST_SCRIPT, 'a job on the runner reaches a service through its published port'],
+    'a service of the runner with no published port' => [fn (): string => CiExamples::change(CiHostVariants::githubWorkflowOnRunner(), "        ports:\n          - 5432:5432\n", ''), CiHostVariants::RUNNER_TEST_SCRIPT, 'publishes no port and the job runs on the runner'],
+    'a download of a file from another host in a job that also fetches the application' => [fn (): string => CiExamples::change(CiHostVariants::githubWorkflowOnRunner(), 'run: curl -sS --retry 30 --retry-connrefused -o /dev/null "$SMOKE_BASE_URL/"', 'run: curl -sSfL -o tool.tgz https://example.test/tool.tgz'), CiHostVariants::RUNNER_TEST_SCRIPT, 'checks no checksum'],
+    'a fetch whose address is a variable that holds no local address' => [fn (): string => CiExamples::change(CiHostVariants::githubWorkflowOnRunner(), 'SMOKE_BASE_URL: http://127.0.0.1:8000', 'SMOKE_BASE_URL: https://example.test'), CiHostVariants::RUNNER_TEST_SCRIPT, 'checks no checksum'],
+    'a fetch whose address is a variable that no env sets' => [fn (): string => CiExamples::change(CiHostVariants::githubWorkflowOnRunner(), "      SMOKE_BASE_URL: http://127.0.0.1:8000\n", ''), CiHostVariants::RUNNER_TEST_SCRIPT, 'checks no checksum'],
+    'a local fetch piped into a shell' => [fn (): string => CiExamples::change(CiHostVariants::githubWorkflowOnRunner(), '-o /dev/null "$SMOKE_BASE_URL/"', '"$SMOKE_BASE_URL/" | sh'), CiHostVariants::RUNNER_TEST_SCRIPT, 'pipes a download into a shell'],
+    'a test script that does not end in the coverage line' => [fn (): string => CiHostVariants::githubWorkflowOnRunner(), 'php -d memory_limit=-1 vendor/bin/pest --coverage-clover=coverage/clover.xml', 'the script behind `composer test:unit` does not run it'],
+    'no script given and no coverage line in the job' => [fn (): string => CiHostVariants::githubWorkflowOnRunner(), '', 'has no line `bash scripts/checks.sh --coverage <report>`'],
+]);
+
+it('detects what breaks the owner exception of a project without an image of its own', function (Closure $workflow, string $script, string $reason): void {
+    expect(CiHostVariants::githubViolations($workflow(), CiHostVariants::githubGuard(backendTestScript: $script)))->toContain($reason);
+})->with('GitHub workflows on the runner that break the owner exception');
+
+it('accepts the owner exception: jobs on the runner, a service by published port, the application fetched on a local address, the coverage line in the test script', function (): void {
+    $guard = CiHostVariants::githubGuard(backendTestScript: CiHostVariants::RUNNER_TEST_SCRIPT);
+    $localhost = CiExamples::change(CiHostVariants::githubWorkflowOnRunner(), 'DB_HOST: 127.0.0.1', 'DB_HOST: localhost');
+    $unset = CiExamples::change(CiHostVariants::githubWorkflowOnRunner(), "      DB_HOST: 127.0.0.1\n      SMOKE_BASE_URL", '      SMOKE_BASE_URL');
+
+    expect(CiHostVariants::githubViolations(CiHostVariants::githubWorkflowOnRunner(), $guard))->toBe('')
+        ->and(CiHostVariants::githubViolations($localhost, $guard))->toBe('')
+        ->and(CiHostVariants::githubViolations($unset, $guard))->toBe('')
+        ->and(CiHostVariants::githubViolations(CiHostExamples::githubWorkflow(), CiHostVariants::githubGuard(backendTestScript: CiHostVariants::RUNNER_TEST_SCRIPT)))->toBe('');
+});
+
+it('reads a second workflow that runs part of the checks script as the kit file unless the owner names it auxiliary', function (): void {
+    $files = ['kit-checks.yml' => CiHostExamples::githubWorkflow(), 'canary.yml' => CiHostVariants::canaryWorkflow()];
+    $unpinned = ['kit-checks.yml' => CiHostExamples::githubWorkflow(), 'canary.yml' => CiExamples::change(CiHostVariants::canaryWorkflow(), 'actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # v7.0.1', 'actions/checkout@v4')];
+
+    expect(CiHostVariants::githubViolations('', files: $files))->toContain('canary.yml: the trigger `workflow_dispatch` is not one of')
+        ->and(CiHostVariants::githubViolations('', files: $files))->toContain('canary.yml: the workflow has no `pull_request` trigger')
+        ->and(CiHostVariants::githubViolations('', CiHostVariants::githubGuard(auxiliary: ['canary.yml']), $files))->toBe('')
+        ->and(CiHostVariants::githubViolations('', CiHostVariants::githubGuard(auxiliary: ['canary.yml']), $unpinned))->toContain('canary.yml: job `canary` uses `actions/checkout@v4`, which is not pinned to a full commit sha')
+        ->and(CiHostVariants::githubViolations('', CiHostVariants::githubGuard(auxiliary: ['canary.yml']), ['canary.yml' => CiHostVariants::canaryWorkflow()]))->toContain('no workflow runs `bash scripts/checks.sh`');
+});
+
 it('flags the kit\'s own file and leaves a pre-existing deploy workflow alone unless the owner names it', function (): void {
     $risky = CiHostVariants::deployWorkflow() . "  other:\n    runs-on: ubuntu-latest\n";
     $workflowRun = "name: Release\non:\n  workflow_run:\n    workflows: [Kit checks]\n    types: [completed]\njobs:\n  release:\n    runs-on: ubuntu-24.04\n    timeout-minutes: 10\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          ref: \${{ github.event.workflow_run.head_sha }}\n      - run: composer install\n";

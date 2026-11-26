@@ -35,7 +35,7 @@ final readonly class GithubJobRules
         $jobs = GithubWorkflowReader::jobs($workflow);
 
         foreach ($jobs as $id => $job) {
-            $violations = [...$violations, ...$this->inJob((string) $id, $job)];
+            $violations = [...$violations, ...$this->inJob((string) $id, $job, is_array($workflow['env'] ?? null) ? $workflow['env'] : [])];
 
             $name = $job['name'] ?? null;
 
@@ -49,9 +49,10 @@ final readonly class GithubJobRules
 
     /**
      * @param array<mixed> $job
+     * @param array<mixed> $workflowEnv
      * @return list<string>
      */
-    private function inJob(string $id, array $job): array
+    private function inJob(string $id, array $job, array $workflowEnv): array
     {
         $where = 'job `' . $id . '`';
         $violations = [];
@@ -71,7 +72,7 @@ final readonly class GithubJobRules
             $violations[] = $where . ' calls the workflow `' . $job['uses'] . '`, which is not pinned to a full commit sha';
         }
 
-        return [...$violations, ...$this->imageRules($where, $job), ...$this->stepRules($where, $job), ...self::downloadRules($where, $job)];
+        return [...$violations, ...$this->imageRules($where, $job), ...$this->stepRules($where, $job), ...self::downloadRules($where, $job, $workflowEnv)];
     }
 
     /**
@@ -132,8 +133,11 @@ final readonly class GithubJobRules
             $violations[] = $label . ' publishes no port and the job runs on the runner: it cannot reach the service';
         }
 
-        if (($job['env']['DB_HOST'] ?? null) !== $name) {
-            $violations[] = $label . ' is not the DB_HOST of its job: a container job reaches a service by its name';
+        $host = is_array($job['env'] ?? null) ? ($job['env']['DB_HOST'] ?? null) : null;
+        $inContainer = $container !== null;
+
+        if ($inContainer ? $host !== $name : $host !== null && ! in_array($host, ['127.0.0.1', 'localhost'], true)) {
+            $violations[] = $label . ' is not the DB_HOST of its job: ' . ($inContainer ? 'a container job reaches a service by its name' : 'a job on the runner reaches a service through its published port, at 127.0.0.1');
         }
 
         return $violations;
@@ -186,35 +190,61 @@ final readonly class GithubJobRules
             return false;
         }
 
-        $text = strtolower(trim($condition));
+        $text = mb_strtolower(trim($condition));
         $text = preg_replace('/^\$\{\{\s*(.*?)\s*\}\}$/', '$1', $text) ?? $text;
 
         return in_array($text, $words, true);
     }
 
     /**
-     * A tool downloaded in a run line is checked against its checksum, and never piped into a shell.
-     *
      * @param array<mixed> $job
+     * @param array<mixed> $workflowEnv
      * @return list<string>
      */
-    private static function downloadRules(string $where, array $job): array
+    private static function downloadRules(string $where, array $job, array $workflowEnv): array
     {
         $lines = GithubWorkflowReader::lines($job);
-        $downloads = array_filter($lines, static fn (string $line): bool => preg_match('/\b(curl|wget)\b/', $line) === 1);
+        $env = [...$workflowEnv, ...(is_array($job['env'] ?? null) ? $job['env'] : [])];
+        $calls = array_filter($lines, static fn (string $line): bool => preg_match('/\b(curl|wget)\b/', $line) === 1);
+        $downloads = array_filter($calls, static fn (string $line): bool => ! self::fetchesOnlyLocalUrls($line, $env));
         $violations = [];
 
         if ($downloads !== [] && ! array_any($lines, static fn (string $line): bool => preg_match('/\bsha256sum\s+(-c|--check)\b|\bshasum\s+(-a\s*256\s+)?-c\b/', $line) === 1)) {
             $violations[] = $where . ' downloads a file with curl or wget and checks no checksum (`sha256sum -c`): a downloaded binary is pinned by its version and its checksum';
         }
 
-        foreach ($downloads as $line) {
+        foreach ($calls as $line) {
             if (preg_match('/\|\s*(sudo\s+)?(ba)?sh\b/', $line) === 1) {
                 $violations[] = $where . ' pipes a download into a shell: `' . $line . '`';
             }
         }
 
         return $violations;
+    }
+
+    /**
+     * @param array<mixed> $env
+     */
+    private static function fetchesOnlyLocalUrls(string $line, array $env): bool
+    {
+        preg_match_all('~"[^"]*"|\'[^\']*\'|\S+~', $line, $matches);
+
+        $urls = [];
+
+        foreach ($matches[0] as $word) {
+            $word = trim($word, '"\'');
+
+            if (preg_match('~^\$\{?([A-Za-z_]\w*)\}?(.*)$~', $word, $variable) === 1) {
+                $value = $env[$variable[1]] ?? null;
+                $word = is_string($value) ? $value . $variable[2] : '';
+            }
+
+            if (preg_match('~^https?://~', $word) === 1) {
+                $urls[] = $word;
+            }
+        }
+
+        return $urls !== [] && ! array_any($urls, static fn (string $url): bool => preg_match('~^https?://(127\.0\.0\.1|localhost|0\.0\.0\.0|\[::1\])([:/]|$)~', $url) !== 1);
     }
 
     private static function pinned(string $uses): bool

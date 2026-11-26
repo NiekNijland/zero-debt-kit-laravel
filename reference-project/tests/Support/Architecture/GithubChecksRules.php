@@ -24,6 +24,7 @@ final readonly class GithubChecksRules
      * @param string       $databaseImage   DATABASE_IMAGE of the kit config; empty where the project has no database
      * @param bool         $frontend        whether the project has a frontend: a `frontend-tests` job and a browser in the smoke run
      * @param string       $smokeBrowser    the text that the smoke job's command holds when it runs in a browser (the browser group)
+     * @param string       $backendTestScript the text of the script behind the backend test command (a Composer script), where the coverage line is in it and not in the job; empty when the job runs the line itself
      */
     public function __construct(
         private array $parts,
@@ -31,6 +32,7 @@ final readonly class GithubChecksRules
         private string $databaseImage,
         private bool $frontend,
         private string $smokeBrowser,
+        private string $backendTestScript = '',
     ) {
     }
 
@@ -66,8 +68,8 @@ final readonly class GithubChecksRules
     {
         $violations = [];
 
-        if (GithubWorkflowReader::condition($job) !== "github.event_name == '" . $event . "'") {
-            $violations[] = 'job `' . $id . '` has another condition than `github.event_name == \'' . $event . '\'`: a condition narrows the checks';
+        if (GithubWorkflowReader::condition($job) !== 'github.event_name ' . GithubWorkflowReader::EQUALS . " '" . $event . "'") {
+            $violations[] = 'job `' . $id . '` has another condition than `github.event_name ' . GithubWorkflowReader::EQUALS . ' \'' . $event . '\'`: a condition narrows the checks';
         }
 
         if (GithubWorkflowReader::needs($job) !== []) {
@@ -188,8 +190,11 @@ final readonly class GithubChecksRules
             $violations[] = 'job `backend-tests` does not run exactly `' . $this->backendTestCommand . '`';
         }
 
-        if ($backend !== [] && ! array_any(GithubWorkflowReader::lines($backend), static fn (string $line): bool => str_starts_with($line, CiContractGuard::CHECKS . ' --coverage '))) {
-            $violations[] = 'job `backend-tests` has no line `' . CiContractGuard::CHECKS . ' --coverage <report>`: the coverage of the run is held at the committed floor';
+        $holdsCoverage = static fn (string $line): bool => str_starts_with($line, CiContractGuard::CHECKS . ' --coverage ');
+        $inScript = array_any(preg_split('/\s*(?:&&|;|\n)\s*/', trim($this->backendTestScript)) ?: [], $holdsCoverage);
+
+        if ($backend !== [] && ! array_any(GithubWorkflowReader::lines($backend), $holdsCoverage) && ! $inScript) {
+            $violations[] = 'job `backend-tests` has no line `' . CiContractGuard::CHECKS . ' --coverage <report>`' . ($this->backendTestScript === '' ? '' : ' and the script behind `' . $this->backendTestCommand . '` does not run it') . ': the coverage of the run is held at the committed floor';
         }
 
         if ($this->frontend && $this->smokeBrowser !== '' && isset($jobs['smoke']) && ! array_any(GithubWorkflowReader::lines($jobs['smoke']), fn (string $line): bool => str_contains($line, $this->smokeBrowser))) {
@@ -214,7 +219,7 @@ final readonly class GithubChecksRules
         $violations = [];
 
         foreach ($scheduled as $id => $job) {
-            if (GithubWorkflowReader::condition($job) !== "github.event_name == 'schedule'") {
+            if (GithubWorkflowReader::condition($job) !== 'github.event_name ' . GithubWorkflowReader::EQUALS . " 'schedule'") {
                 $violations[] = 'job `' . $id . '` runs the scheduled checks on another condition than the schedule event';
             }
 
