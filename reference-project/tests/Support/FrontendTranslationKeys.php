@@ -10,6 +10,10 @@ use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use SplFileInfo;
 
+/**
+ * The translation keys the frontend and the backend read, against the seeded texts. The repository root, the frontend folder and
+ * the folders that count as production code (folder to file extensions) are arguments: the thin test holds the literals.
+ */
 final class FrontendTranslationKeys
 {
     public const string PLACEHOLDER = '*';
@@ -30,7 +34,19 @@ final class FrontendTranslationKeys
     private static ?array $seeded = null;
 
     /** @var array{keys: array<string, list<string>>, templates: array<string, list<string>>}|null */
-    private static ?array $found = null;
+    private ?array $found = null;
+
+    /**
+     * @param string $root the repository root
+     * @param string $frontend the folder of the TypeScript sources, relative to the root
+     * @param array<string, list<string>> $productionFolders folder relative to the root => the file extensions that are production code
+     */
+    public function __construct(
+        private readonly string $root,
+        private readonly string $frontend,
+        private readonly array $productionFolders,
+    ) {
+    }
 
     /**
      * @return array<string, array<string, string>>
@@ -43,17 +59,17 @@ final class FrontendTranslationKeys
     /**
      * @return array<string, list<string>>
      */
-    public static function keys(): array
+    public function keys(): array
     {
-        return self::found()['keys'];
+        return $this->found()['keys'];
     }
 
     /**
      * @return array<string, list<string>>
      */
-    public static function templates(): array
+    public function templates(): array
     {
-        return self::found()['templates'];
+        return $this->found()['templates'];
     }
 
     public static function pattern(string $template): string
@@ -80,9 +96,9 @@ final class FrontendTranslationKeys
     /**
      * @return list<string>
      */
-    public static function unused(): array
+    public function unused(): array
     {
-        $code = self::productionCode();
+        $code = $this->productionCode();
         preg_match_all('/[A-Za-z][\w-]*(?:\.[\w-]+)+/', $code, $words);
         $words = array_flip($words[0]);
         $withoutNames = (string) preg_replace(self::ROUTE_OR_PERMISSION_NAME, '', $code);
@@ -94,13 +110,13 @@ final class FrontendTranslationKeys
         $suffixes = array_keys(array_flip($suffixes[1]));
         $literals = array_flip($literals[1]);
         $templates = array_values(array_filter(
-            array_keys(self::templates()),
+            array_keys($this->templates()),
             static fn (string $template): bool => ! str_starts_with($template, self::PLACEHOLDER),
         ));
         $unused = [];
 
         foreach (array_keys(self::seeded()['en']) as $key) {
-            if (isset($words[$key]) || isset(self::keys()[$key]) || self::isCovered($key, $prefixes, $suffixes, $literals, $templates)) {
+            if (isset($words[$key]) || isset($this->keys()[$key]) || self::isCovered($key, $prefixes, $suffixes, $literals, $templates)) {
                 continue;
             }
 
@@ -134,14 +150,13 @@ final class FrontendTranslationKeys
             || array_any($templates, static fn (string $template): bool => preg_match(self::pattern($template), $key) === 1);
     }
 
-    private static function productionCode(): string
+    private function productionCode(): string
     {
-        $root = dirname(__DIR__, 2);
         $code = '';
 
-        foreach (['resources/js' => ['ts', 'tsx'], 'app' => ['php'], 'routes' => ['php'], 'config' => ['php'], 'bootstrap' => ['php'], 'resources/views' => ['php'], 'database/seeders' => ['php']] as $directory => $extensions) {
+        foreach ($this->productionFolders as $directory => $extensions) {
             /** @var SplFileInfo $file */
-            foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root . '/' . $directory, FilesystemIterator::SKIP_DOTS)) as $file) {
+            foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($this->root . '/' . $directory, FilesystemIterator::SKIP_DOTS)) as $file) {
                 if (in_array($file->getExtension(), $extensions, true) && preg_match(self::TEST_ONLY_AND_FIXTURES, $file->getPathname()) !== 1) {
                     $code .= file_get_contents($file->getPathname()) . "\n";
                 }
@@ -154,17 +169,17 @@ final class FrontendTranslationKeys
     /**
      * @return array{keys: array<string, list<string>>, templates: array<string, list<string>>}
      */
-    private static function found(): array
+    private function found(): array
     {
-        if (self::$found !== null) {
-            return self::$found;
+        if ($this->found !== null) {
+            return $this->found;
         }
 
-        $root = dirname(__DIR__, 2);
+        $root = $this->root;
         $found = ['keys' => [], 'templates' => []];
 
         /** @var SplFileInfo $file */
-        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root . '/resources/js')) as $file) {
+        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root . '/' . $this->frontend)) as $file) {
             $path = substr($file->getPathname(), strlen($root) + 1);
 
             if (! in_array($file->getExtension(), ['ts', 'tsx'], true) || preg_match(self::TEST_ONLY, $path) === 1) {
@@ -183,6 +198,6 @@ final class FrontendTranslationKeys
             ksort($found[$type]);
         }
 
-        return self::$found = $found;
+        return $this->found = $found;
     }
 }

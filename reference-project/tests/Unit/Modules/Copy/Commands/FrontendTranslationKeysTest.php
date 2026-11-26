@@ -9,6 +9,16 @@ use Tests\Support\FrontendTranslationKeys;
 use Tests\Support\FrontendTranslationLiterals;
 use Tests\Support\Narrow;
 
+$frontend = new FrontendTranslationKeys(dirname(__DIR__, 5), 'resources/js', [
+    'resources/js' => ['ts', 'tsx'],
+    'app' => ['php'],
+    'routes' => ['php'],
+    'config' => ['php'],
+    'bootstrap' => ['php'],
+    'resources/views' => ['php'],
+    'database/seeders' => ['php'],
+]);
+
 it('seeds the same keys in every language', function (): void {
     $translations = FrontendTranslationKeys::seeded();
     $onlyEn = array_keys(array_diff_key($translations['en'], $translations['fr']));
@@ -58,17 +68,17 @@ it('gives every text the same singular and plural forms in every language', func
     expect($different)->toBe([], 'Different plural forms: ' . implode(', ', $different));
 });
 
-it('seeds no key that no code reads', function (): void {
-    $unused = FrontendTranslationKeys::unused();
+it('seeds no key that no code reads', function () use ($frontend): void {
+    $unused = $frontend->unused();
 
     expect($unused)->toBe([], "Delete from resources/translations (the block of every language) and add a migration that deletes the rows:\n" . implode("\n", $unused));
 });
 
-it('seeds every key the frontend passes to the translator in every language', function (): void {
+it('seeds every key the frontend passes to the translator in every language', function () use ($frontend): void {
     $translations = FrontendTranslationKeys::seeded();
     $missing = [];
 
-    foreach (FrontendTranslationKeys::keys() as $key => $locations) {
+    foreach ($frontend->keys() as $key => $locations) {
         foreach (['en', 'fr'] as $locale) {
             if (! array_key_exists($key, $translations[$locale])) {
                 $missing[] = "{$key} ({$locale}) in " . implode(', ', $locations);
@@ -76,15 +86,15 @@ it('seeds every key the frontend passes to the translator in every language', fu
         }
     }
 
-    expect(count(FrontendTranslationKeys::keys()))->toBeGreaterThan(0)
+    expect(count($frontend->keys()))->toBeGreaterThan(0)
         ->and($missing)->toBe([], "Add to resources/translations (the block of every language):\n" . implode("\n", $missing));
 });
 
-it('seeds at least one key for every key the frontend builds from a fixed beginning', function (): void {
+it('seeds at least one key for every key the frontend builds from a fixed beginning', function () use ($frontend): void {
     $translations = FrontendTranslationKeys::seeded();
     $unmatched = [];
 
-    foreach (FrontendTranslationKeys::templates() as $template => $locations) {
+    foreach ($frontend->templates() as $template => $locations) {
         if (str_starts_with($template, FrontendTranslationKeys::PLACEHOLDER)) {
             continue;
         }
@@ -96,18 +106,18 @@ it('seeds at least one key for every key the frontend builds from a fixed beginn
         }
     }
 
-    expect(FrontendTranslationKeys::templates())->not->toBeEmpty()
+    expect($frontend->templates())->not->toBeEmpty()
         ->and($unmatched)->toBe([], "No seeded key matches:\n" . implode("\n", $unmatched));
 });
 
-it('builds a key without a fixed beginning only where the beginning is passed in', function (): void {
+it('builds a key without a fixed beginning only where the beginning is passed in', function () use ($frontend): void {
     $allowed = [
         'resources/js/Components/features/notifications/notification-item.tsx' => 'the notification key comes from the server',
         'resources/js/Components/features/products/product-form/field-error.tsx' => 'the messageKey of the field error names the text',
     ];
     $files = [];
 
-    foreach (FrontendTranslationKeys::templates() as $template => $locations) {
+    foreach ($frontend->templates() as $template => $locations) {
         if (str_starts_with($template, FrontendTranslationKeys::PLACEHOLDER)) {
             foreach ($locations as $location) {
                 $files[] = (string) preg_replace('/:\d+$/', '', $location);
@@ -121,7 +131,7 @@ it('builds a key without a fixed beginning only where the beginning is passed in
     expect($files)->toBe(array_keys($allowed));
 });
 
-it('seeds a key for every value behind a template key of the frontend', function (string $pattern, array $values): void {
+it('seeds a key for every value behind a template key of the frontend', function (string $pattern, array $values) use ($frontend): void {
     $translations = FrontendTranslationKeys::seeded();
     $missing = [];
 
@@ -135,7 +145,7 @@ it('seeds a key for every value behind a template key of the frontend', function
         }
     }
 
-    expect(array_keys(FrontendTranslationKeys::templates()))->toContain(str_replace('%s', FrontendTranslationKeys::PLACEHOLDER, $pattern))
+    expect(array_keys($frontend->templates()))->toContain(str_replace('%s', FrontendTranslationKeys::PLACEHOLDER, $pattern))
         ->and($missing)->toBe([], 'Missing: ' . implode(', ', $missing));
 })->with([
     'orders.status.%s' => ['orders.status.%s', array_column(OrderStatus::cases(), 'value')],
