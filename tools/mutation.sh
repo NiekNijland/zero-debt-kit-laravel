@@ -63,6 +63,7 @@ if [ "$MODE" = "--changed" ]; then
         [ -n "$BASE" ] || BASE=$(eval "printf '%s' \"\${$variable:-}\"")
     done
     BASE="${BASE:-$DEFAULT_BASE_BRANCH}"
+    kit_local_base "$BASE" || fail "$KIT_BRANCH_ERROR"
     # shellcheck disable=SC2086
     CHANGED_FILES=$(git -c core.quotePath=false diff --no-renames --name-only --diff-filter=AM "$REMOTE/$BASE"...HEAD -- $MUTATION_SOURCE_FOLDERS)
     # An explicit loop, not a grep whose failure is forced to success: such a tail reads as a skipped step to the ci-skipped-steps ratchet.
