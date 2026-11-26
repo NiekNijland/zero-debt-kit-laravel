@@ -14,9 +14,6 @@ use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\NodeFinder;
-use PhpParser\NodeTraverser;
-use PhpParser\NodeVisitor\NameResolver;
-use PhpParser\ParserFactory;
 
 /**
  * A table or a statement reached without a model: through the `DB` facade, through an injected connection or database manager
@@ -85,7 +82,7 @@ final readonly class RawTableGuard
      */
     private function lines(string $source): array
     {
-        $statements = (new NodeTraverser(new NameResolver()))->traverse((new ParserFactory())->createForHostVersion()->parse($source) ?? []);
+        $statements = PhpSource::resolved($source);
         $lines = [];
         $connections = TypedReceivers::in($statements, self::CONNECTIONS, ['db']);
 

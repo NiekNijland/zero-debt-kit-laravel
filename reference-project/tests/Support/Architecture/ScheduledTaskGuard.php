@@ -17,9 +17,6 @@ use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Stmt\Expression;
 use PhpParser\NodeFinder;
-use PhpParser\NodeTraverser;
-use PhpParser\NodeVisitor\NameResolver;
-use PhpParser\ParserFactory;
 use RuntimeException;
 use Tests\Support\Globs;
 
@@ -75,7 +72,7 @@ final readonly class ScheduledTaskGuard
      */
     public function inSource(string $source): array
     {
-        $statements = (new NodeTraverser(new NameResolver()))->traverse((new ParserFactory())->createForHostVersion()->parse($source) ?? []);
+        $statements = PhpSource::resolved($source);
         $schedulers = self::schedulerParameters($statements);
         $held = [];
         $locked = [];

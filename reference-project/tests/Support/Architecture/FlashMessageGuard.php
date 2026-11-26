@@ -23,9 +23,6 @@ use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\Return_;
 use PhpParser\NodeFinder;
-use PhpParser\NodeTraverser;
-use PhpParser\NodeVisitor\NameResolver;
-use PhpParser\ParserFactory;
 use ReflectionClass;
 
 final readonly class FlashMessageGuard
@@ -195,6 +192,6 @@ final readonly class FlashMessageGuard
      */
     private static function parse(string $source): array
     {
-        return (new NodeTraverser(new NameResolver()))->traverse((new ParserFactory())->createForHostVersion()->parse($source) ?? []);
+        return PhpSource::resolved($source);
     }
 }

@@ -23,7 +23,6 @@ use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Property;
 use PhpParser\NodeFinder;
-use PhpParser\ParserFactory;
 
 final readonly class QueueNameGuard
 {
@@ -60,7 +59,7 @@ final readonly class QueueNameGuard
      */
     public function inSource(string $source): array
     {
-        $statements = (new ParserFactory())->createForHostVersion()->parse($source) ?? [];
+        $statements = PhpSource::parse($source);
         $finder = new NodeFinder();
         $violations = [];
 

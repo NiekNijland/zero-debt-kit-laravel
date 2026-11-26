@@ -16,9 +16,6 @@ use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassLike;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\NodeFinder;
-use PhpParser\NodeTraverser;
-use PhpParser\NodeVisitor\NameResolver;
-use PhpParser\ParserFactory;
 use Spatie\Multitenancy\Tasks\SwitchTenantTask;
 
 final readonly class PerTenantStateGuard
@@ -80,7 +77,7 @@ final readonly class PerTenantStateGuard
      */
     public function inSource(string $source): array
     {
-        $statements = (new NodeTraverser(new NameResolver()))->traverse((new ParserFactory())->createForHostVersion()->parse($source) ?? []);
+        $statements = PhpSource::resolved($source);
         $finder = new NodeFinder();
         $owners = [];
 

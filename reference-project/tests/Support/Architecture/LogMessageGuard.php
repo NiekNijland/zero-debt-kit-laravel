@@ -16,9 +16,6 @@ use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\NodeFinder;
-use PhpParser\NodeTraverser;
-use PhpParser\NodeVisitor\NameResolver;
-use PhpParser\ParserFactory;
 use Psr\Log\LoggerInterface;
 
 final readonly class LogMessageGuard
@@ -57,7 +54,7 @@ final readonly class LogMessageGuard
      */
     public function inSource(string $source): array
     {
-        $statements = (new NodeTraverser(new NameResolver()))->traverse((new ParserFactory())->createForHostVersion()->parse($source) ?? []);
+        $statements = PhpSource::resolved($source);
         $finder = new NodeFinder();
         $loggers = TypedReceivers::in($statements, self::LOGGERS, ['log']);
         $held = [];

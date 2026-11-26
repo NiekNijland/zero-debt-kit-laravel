@@ -6,7 +6,6 @@ namespace Tests\Support\Architecture;
 
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\NodeFinder;
-use PhpParser\ParserFactory;
 
 /**
  * Dependencies come through the constructor or `handle()`, never through the container: `app()`, `resolve()`, the facade's `make()`, `call()` and
@@ -46,7 +45,7 @@ final readonly class ContainerCallGuard
     public function inSource(string $source): array
     {
         $messages = [];
-        $statements = new ParserFactory()->createForHostVersion()->parse($source) ?? [];
+        $statements = PhpSource::parse($source);
         $methods = new NodeFinder()->findInstanceOf($statements, ClassMethod::class);
 
         foreach ($this->lines($source) as $line) {

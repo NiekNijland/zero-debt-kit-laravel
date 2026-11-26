@@ -9,7 +9,6 @@ use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\PropertyItem;
 use PhpParser\Node\Scalar\String_;
 use PhpParser\NodeFinder;
-use PhpParser\ParserFactory;
 use PhpToken;
 
 /**
@@ -71,7 +70,7 @@ final readonly class TenantScopeBypassGuard
         $tables = [];
 
         foreach ($this->inspector->phpFiles($this->root . '/' . $this->models) as $file) {
-            $statements = new ParserFactory()->createForHostVersion()->parse((string) file_get_contents($file)) ?? [];
+            $statements = PhpSource::parse((string) file_get_contents($file));
 
             foreach (new NodeFinder()->findInstanceOf($statements, Class_::class) as $class) {
                 if ($class->isAbstract() || $class->name === null) {

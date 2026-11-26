@@ -19,7 +19,6 @@ use PhpParser\Node\Scalar\InterpolatedString;
 use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\NodeFinder;
-use PhpParser\ParserFactory;
 use Tests\Support\Globs;
 
 /**
@@ -143,7 +142,7 @@ final readonly class ConcurrentIndexGuard
     {
         $methods = [];
 
-        foreach ($finder->findInstanceOf((new ParserFactory())->createForHostVersion()->parse($source) ?? [], ClassMethod::class) as $method) {
+        foreach ($finder->findInstanceOf(PhpSource::parse($source), ClassMethod::class) as $method) {
             $methods[mb_strtolower($method->name->toString())] = $method->stmts ?? [];
         }
 
