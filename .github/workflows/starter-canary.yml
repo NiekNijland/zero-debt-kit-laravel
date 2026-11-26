@@ -1,0 +1,130 @@
+# PROPOSAL, not run. The kit's canary against the starter (the worked example, NiekNijland/zero-debt-laravel): it checks out the
+# starter, puts this repository's tools into it the way the starter's own kit-canary does with the kit's main, and runs the starter's
+# checks. A kit change that breaks the reference is found here, before it is found by a project. It runs in the kit repository and is
+# not a template for a project. It writes nothing to either repository.
+#
+# Not verified: that the starter is public and checks out without a token (it was public when this was written); that the doctor
+# applies this repository's scripts to the starter without leaving a diff the starter's own sync would not leave; that the steps
+# below stay inside the timeouts; that the guards part needs no database beyond the service below; the full `bash scripts/checks.sh`
+# (its gate part fails any changed script by design, so the parts static and guards run here, as in the starter's own canary).
+# A workflow with only schedule and workflow_dispatch may need one later commit before GitHub lists it (starter finding P4-2).
+#
+# Action pins are the shas of proof.yml, looked up through the GitHub API on 2026-11-26; upload-artifact is the pin of the starter's
+# canary (cf430e0... v7.0.2), copied, not looked up again here. Re-verify one before changing it.
+
+name: Starter canary
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  canary:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    services:
+      database:
+        image: postgres:17
+        env:
+          POSTGRES_USER: laravel
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: laravel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U laravel"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - name: Check out the kit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        timeout-minutes: 5
+        with:
+          path: kit-main
+          fetch-depth: 0
+      - name: Check out the starter, with full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        timeout-minutes: 5
+        with:
+          repository: NiekNijland/zero-debt-laravel
+          path: starter
+          fetch-depth: 0
+      - name: Set up PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        timeout-minutes: 10
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, pcov
+          coverage: pcov
+          tools: composer:2.9
+      - name: Install the starter from its lock file
+        timeout-minutes: 10
+        working-directory: starter
+        run: composer install --no-interaction --no-progress --prefer-dist
+      - name: Prove the kit's own scripts that read the starter
+        timeout-minutes: 15
+        env:
+          STARTER_DIR: ${{ github.workspace }}/starter
+          PROOF_ONLY: '^(RG|TX51)'
+        run: bash kit-main/tools/proof/proof.sh /bin/bash starter-canary
+      - name: Compare the starter's scripts with the kit
+        timeout-minutes: 5
+        working-directory: starter
+        run: |
+          status=0
+          bash ../kit-main/tools/doctor.sh --project "$PWD" > ../doctor-report.txt || status=$?
+          { echo '## Drift of the starter against this kit'; echo; echo '```text'; cat ../doctor-report.txt; echo '```'; echo; echo "Doctor exit status: $status"; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Put the kit's scripts into the starter, keeping its config
+        timeout-minutes: 5
+        working-directory: starter
+        run: bash ../kit-main/tools/doctor.sh --project "$PWD" --upgrade-plan --apply
+      - name: Put the starter's own task lines of checks.sh back
+        timeout-minutes: 2
+        working-directory: starter
+        run: |
+          # The doctor drops the task lines a project added while PARTS still names them (starter finding P3-11).
+          git show HEAD:scripts/checks.sh | grep -E '^    "[A-Za-z][A-Za-z ]*::' | while IFS= read -r line; do
+            name="${line#    \"}"
+            name="${name%%::*}"
+            if grep -qF "\"$name::" scripts/checks.sh; then continue; fi
+            awk -v add="$line" '/^    "Guard tests::/ && done != 1 { print add; done = 1 } { print }' scripts/checks.sh > checks.tmp
+            mv checks.tmp scripts/checks.sh
+          done
+      - name: Move the kit checkout out of the workspace, the starter's formatter reads every file below it
+        timeout-minutes: 2
+        run: mv kit-main "$RUNNER_TEMP/kit-main"
+      - name: Prove the ratchet rows against the kit's script
+        timeout-minutes: 10
+        working-directory: starter
+        run: bash scripts/ci-ratchets.sh --self-test
+      - name: Count every ratchet row with the kit's script
+        timeout-minutes: 10
+        working-directory: starter
+        run: bash scripts/ci-ratchets.sh --head
+      - name: Run the dashboard with the kit's script
+        timeout-minutes: 15
+        working-directory: starter
+        run: bash scripts/debt-dashboard.sh --final --offline --details
+      - name: Run the static checks with the kit's scripts
+        timeout-minutes: 20
+        working-directory: starter
+        run: bash scripts/checks.sh --main --part static
+      - name: Run the guard tests with the kit's scripts
+        timeout-minutes: 20
+        working-directory: starter
+        run: bash scripts/checks.sh --main --part guards
+      - name: Keep the drift report
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        timeout-minutes: 5
+        with:
+          name: starter-canary-report
+          path: doctor-report.txt
+          if-no-files-found: ignore

@@ -207,6 +207,8 @@ check TX47 "ci-parallel: a task of spaces fails with 64" fail 'has no name or no
 check TX48 "ci-parallel: a task without :: fails with 64" fail 'is not Name::command' "$SHELL_BIN" "$KIT/tools/ci-parallel.sh" "just a command"
 check TX49 "ci-parallel: a limit that is no number is an error, not a timeout of every command" fail 'whole numbers of seconds' env CI_CHECK_TIMEOUT=abc "$SHELL_BIN" "$KIT/tools/ci-parallel.sh" "A::echo a"
 check TX50 "ci-parallel: stopped with TERM, it leaves no watchdog behind" 0 '^0$' "$SHELL_BIN" -c 'CI_CHECK_TIMEOUT=7601 bash "$0" "a::sleep 7301" "b::sleep 7302" > /dev/null 2>&1 & pid=$!; sleep 3; kill -TERM $pid; sleep 2; ps -axo command | grep -c -E "^sleep (7301|7302|7601)$"; pkill -f "^sleep (7301|7302|7601)$" 2> /dev/null; exit 0' "$KIT/tools/ci-parallel.sh"
-check TX51 "ci-parallel: the reference project's copy is the kit's" 0 '^$' diff "$KIT/tools/ci-parallel.sh" "$KIT/reference-project/scripts/ci-parallel.sh"
+if [ -n "${STARTER_DIR:-}" ] && [ -f "$STARTER_DIR/scripts/ci-parallel.sh" ]; then
+    check TX51 "ci-parallel: the starter's copy (STARTER_DIR) is the kit's" 0 '^$' diff "$KIT/tools/ci-parallel.sh" "$STARTER_DIR/scripts/ci-parallel.sh"
+fi
 
 cd "$TX_CWD" || exit 1

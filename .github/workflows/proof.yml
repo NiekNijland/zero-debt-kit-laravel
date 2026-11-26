@@ -55,10 +55,10 @@ jobs:
           exit "$status"
       - name: node --check on the TypeScript mover
         run: node --check tools/move-ts.mjs
-      - name: php -l on the reference PHP
+      - name: php -l on the example and fixture PHP
         run: |
           status=0
-          for file in $(git ls-files 'reference-project/*.php'); do
+          for file in $(git ls-files 'reference-project/*.php' 'tools/proof/fixtures/*.php'); do
             php -l "$file" > /dev/null || { echo "php -l failed: $file"; status=1; }
           done
           exit "$status"

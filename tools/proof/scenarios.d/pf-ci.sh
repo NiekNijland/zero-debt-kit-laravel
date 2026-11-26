@@ -2,7 +2,7 @@
 # on a runner, the sha recipe, the Dependabot form, the cost and weekly mutation variant, the settings read in step 1). Sourced by
 # ../proof.sh with its helpers in scope (check, check_php, KIT, ROOT, SHELL_BIN). Text checks over the skeletons and the docs, a YAML
 # parse where ruby exists, and the comparison of the filled runner skeleton with the example that the contract test reads. The contract
-# guard itself runs in a Pest project (reference-project/tests/Unit/CiHostFormsArchitectureTest.php), not here.
+# guard itself runs in a Pest project (the starter keeps its own, for the GitHub form), not here.
 
 PF="$ROOT/pf"
 mkdir -p "$PF"
@@ -53,8 +53,8 @@ pf_fill_runner() {
         "$PF_RUNNER" | grep -v -E '^[[:space:]]*#' | grep -v -E '^[[:space:]]*$' | sed -E 's/ # (the part that holds|holds the coverage).*$//'
 }
 pf_example() {
-    printf '%s\n' '<?php' 'require $argv[1];' 'echo Tests\Support\Architecture\CiHostExamples::githubRunnerWorkflow();' > "$PF/example.php"
-    php "$PF/example.php" "$KIT/reference-project/tests/Support/Architecture/CiHostExamples.php" | grep -v -E '^[[:space:]]*$'
+    printf '%s\n' '<?php' 'require $argv[1];' 'echo Tests\Support\Ci\CiHostExamples::githubRunnerWorkflow();' > "$PF/example.php"
+    php "$PF/example.php" "$KIT/tools/proof/fixtures/ci/CiHostExamples.php" | grep -v -E '^[[:space:]]*$'
 }
 pf_runner_vs_example() {
     pf_fill_runner > "$PF/runner-filled.yml"
@@ -74,7 +74,7 @@ pf_runner_yaml() {
 if [ -f "$PF_RUNNER" ]; then
     check_ruby PF01 "github-actions-runner.yml with its placeholders filled is a YAML document with the seven jobs" 0 '^jobs: checks,checks-result,checks-main,backend-tests,frontend-tests,smoke,scheduled$' pf_runner_yaml
     check PF02 "github-actions-runner.yml: no container and no image digest outside a comment" 0 '^0$' "$SHELL_BIN" -c "grep -v -E '^[[:space:]]*#' '$PF_RUNNER' | grep -c -E 'container:|@sha256'; exit 0"
-    if [ -f "$KIT/reference-project/tests/Support/Architecture/CiHostExamples.php" ]; then
+    if [ -f "$KIT/tools/proof/fixtures/ci/CiHostExamples.php" ]; then
         check_php PF03 "github-actions-runner.yml with its placeholders filled equals the runner example of the contract test, line for line" 0 '^same$' pf_runner_vs_example
     fi
     check PF04 "github-actions-runner.yml: every service publishes a port and every job reaches it at 127.0.0.1 (3 services, 3 ports, 3 hosts, no host by name)" 0 '^3 3 3 0$' "$SHELL_BIN" -c "pf() { grep -v -E '^[[:space:]]*#' '$PF_RUNNER' | grep -c -E -e \"\$1\"; }; echo \"\$(pf '^    services:') \$(pf \"^        ports:\") \$(pf 'DB_HOST: 127\\.0\\.0\\.1') \$(pf 'DB_HOST: database')\"; exit 0"

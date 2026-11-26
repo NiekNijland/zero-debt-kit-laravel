@@ -113,8 +113,8 @@ cx_fill_github() {
         "$KIT/ci/github-actions.yml" | grep -v -E '^[[:space:]]*#' | grep -v -E '^[[:space:]]*$' | sed -E 's/ # (the part that holds|holds the coverage).*$//'
 }
 cx_github_example() {
-    printf '%s\n' '<?php' 'require $argv[1];' 'echo Tests\Support\Architecture\CiHostExamples::githubWorkflow();' > "$ROOT/cx-example.php"
-    php "$ROOT/cx-example.php" "$KIT/reference-project/tests/Support/Architecture/CiHostExamples.php" | grep -v -E '^[[:space:]]*$'
+    printf '%s\n' '<?php' 'require $argv[1];' 'echo Tests\Support\Ci\CiHostExamples::githubWorkflow();' > "$ROOT/cx-example.php"
+    php "$ROOT/cx-example.php" "$KIT/tools/proof/fixtures/ci/CiHostExamples.php" | grep -v -E '^[[:space:]]*$'
 }
 cx_skeleton_vs_example() {
     cx_fill_github > "$ROOT/cx-skeleton-filled.yml"
@@ -126,7 +126,7 @@ cx_skeleton_vs_example() {
     fi
     diff "$ROOT/cx-skeleton-filled.yml" "$ROOT/cx-example.yml" && echo same
 }
-if [ -f "$KIT/ci/github-actions.yml" ] && [ -f "$KIT/reference-project/tests/Support/Architecture/CiHostExamples.php" ]; then
+if [ -f "$KIT/ci/github-actions.yml" ] && [ -f "$KIT/tools/proof/fixtures/ci/CiHostExamples.php" ]; then
     check_php CX27 "github-actions.yml with its placeholders filled equals the example of the contract test, line for line" 0 '^same$' cx_skeleton_vs_example
 fi
 if [ -f "$KIT/ci/github-actions.yml" ]; then
