@@ -184,7 +184,7 @@ A frontend in another component framework keeps every row; only the rule names c
 - A view is passed models, DTOs and scalars under camelCase keys; the DTO package is needed only where the project has a JSON endpoint. `spatie/laravel-typescript-transformer` and the generated-types drift step have no subject.
 - The Livewire rows of `catalog/backend-laravel.md` hold for the component classes behind the views.
 
-Not in the reference project, which renders with React: the first project that builds the two view guards writes them back.
+Not in the starter, which renders with React: the first project that builds the two view guards writes them back.
 
 ## Tests
 
@@ -226,7 +226,7 @@ Not in the reference project, which renders with React: the first project that b
 
 ### A document database
 
-The patterns of the SQL rows, in a document database's terms. Not proven in the reference project: the first project that builds a guard here writes it back.
+The patterns of the SQL rows, in a document database's terms. Not proven in the starter: the first project that builds a guard here writes it back.
 
 | Pattern | In a document database | Count the old way | Guard |
 | --- | --- | --- | --- |

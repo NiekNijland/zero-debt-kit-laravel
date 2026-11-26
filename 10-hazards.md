@@ -6,7 +6,7 @@ Read before the first code change. Each line cost a red build, a wasted push or 
 
 A middleware that wraps the next handler in a transaction never rolls back on a server error: the framework's router turns the handler's exception into a response before control returns to the middleware, so the wrapped call returns normally and the transaction commits. A test with exception handling off does see a rollback, so it passes on the bug. A test that sends a real request and asserts a server error finds it.
 
-The shape of the fix (PHP example: `reference-project/app/Http/Middleware/RunInTransaction.php`):
+The shape of the fix (PHP example: `reference-project/examples/php/app/Http/Middleware/RunInTransaction.php`, an example that does not run):
 
 - inside the transaction: when the response carries an exception (the framework keeps the exception it rendered on the response object), keep the response and rethrow the exception, so the transaction rolls back;
 - outside the transaction: catch it and return the response that was already rendered. The handler has reported the exception once; rendering or reporting it again would double the report.

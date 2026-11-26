@@ -182,7 +182,7 @@ One line differs by technique: a project that uses Tailwind keeps the entry `pre
 
 ## PHP refactoring tool (`rector.php`)
 
-The sets are the pattern; the paths are the project's. Worked example of the file's shape: `reference-project/rector.php`.
+The sets are the pattern; the paths are the project's. Worked example of the file's shape: `rector.php` of the starter.
 
 ```php
 return RectorConfig::configure()
@@ -218,7 +218,7 @@ return RectorConfig::configure()
 
 ## PHP analyser and type checker (`phpstan.neon`, `tsconfig.json`)
 
-The analyser's strictness is a set of switches, and the ratchet row `analyser-switches` counts the ones that are on (`ANALYSER_SWITCHES` in the ratchet script). There are 18 in all: two includes and five parameters in the analyser config, eleven compiler options in the type-checker config. Copy both blocks as they are in step 2; the paths, the type-coverage numbers and the disallowed-call rules are the project's, and a switch that is off for its own pull request is counted only when it is on (`05-program.md` D2). Worked example of the PHP file: `reference-project/phpstan.neon`.
+The analyser's strictness is a set of switches, and the ratchet row `analyser-switches` counts the ones that are on (`ANALYSER_SWITCHES` in the ratchet script). There are 18 in all: two includes and five parameters in the analyser config, eleven compiler options in the type-checker config. Copy both blocks as they are in step 2; the paths, the type-coverage numbers and the disallowed-call rules are the project's, and a switch that is off for its own pull request is counted only when it is on (`05-program.md` D2). Worked example of the PHP file: `phpstan.neon` of the starter.
 
 ```neon
 includes:
