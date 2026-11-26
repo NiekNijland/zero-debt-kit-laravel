@@ -1,0 +1,88 @@
+# Changelog
+
+All notable changes to the kit. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
+[Semantic Versioning](https://semver.org/): a change to a script's behaviour or to the config block's keys is at least a minor
+version, and every release says which scripts changed, because a project's copies are guarded files (UPGRADING.md).
+
+The versions before 0.9.0 were not tagged; they are reconstructed from the history of the repository and are grouped by theme.
+
+## [Unreleased]
+
+The audit-fix round: the tools were reviewed again, their defects fixed and proven, and the kit got an upgrade path.
+
+### Added
+- `tools/doctor.sh`: compares the scripts in a project's `scripts/` with the kit's copies while ignoring the config block, the
+  ratchet table rows and the task commands of `checks.sh`; reports identical, config-differs, body-differs, missing and
+  project-only per script; names the kit version and commit the copies match; `--upgrade-plan` and `--apply` bring the bodies to
+  the kit's version and keep the project's values. Proven by the scenarios `DX01` to `DX23`.
+- `VERSION`, this changelog and `UPGRADING.md`.
+- `tools/proof/proof.sh`: `PROOF_ONLY=<regex on the scenario id>` runs one area, `PROOF_LIST=1` lists the ids. A run without
+  either behaves as before.
+- The kit's own CI, `.github/workflows/proof.yml`: lint (`bash -n`, `php -l`) and the proof suite on Linux and on macOS (bash 3.2).
+- `ci-ratchets.sh --self-test`: the expressions of the ratchet rows against their fixture, so a row whose regular expression
+  stopped matching fails loudly; it runs in the gate part of `checks.sh`.
+- A GitHub Actions skeleton in a file of its own (`ci/github-actions.yml`): merge-first, concurrency, one aggregate required
+  check, services with environment and health checks, the container image pinned by digest; the dependency bot keeps pinned action
+  digests current.
+- Contract point 22 (code owners): the code-owners files are guarded files by default, `ci/CODEOWNERS.example`, and a contract-test
+  reader for GitHub workflows, GitLab pipelines and the code-owners point.
+- At-zero overrides (`OVERRIDE_AT_ZERO`), `--init` for the keyed baseline, and a hazards section for a tool upgrade.
+- Proof scenarios `RX` (ratchet script fixes), `FX` (CI follow-ups), `TX01` to `TX51` (audited defects), and for the skeletons.
+
+### Changed
+- `ci-ratchets.sh`: attributes, commented-out switches, quoted names, tag position, fork fetch and the missing spellings are read
+  correctly; the self-test fixture and the fetch fallbacks no longer count as skipped CI steps.
+- `mutation.sh` resolves the base from `CHECK_BASE`, then the host variables, then the default branch.
+- `ci-duration-minutes` is the median of the last ten successful push runs.
+- The README has a minimal adoption path, lists every guard and ratchet, and says what is proven.
+- Reference project: the guards take their folders and files as arguments, read injected collaborators and the container's string
+  forms, and every guard test file is in the group `arch`; the PHP floor is 8.4.
+- Pull requests merge first on Bitbucket and GitHub (the merge ref is what is tested); a merge queue is not supported
+  (`ci/github-actions.yml` says why).
+
+### Fixed
+- `audit-gate.sh` keeps its "printed no JSON" message for empty input.
+
+## [0.9.0] - 2026-11-26
+
+The tools audit: every script of `tools/` was reviewed; the defects found were fixed and each has a proof scenario.
+
+### Changed
+- `audit-gate.sh` rejects truncated or foreign JSON, uses the UTC date, counts one id per entry and deduplicates ids.
+- `debt-dashboard.sh` validates its expressions, counts last lines, takes one-number command rows, shows lowered goals and skip
+  reasons.
+- `keyed-baseline.sh` needs a position for `tsc` findings, ignores `knip` lines before a heading, and `--write` refuses growth.
+- `mutation.sh` includes renamed files and non-ASCII paths; there is one Stryker floor mechanism.
+- `map-normalise.sh` sorts once and respects name boundaries; `move-ts.mjs` checks before moving and handles non-ASCII paths, CRLF
+  and more specifier forms.
+- `ci-commit-messages.sh` no longer lets single-parent `Merge` titles and open-ended `Revert` titles pass.
+- `ci-parallel.sh` validates its tasks and limits and stops its watchdogs; the reference copy is the kit's.
+- CI scripts: one fetch in `prepush.sh`, one argument loop, phantom part names rejected, the base fetched only by the parts that
+  read it, the scan range ends at `CHECK_HEAD`.
+- Reference project guards read more of the language: queued-class limits through parents and traits, injected dispatchers,
+  loggers and transactions, joined queue names, `whereLike`, rate limiters and form requests.
+
+### Added
+- The proof suite reads scenario files from `tools/proof/scenarios.d/`.
+
+## [0.2.0]
+
+The reference project and the hazards of the first complete cleanup.
+
+### Added
+- Reference project guards: register, closed-class, method-size and module-layout guards.
+- The adapter layer and the autoload-conformance guard row.
+- Hazards of the closing rounds: an advisory at the bottom of a chain, caps that equal their rows, any-of abilities, queued class
+  formats, git and shell traps, merge waiters.
+
+### Changed
+- A pull request is ready only when every review thread is answered and resolved; approvals are chained after a retarget.
+
+## [0.1.0]
+
+### Added
+- The kit: the principles, the ten steps, conventions, guards, program, lock and audit, process, builder rules, reviewer brief and
+  hazards documents; the scripts of `tools/`; the CI skeletons; the catalog and the templates.
+- Pull requests are chained by default and merged from the bottom with the source branch closed.
+- A README that opens with the problem: architecture tests and ratchets as the CI quality gate.
+
