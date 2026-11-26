@@ -22,6 +22,12 @@
 #   3. A solo owner puts the owner's own account in the bypass list of a ruleset (or leaves administrators able to bypass). The
 #      rule then stops every identity that has no bypass, and stops nothing when the agents use the owner's token: a merge by that
 #      token is a bypass. Write that state in the profile as it is. The rule is not weakened by this paragraph; it is not met.
+#   4. Unenforced: the host cannot enforce anything. A private repository on a free plan has no branch protection, no ruleset and
+#      no enforced code owners (the API answered 403 "Upgrade to GitHub Pro" on the one repository read). This file stays, the
+#      contract test (04-guards.md C4, point 22) still requires it and reads it, and the owner still reads the tag of every
+#      override in git log; what is then not enforced is stated in the profile, in these words: nothing stops a merge without the
+#      owner's review, nothing stops a pull request from editing this file or the workflow, and a merge waits on gh pr checks only
+#      (07-process.md section 12). When the plan changes, the setting can be switched on and the file is already there.
 # The ruleset option "Require approval of the most recent reviewable push" (the person who pushed last cannot approve) belongs to
 # the same question; how it treats commits an agent pushed under the owner's name is UNVERIFIED.
 #
@@ -49,9 +55,11 @@
 /tests/Support/Architecture/ <owner>
 /tests/Unit/*ArchitectureTest.php <owner>
 
-# The format commits that blame skips, the dependency bot's config and the move tool of the program.
+# The format commits that blame skips, the dependency bot's config (Renovate or Dependabot: keep the line of the one in use) and the
+# move tool of the program.
 /.git-blame-ignore-revs <owner>
 /renovate.json <owner>
+/.github/dependabot.yml <owner>
 /tools/codemods/ <owner>
 
 # This file itself.

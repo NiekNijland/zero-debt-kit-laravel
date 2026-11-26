@@ -1,0 +1,258 @@
+# Runner form of the skeleton for GitHub Actions. Replace every <placeholder>. Copy this file to .github/workflows/kit-checks.yml (a
+# file of its own, always: the reasons, the triggers, the merge ref, the concurrency group, the required checks and the scheduled
+# run are those of ci/github-actions.yml, whose header you read first). Use this file, not that one, where the project has no CI
+# image: no Dockerfile to build, no registry to publish to, no digest to keep, no credentials. gh and git are on the runner.
+#
+# What differs from the container form, and nothing else does:
+#   - No container:. The job runs on the runner image labelled ubuntu-24.04 (never *-latest), and the toolchain is what the job sets
+#     up: shivammathur/setup-php (PHP version, extensions, Composer, a coverage driver) and actions/setup-node (the version from the
+#     file the project keeps, for example .nvmrc), each pinned to a full commit sha. The digest of point 7 of 04-guards.md C4 is
+#     given up: it is an owner exception that goes in the profile (the runner image changes under a fixed label; the pins hold the
+#     PHP and Node versions, not the rest of the image). Make the baselines on the same label, and look at the runner image notes
+#     when a number moves without a code change.
+#   - Services are reached at 127.0.0.1 on a published port: ports: on the service, DB_HOST: 127.0.0.1 in the job. Never the service
+#     name (that is the container form: the two are valid and mixing them is the trap) and never localhost, which may resolve to ::1.
+#   - The runner user is not root: sudo before anything that writes outside the workspace (the gitleaks install below).
+#   - No gh install step: gh is preinstalled.
+# The contract test reads this form with the same points (04-guards.md C4, points 7 and 10): a PHP tool in a job without setup-php,
+# a Node tool without setup-node, a service without ports, DB_HOST by the service name all fail.
+#
+# Look up the sha of each action release with  gh api repos/<owner>/<repo>/tags --jq '.[0:4][] | .name + " " + .commit.sha'  (the
+# header of ci/github-actions.yml says why not git/ref/tags), and take a release whose action.yml says using: node24.
+#
+# The service blocks of the engines (keep the pair of the engine, delete the others, in every services block of this file; the
+# contract test reads the engine from DATABASE_IMAGE and names an auxiliary image beside it):
+#   postgres  image postgres:17   env POSTGRES_PASSWORD: ci        ports - '5432:5432'   health pg_isready -U postgres
+#   mysql     image mysql:8.4     env MYSQL_ROOT_PASSWORD: ci      ports - '3306:3306'   health mysqladmin ping -h 127.0.0.1 -uroot -pci
+#   mariadb   image mariadb:11.4  env MARIADB_ROOT_PASSWORD: ci    ports - '3306:3306'   health healthcheck.sh --connect --innodb_initialized
+#   mongo     image mongo:8       no variable                      ports - '27017:27017' health mongosh --quiet --eval "db.runCommand({ping:1})"
+#   redis     image redis:7       no variable                      ports - '6379:6379'   health redis-cli ping
+# MongoDB or Redis next to a SQL database, or MongoDB as the database: a second entry under services: (for example  cache:  with
+# image redis:7), the variable of the application set to 127.0.0.1 (MONGODB_URI: mongodb://127.0.0.1:27017, REDIS_HOST: 127.0.0.1),
+# and the contract test given the auxiliary image and the host variable. Only postgres, mysql and mariadb need a password
+# variable, and their images exit at start without it. Observed on one run of a private repository: MongoDB and Redis services with
+# ports: and 127.0.0.1 on the runner, the smoke suite green. The postgres, mysql and mariadb blocks are the images' documented
+# values and ran only through the contract test (UNVERIFIED on a runner).
+#
+# The smoke stack runs the production drivers, not the production environment: where the application forces https in production
+# (a URL::forceHttps() call), a stack served over plain http renders blank pages. Boot it with APP_ENV=staging and the drivers of
+# production (cache store, queue, database engine) set by name.
+#
+# The weekly mutation variant and the reading of the Actions minutes: the same as in ci/github-actions.yml (a second cron entry,
+# and  if: github.event.schedule == '<that cron>'  on the mutation step of the scheduled job).
+
+name: Kit checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches: ['<main branch>', '<other deploying branch>']
+  schedule:
+    - cron: '<cron expression: once a day, at an odd minute, for example 17 3>'
+
+concurrency:
+  group: kit-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  checks:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: <maximum minutes>
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [gate, static, guards, repo]
+    env:
+      CHECK_BASE: ${{ github.base_ref }}
+    steps:
+      - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v7.0.1>
+        with:
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@<40-character commit sha of the setup-php release> # <release, for example v2>
+        with:
+          php-version: '<PHP version of production, for example 8.4>'
+          extensions: <extensions the project needs, comma separated>
+          tools: composer:v2
+      - uses: actions/setup-node@<40-character commit sha of the setup-node release> # <release, for example v7.1.0>
+        with:
+          node-version-file: <file that names the Node version, for example .nvmrc>
+      - run: <install the PHP dependencies from the lock file>
+      - run: <install the frontend dependencies from the lock file>
+      - name: Install gitleaks
+        if: matrix.part == 'repo' # the part that holds the Secret scan of PARTS: move this condition with that task
+        env:
+          GITLEAKS_VERSION: <version, for example 8.30.1>
+          GITLEAKS_SHA256: <sha256 of the linux_x64 tarball, copied from gitleaks_<version>_checksums.txt of that release>
+        run: |
+          curl -sSfL -o gitleaks.tgz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tgz" | sha256sum -c -
+          tar -xzf gitleaks.tgz gitleaks
+          sudo install -m 0755 gitleaks /usr/local/bin/gitleaks
+          rm gitleaks.tgz gitleaks
+      - run: bash scripts/checks.sh --part ${{ matrix.part }}
+
+  checks-result:
+    if: always() && github.event_name == 'pull_request'
+    needs: [checks]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Every part of the checks run passed
+        env:
+          RESULT: ${{ needs.checks.result }}
+        run: test "$RESULT" = success
+
+  checks-main:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: <maximum minutes>
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [gate, static, guards, repo]
+    steps:
+      - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v7.0.1>
+        with:
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@<40-character commit sha of the setup-php release> # <release, for example v2>
+        with:
+          php-version: '<PHP version of production, for example 8.4>'
+          extensions: <extensions the project needs, comma separated>
+          tools: composer:v2
+      - uses: actions/setup-node@<40-character commit sha of the setup-node release> # <release, for example v7.1.0>
+        with:
+          node-version-file: <file that names the Node version, for example .nvmrc>
+      - run: <install the PHP dependencies from the lock file>
+      - run: <install the frontend dependencies from the lock file>
+      - run: bash scripts/checks.sh --main --part ${{ matrix.part }}
+
+  backend-tests:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: <maximum minutes>
+    env:
+      CHECK_BASE: ${{ github.base_ref }}
+      DB_HOST: 127.0.0.1
+    services:
+      database:
+        image: <the image of DATABASE_IMAGE in scripts/kit-config.sh>
+        # The variable, the port and the health command of the engine: the table in the header. The official SQL images exit at
+        # start without their password variable, and GitHub then fails the job at "Initialize containers", before a step runs.
+        env:
+          POSTGRES_PASSWORD: ci
+        ports:
+          - '5432:5432'
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v7.0.1>
+        with:
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@<40-character commit sha of the setup-php release> # <release, for example v2>
+        with:
+          php-version: '<PHP version of production, for example 8.4>'
+          extensions: <extensions the project needs, comma separated>
+          tools: composer:v2
+          coverage: pcov
+      - run: <install the PHP dependencies from the lock file>
+      - run: <backend test command, writing a clover coverage report>
+      - run: bash scripts/checks.sh --coverage <path of the clover report> # holds the coverage at the committed floor (tools/README.md, "Coverage")
+
+  frontend-tests:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: <maximum minutes>
+    steps:
+      - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v7.0.1>
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@<40-character commit sha of the setup-node release> # <release, for example v7.1.0>
+        with:
+          node-version-file: <file that names the Node version, for example .nvmrc>
+      - run: <install the frontend dependencies from the lock file>
+      - run: <frontend test command, with coverage held at the committed floor (tools/README.md, "Coverage")>
+
+  smoke:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: <maximum minutes>
+    env:
+      DB_HOST: 127.0.0.1
+    services:
+      database:
+        image: <the image of DATABASE_IMAGE in scripts/kit-config.sh>
+        # the variable, the port and the health command of the engine, as in backend-tests
+        env:
+          POSTGRES_PASSWORD: ci
+        ports:
+          - '5432:5432'
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v7.0.1>
+        with:
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@<40-character commit sha of the setup-php release> # <release, for example v2>
+        with:
+          php-version: '<PHP version of production, for example 8.4>'
+          extensions: <extensions the project needs, comma separated>
+          tools: composer:v2
+      - uses: actions/setup-node@<40-character commit sha of the setup-node release> # <release, for example v7.1.0>
+        with:
+          node-version-file: <file that names the Node version, for example .nvmrc>
+      - run: <install the PHP dependencies from the lock file>
+      - run: <install the frontend dependencies from the lock file>
+      - run: <boot the stack with seeded data and the production drivers (cache store, queue, database engine)>
+      - run: <smoke suite command, in a browser where the project has a frontend, after installing that browser at a pinned version>
+
+  scheduled:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: <maximum minutes>
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      DB_HOST: 127.0.0.1
+    services:
+      database:
+        image: <the image of DATABASE_IMAGE in scripts/kit-config.sh>
+        # the variable, the port and the health command of the engine, as in backend-tests
+        env:
+          POSTGRES_PASSWORD: ci
+        ports:
+          - '5432:5432'
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v7.0.1>
+        with:
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@<40-character commit sha of the setup-php release> # <release, for example v2>
+        with:
+          php-version: '<PHP version of production, for example 8.4>'
+          extensions: <extensions the project needs, comma separated>
+          tools: composer:v2
+          coverage: pcov
+      - uses: actions/setup-node@<40-character commit sha of the setup-node release> # <release, for example v7.1.0>
+        with:
+          node-version-file: <file that names the Node version, for example .nvmrc>
+      - run: <install the PHP dependencies from the lock file>
+      - run: <install the frontend dependencies from the lock file>
+      # gh is on the runner: the dashboard row for the CI duration reads gh run list with GH_TOKEN, GH_REPO and actions: read above.
+      - run: bash scripts/checks.sh --scheduled
+      - run: bash scripts/mutation.sh
