@@ -2,26 +2,52 @@
 
 declare(strict_types=1);
 
+use Tests\Support\Architecture\GlobalImportGuard;
+use Tests\Support\Architecture\PhpFileInspector;
+use Tests\Support\SourceSandbox;
+
 uses()->group('arch');
 
-it('never imports a global class by its bare name in a test file without a namespace', function (): void {
-    $offenders = [];
+dataset('a global class imported in a file without a namespace', [
+    'a bare import' => ["<?php\n\nuse RuntimeException;\n\nit('throws', fn () => throw new RuntimeException());\n"],
+    'an import after the strict types line' => ["<?php\ndeclare(strict_types=1);\nuse Closure;\n"],
+]);
 
-    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator(dirname(__DIR__), FilesystemIterator::SKIP_DOTS)) as $file) {
-        if (! $file instanceof SplFileInfo || $file->getExtension() !== 'php') {
-            continue;
-        }
+it('detects the import of a global class in a file without a namespace', function (string $source): void {
+    $violations = new GlobalImportGuard(new PhpFileInspector(), dirname(__DIR__, 2), ['tests'])->inSource($source);
 
-        $source = (string) file_get_contents($file->getPathname());
+    expect($violations)->toHaveCount(1)
+        ->and($violations[0])->toContain('bare name in a file without a namespace', 'delete the use line', 'declare a namespace');
+})->with('a global class imported in a file without a namespace');
 
-        if (preg_match('/^namespace\s/m', $source) === 1) {
-            continue;
-        }
+dataset('imports that are not the mistake', [
+    'a namespaced import in a file with a namespace' => ["<?php\nnamespace Tests\\Support;\nuse RuntimeException;\n"],
+    'a qualified import in a file without a namespace' => ["<?php\nuse Tests\\Support\\SourceSandbox;\n"],
+    'an aliased import' => ["<?php\nuse RuntimeException as Failure;\n"],
+    'a function import' => ["<?php\nuse function sprintf;\n"],
+    'no import' => ["<?php\nit('works', fn () => expect(true)->toBeTrue());\n"],
+]);
 
-        if (preg_match('/^use [A-Za-z_]+;$/m', $source) === 1) {
-            $offenders[] = substr($file->getPathname(), strlen(dirname(__DIR__)) + 1);
-        }
+it('accepts the imports that PHP honors and files without an import', function (string $source): void {
+    expect(new GlobalImportGuard(new PhpFileInspector(), dirname(__DIR__, 2), ['tests'])->inSource($source))->toBe([]);
+})->with('imports that are not the mistake');
+
+it('reads a tree under a dot directory and names the file relative to the root', function (): void {
+    $root = SourceSandbox::create([
+        'tests/Unit/BadTest.php' => "<?php\nuse Closure;\n",
+        'tests/Unit/GoodTest.php' => "<?php\nuse Tests\\Support\\SourceSandbox;\n",
+    ], prefix: '.checkout-');
+
+    try {
+        $violations = new GlobalImportGuard(new PhpFileInspector(), $root, ['tests'])->violations();
+    } finally {
+        SourceSandbox::remove($root);
     }
 
-    expect($offenders)->toBe([]);
+    expect($violations)->toHaveCount(1)
+        ->and($violations[0])->toStartWith('tests/Unit/BadTest.php: imports a global class by its bare name');
+});
+
+it('lets no test file import a global class by its bare name', function (): void {
+    expect(new GlobalImportGuard(new PhpFileInspector(), dirname(__DIR__, 2), ['tests'])->violations())->toBe([]);
 });
