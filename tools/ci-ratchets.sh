@@ -7,7 +7,6 @@
 SOURCE_PATHS="app,bootstrap,config,database,routes,lang?,resources/views?"
 TEST_PATHS="tests"
 # The test folders whose tests are written in the backend's test framework: the row test-skip counts there.
-# Empty in a project whose only language is TypeScript: frontend-test-skip counts its skips.
 TEST_SKIP_PATHS="tests"
 FRONTEND_PATHS="resources/js,vite.config.ts?,vitest.setup.ts?"
 # Codemods live in tools/codemods and project scripts written in a source language (scripts/<name>.mjs) are named here: no row counts them.

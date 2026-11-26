@@ -29,7 +29,7 @@ You can also take only the core: the ratchet script and three guards. The README
 
 - A run on a real GitHub repository is in progress; until it finishes, treat the GitHub skeleton as unverified. It is proved on examples only.
 - GitLab is untested.
-- Nothing outside Laravel and React has been run. The catalog maps every row to other stacks on paper.
+- The kit is for Laravel and React. Other stacks are out of scope; nothing is promised or proven for them.
 - The mutation forms for Pest, Infection and Stryker were run on small scratch projects (Pest 5.3.7, Infection 0.35.12, Stryker 10.1.1); only the Pest form also ran on a sample of a real application. Infection with Xdebug is not verified.
 - The reference is a small running starter (a notes API), pinned to a kit commit; copy from it by `reference-project/files-to-copy.md`, and read what it lacks in `docs/starter-variants.md`.
 - The plugin install path from a marketplace had not been exercised at the time of writing this draft.

@@ -59,7 +59,6 @@ The patterns, the layout, the limits and the strictness are the kit's (`catalog/
 - per catalog row: the ways the codebase does the task today and how many sites each has. Look especially at the newest code and at places where a bug class keeps returning;
 - the domain list: which modules the project will have, and which of today's folders goes into each (`03-conventions.md` B3);
 - tasks the catalog does not cover, each with the way chosen by `03-conventions.md` B1;
-- the rows that apply in another technique's form (`catalog/other-stacks.md`), with the project's mechanism for each;
 - every place where the project would need an exception. An exception is a question for the owner (1.10), never a silent variant.
 
 This must exist now, because the measurements and the definition of clean depend on it.

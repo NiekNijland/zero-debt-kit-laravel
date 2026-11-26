@@ -26,7 +26,7 @@ No. It is a program an agent runs, with shell tools you copy. A package for the 
 
 ## Does it work for stacks other than Laravel and React?
 
-The method and the shell tools are stack-neutral; the catalogs, configs and reference are Laravel and React. `catalog/other-stacks.md` maps the rows on paper. Nothing outside Laravel and React has been run.
+No. Other stacks are out of scope: the method can inspire them, but nothing is promised or proven.
 
 ## Does it work on GitHub and GitLab?
 

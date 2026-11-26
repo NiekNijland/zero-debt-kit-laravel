@@ -4,9 +4,25 @@ All notable changes to the kit. The format follows [Keep a Changelog](https://ke
 [Semantic Versioning](https://semver.org/): a change to a script's behaviour or to the config block's keys is at least a minor
 version, and every release says which scripts changed, because a project's copies are guarded files (UPGRADING.md).
 
-No version is tagged yet; v0.10.0 will be the first tag. The versions before 0.9.0 are reconstructed from the history of the repository and are grouped by theme.
+No version is tagged yet; v0.12.0 will be the first tag. The versions before 0.9.0 are reconstructed from the history of the repository and are grouped by theme.
 
 ## [Unreleased]
+
+## [0.12.0] - 2026-11-26
+
+The scope is narrowed to what has been run: a Laravel (PHP) backend with a React frontend. A Laravel project without a frontend
+source folder stays supported. Other stacks are out of scope; nothing is promised or proven for them.
+
+### Removed
+- `catalog/other-stacks.md` and every reference to it.
+- In `tools/README.md`: the section "Another stack", with the TypeScript-backend example block, and the sentences on a project
+  without PHP. The block for a Laravel project without a frontend source folder stays, under its own heading.
+- The proof scenarios that proved only a TypeScript backend: `T03`, `T03b`, `T05`, `T06`, `T06b`, `T08`, `T08c` and `T12`.
+- The sections and sentences that said the method or the tools work for any stack (README, FAQ, adoption guide, catalogs,
+  templates, `05-program.md`, `01-principles.md`, `04-guards.md`, `06-lock-and-audit.md`).
+
+### Changed
+- README "Who it is for" states the scope once. No script changed its behaviour; `tools/ci-ratchets.sh` lost a comment line.
 
 ## [0.11.0] - 2026-11-26
 

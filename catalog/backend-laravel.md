@@ -1,6 +1,6 @@
 # Catalog: backend (PHP, Laravel)
 
-Per task: the one way, how to count the old ways, and the guard. This file is the PHP and Laravel form; tool and class names here are that stack's. Another stack: `catalog/other-stacks.md`, which has a row for every row here.
+Per task: the one way, how to count the old ways, and the guard. This file is the PHP and Laravel form; tool and class names here are that stack's.
 
 Every project converges to these patterns; code that differs is debt (`01-principles.md`, "Who decides what"). A row marked with a technique (SQL, multi-tenant) applies where the project uses it. Counts are text matches in tracked files, run from the repository root on the main branch; `app` stands for the source folder.
 
@@ -49,7 +49,7 @@ The package behind each pattern, so no project picks its own. A project on anoth
 | Coverage | the test runner's own coverage with `pcov` as the driver, written as a clover report. A Pest project may add `--parallel` to the coverage run (`composer test:unit`): on Pest 5 it wrote one clover report that read the same as the serial run (one project: 12 processes). On macOS `pecl install pcov` stops with "pcre2.h not found": run `CPPFLAGS=-I$(brew --prefix pcre2)/include pecl install pcov` | "Coverage" (`catalog/tests-database-ci-docs.md`) |
 | Unused packages | `icanhazstring/composer-unused` | "Unused packages" (`catalog/tests-database-ci-docs.md`) |
 | YAML reader for the contract test | `symfony/yaml`, as a development dependency | the contract test over the CI files (`04-guards.md` C4) |
-| Secret scan | gitleaks (every stack) | "Secrets" (`catalog/tests-database-ci-docs.md`) |
+| Secret scan | gitleaks | "Secrets" (`catalog/tests-database-ci-docs.md`) |
 
 The formatter and Prettier configs to copy, the refactoring-tool sets and the dependency bot's config are in `templates/tool-configs.md`, with the list of what the kit considered and rejected.
 

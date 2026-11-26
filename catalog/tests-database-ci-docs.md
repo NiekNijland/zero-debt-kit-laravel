@@ -1,6 +1,6 @@
 # Catalog: tests, database, CI and dependencies, docs
 
-The test and database tables are the PHP and SQL form; the CI, translation and docs tables are technique-neutral and hold for every stack as written. Another stack: `catalog/other-stacks.md`, which has a row for every row here.
+The test and database tables are the PHP and SQL form; the CI, translation and docs tables are technique-neutral.
 
 Every project converges to these patterns; code that differs is debt (`01-principles.md`, "Who decides what"). Counts are text matches in tracked files, run from the repository root on the main branch. The Guard column reads as in `catalog/backend-laravel.md` ("Reading the Guard column"): a file name is the worked example in the starter, written in Pest; the written rules of that example are in its `tests/AGENTS.md`.
 
@@ -129,7 +129,7 @@ Never: an ignore, a baseline, `assert()`, an inline `@var`, a cast on an uncheck
 | Runtime check | at the end of every step that changes source code, on a production-like environment (`05-program.md` D4, point 5) | none | the runtime-check row of the step in the plan; not optional |
 | Cache round trip | every cached value is written and read back through the production cache driver and its serializer settings, in a test | cache key families without such a test | one test per cache key family, beside the "Cached values" guard of `catalog/backend-laravel.md`. Not in the starter |
 | Contract with a sibling repository | part of every run. Every external HTTP client, and every API a sibling repository calls or serves, has recorded request and response fixtures asserted on this repository's side; the sibling's side is a note for its own run | external clients and such APIs without a fixture test | a coverage test over the client classes (`04-guards.md` C1): each client has a fixture test that names it; deploy order written in the PR |
-| Secrets | the secret scanner (gitleaks, in every stack) is clean on the tree; a finding in history is rotated by the owner, history is not rewritten. Scan before dependencies are installed or filter to tracked files; no secret-shaped string in a test or a fixture, because the scan reads every commit and a later fix does not clear an earlier one | gitleaks over the tree and the history, output redacted | the scan on every pull request, a line of `scripts/checks.sh` (`04-guards.md` C4) |
+| Secrets | the secret scanner (gitleaks) is clean on the tree; a finding in history is rotated by the owner, history is not rewritten. Scan before dependencies are installed or filter to tracked files; no secret-shaped string in a test or a fixture, because the scan reads every commit and a later fix does not clear an earlier one | gitleaks over the tree and the history, output redacted | the scan on every pull request, a line of `scripts/checks.sh` (`04-guards.md` C4) |
 
 ## Tests (frontend)
 
@@ -147,7 +147,7 @@ Never: an ignore, a baseline, `assert()`, an inline `@var`, a cast on an uncheck
 
 ## Database
 
-These rows are for a SQL database, with the form per engine. A document database: `catalog/other-stacks.md`, "A document database". The starter is on Postgres; the MySQL column is not proven there.
+These rows are for a SQL database, with the form per engine. The starter is on Postgres; the MySQL column is not proven there.
 
 | Task | The one way | Postgres | MySQL | Count the old way | Guard |
 | --- | --- | --- | --- | --- | --- |

@@ -1,6 +1,6 @@
 # Catalog: frontend (React, TypeScript, Inertia)
 
-This file is the React and TypeScript form; tool names here are that stack's. Another frontend framework, and a TypeScript backend: `catalog/other-stacks.md`, which has a row for every row here.
+This file is the React and TypeScript form; tool names here are that stack's.
 
 Every project converges to these patterns; code that differs is debt (`01-principles.md`, "Who decides what"). Counts are text matches in tracked files, run from the repository root on the main branch. `<src>` is the frontend source folder.
 

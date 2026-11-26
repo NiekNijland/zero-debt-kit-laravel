@@ -103,4 +103,4 @@ Filled in during step 1 from the repository and the hosting API. Mark each line 
 
 ## Differences from the kit
 
-(Techniques this project uses instead of the PHP and React of the stack catalogs: per need of `catalog/other-stacks.md`, "Tooling in another stack", the one tool; for a stack without a table there, the table the lead built in step 1. Exceptions on a code pattern: only those the owner granted, each with its decision row.)
+(Techniques this project uses instead of the tools of the catalogs, per need of `catalog/backend-laravel.md`, "Tooling per row". Exceptions on a code pattern: only those the owner granted, each with its decision row.)

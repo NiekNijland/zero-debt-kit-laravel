@@ -57,7 +57,7 @@ What you do not get this way: the layout, the written patterns, the burn-down, t
 
 ## Who it is for
 
-Teams on Laravel and React (Pest, PHPStan, Rector, Pint) that already have decent coverage and static analysis and still see patterns drift, especially when agents write code. The method and the shell tools work for any stack; the catalogs, the starter and the tool configs are written for Laravel and React. `catalog/other-stacks.md` maps the rows to other stacks, but nothing outside Laravel and React has been run.
+Teams on Laravel and React (Pest, PHPStan, Rector, Pint) that already have decent coverage and static analysis and still see patterns drift, especially when agents write code. The kit is for a Laravel (PHP) backend with a React frontend; a Laravel project without a frontend source folder is supported too. Other stacks are out of scope: the method can inspire them, but nothing is promised or proven.
 
 The kit decides the patterns and the structure, and only techniques differ between projects (`01-principles.md`, "Who decides what"). It is generic: it holds no organisation-specific rule, name, address or token. What an organisation manages for itself (a shared formatter config, shared pipeline images, an autofix commit) is asked in step 1 and stays the organisation's.
 
@@ -239,7 +239,7 @@ Then, in the target repository:
 | `/zero-debt:zero-debt-review <branch, PR or guard>` | cold review with `09-reviewer-brief.md` |
 | `/zero-debt:zero-debt-doctor` | run `tools/doctor.sh` against a kit checkout and explain the result |
 
-The plugin files validate locally with `claude plugin validate .`; installing from the marketplace has not been tested yet. The skills are plain `SKILL.md` files, so another agent can read them from `skills/`. Without a plugin, give the agent the folder path and paste `00-START-PROMPT.md` as "How to use it" says. Plugin instructions run with your agent's privileges: pin to a release tag (v0.10.0 once tagged) or a commit hash and read what you install (`SECURITY.md`).
+The plugin files validate locally with `claude plugin validate .`; installing from the marketplace has not been tested yet. The skills are plain `SKILL.md` files, so another agent can read them from `skills/`. Without a plugin, give the agent the folder path and paste `00-START-PROMPT.md` as "How to use it" says. Plugin instructions run with your agent's privileges: pin to a release tag (v0.12.0 once tagged) or a commit hash and read what you install (`SECURITY.md`).
 
 ## How to use it
 
@@ -270,7 +270,6 @@ More: `docs/adoption-guide.md` (who it is for, what to prepare, what the three g
 - **The program has been run on three Laravel applications, all hosted on Bitbucket.** The Bitbucket skeleton ran in real pipelines there, and the lessons of each run are written back into the kit. Only a few measured figures appear in the method files, each marked as one run; the rest of what the runs measured is not published here.
 - **GitHub Actions has run once.** The GitHub skeleton ran on one real repository (a private repository of a free plan, runner form). What was seen and what was not is in `04-guards.md` C4, "What has run". Treat the rest of the GitHub skeleton (the container form, the schedule, a stacked pull request, a required check) as unverified (`docs/adoption-guide.md`, "GitHub first-run notes").
 - **GitLab is untested.** The skeleton exists and is checked against examples only.
-- **Other stacks have not been run.** `catalog/other-stacks.md` maps every row to another stack on paper.
 - **Mutation tools.** The Pest, Infection and Stryker forms were run on scratch projects on 2026-11-26 (Pest 5.3.7, Infection 0.35.12, Stryker 10.1.1); the versions and the recorded outputs are in `tools/README.md`, "Mutation". The proof replays those outputs with a fake `npx` and fake `vendor/bin` scripts. Only the Pest form was also run on a sample of a real application. Not verified: Infection with Xdebug or phpdbg, a Stryker path that holds a comma, and a Stryker runner other than vitest.
 - **The reference is a starter, not a product**: a small running application (a notes API) built at the kit's end state; what it lacks (multi-tenancy, a frontend, the Bitbucket and GitLab readers) is in `docs/starter-variants.md`.
 
@@ -294,7 +293,7 @@ The worked example is the strict Laravel starter, <https://github.com/NiekNijlan
 | `09-reviewer-brief.md` | cold reviewer with the break sample, object-level access checklist, auditor | reviewers and auditors |
 | `10-hazards.md` | the traps, each ending in what to do | before the first code change |
 | `record-source-project.md` | optional reading: the lessons of the earlier runs and the instruction each became | never needed for a run |
-| `catalog/` | `backend-laravel.md`, `frontend-react.md` and `tests-database-ci-docs.md`: per task the one way, how to count the old way, and the guard; `other-stacks.md`: every one of those rows for any other stack | in step 1 (the mapping of 1.5) only the files of the project's stack: a stack other than Laravel and React reads `other-stacks.md` and, of the other three, only the rows and tables it points to. Then per step, the tables that step names |
+| `catalog/` | `backend-laravel.md`, `frontend-react.md` and `tests-database-ci-docs.md`: per task the one way, how to count the old way, and the guard | in step 1 (the mapping of 1.5) only the files of the project's stack: `backend-laravel.md` for a Laravel backend, `frontend-react.md` for a React frontend, `tests-database-ci-docs.md` with either. Then per step, the tables that step names |
 | `templates/` | `project-profile.md`, `zero-debt-plan.md`, `backlog-and-continue.md`, `repo-docs.md` (the `AGENTS.md` set, decision record, review rubric, PR template), `pr-description-and-brief.md` (with the move map format), `tool-configs.md` (formatter and refactoring-tool configs to copy) | when creating them |
 | `tools/` | `ci-ratchets.sh`, `debt-dashboard.sh`, `debt-caps.json`, `kit-config.sh`, `ci-commit-messages.sh`, `ci-parallel.sh`, `keyed-baseline.sh`, `audit-gate.sh`, `mutation.sh`, `map-normalise.sh` and `move-ts.mjs` (what each does: `tools/README.md`), and `tools/proof/proof.sh`, which proves every script in scratch repositories. The starter holds a copy of each of them with its own config block | step 1 (the scratch dashboard of 1.6, the mutation sample of 1.7) and step 2 |
 | `ci/` | `checks.sh`, the one command that the pipeline's checks step (one step per part) and a developer both run, `prepush.sh`, which runs every part side by side before a push, `CODEOWNERS.example`, and the pipeline skeletons `bitbucket-pipelines.yml`, `github-actions.yml` and `gitlab-ci.yml`; a repository that has a pipeline adds their jobs to its own file | step 2 |

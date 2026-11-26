@@ -51,7 +51,7 @@
 /bitbucket-pipelines.yml <owner>
 
 # The guards: the detector classes and the thin tests of the guard group (PHP: tests/Support/Architecture and the architecture
-# tests of tests/Unit; another stack: the guard folder its tooling table names).
+# tests of tests/Unit).
 /tests/Support/Architecture/ <owner>
 /tests/Unit/*ArchitectureTest.php <owner>
 
