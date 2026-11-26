@@ -6,6 +6,7 @@ namespace Tests\Support\Architecture;
 
 use PhpParser\Node;
 use PhpParser\Node\Expr;
+use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\Variable;
@@ -28,8 +29,10 @@ final readonly class TypedReceivers
      * @param list<string> $variables
      * @param list<string> $properties
      * @param list<string> $containerKeys
+     * @param list<string> $types
      */
     private function __construct(
+        private array $types,
         private array $variables,
         private array $properties,
         private array $containerKeys,
@@ -66,7 +69,7 @@ final readonly class TypedReceivers
             }
         }
 
-        return new self($variables, $properties, $containerKeys);
+        return new self($types, $variables, $properties, $containerKeys);
     }
 
     public function holds(Expr $receiver): bool
@@ -75,9 +78,20 @@ final readonly class TypedReceivers
             $receiver instanceof Variable => is_string($receiver->name) && in_array($receiver->name, $this->variables, true),
             $receiver instanceof PropertyFetch => $receiver->var instanceof Variable && $receiver->var->name === 'this'
                 && $receiver->name instanceof Identifier && in_array($receiver->name->toString(), $this->properties, true),
-            $receiver instanceof FuncCall => $receiver->name instanceof Name && $receiver->name->toLowerString() === 'app'
-                && ($receiver->getArgs()[0] ?? null)?->value instanceof String_
-                && in_array($receiver->getArgs()[0]->value->value, $this->containerKeys, true),
+            $receiver instanceof FuncCall => $receiver->name instanceof Name && $receiver->name->toLowerString() === 'app' && $this->resolvesFromContainer(($receiver->getArgs()[0] ?? null)?->value),
+            default => false,
+        };
+    }
+
+    /**
+     * `app('events')` (a key the caller lists) and `app(Dispatcher::class)` (a type the caller lists).
+     */
+    private function resolvesFromContainer(?Expr $argument): bool
+    {
+        return match (true) {
+            $argument instanceof String_ => in_array($argument->value, $this->containerKeys, true),
+            $argument instanceof ClassConstFetch => $argument->class instanceof Name && $argument->name instanceof Identifier
+                && $argument->name->toLowerString() === 'class' && in_array(ltrim($argument->class->toString(), '\\'), $this->types, true),
             default => false,
         };
     }

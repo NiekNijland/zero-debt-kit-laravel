@@ -5,10 +5,14 @@ declare(strict_types=1);
 use Tests\Support\Architecture\FormRequestGuard;
 use Tests\Support\Architecture\PhpFileInspector;
 
+uses()->group('arch');
+
 dataset('form requests out of line', [
     'authorize that only returns true' => ["<?php\nnamespace App\\Http\\Requests;\nfinal class StoreRequest extends FormRequest {\n    public function authorize(): bool { return true; }\n    public function rules(): array { return ['name' => ['required']]; }\n}\n", '4: authorize() that only returns true: remove the method'],
     'authorize that only returns true, in capitals' => ["<?php\nnamespace App\\Http\\Requests;\nfinal class StoreRequest extends FormRequest {\n    public function authorize()\n    {\n        return TRUE;\n    }\n}\n", '4: authorize() that only returns true: remove the method'],
     'rules as a pipe string' => ["<?php\nnamespace App\\Http\\Requests;\nfinal class StoreRequest extends FormRequest {\n    public function rules(): array\n    {\n        return [\n            'email' => 'required|email',\n        ];\n    }\n}\n", "7: the rules of a field as one string: write them as an array, ['required', 'email']"],
+    'a pipe string held in a variable' => ["<?php\nnamespace App\\Http\\Requests;\nfinal class StoreRequest extends FormRequest {\n    public function rules(): array\n    {\n        \$email = 'required|email';\n        return ['email' => \$email];\n    }\n}\n", 'held in a variable or joined'],
+    'a pipe string joined from two texts' => ["<?php\nnamespace App\\Http\\Requests;\nfinal class StoreRequest extends FormRequest {\n    public function rules(): array { return ['email' => 'required|' . 'email']; }\n}\n", 'held in a variable or joined'],
     'one rule as a string' => ["<?php\nnamespace App\\Http\\Requests;\nfinal class StoreRequest extends FormRequest {\n    public function rules(): array { return ['token' => 'required', 'name' => ['required']]; }\n}\n", "4: the rules of a field as one string: write them as an array, ['required']"],
     'a string rule in a merged array' => ["<?php\nnamespace App\\Http\\Requests;\nfinal class StoreRequest extends FormRequest {\n    public function rules(): array { return [...parent::rules(), 'images.*' => 'image']; }\n}\n", "4: the rules of a field as one string: write them as an array, ['image']"],
 ]);
