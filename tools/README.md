@@ -91,7 +91,7 @@ The values more than one script reads are set once, here. The scripts source the
 | `KEYED_BASELINES` | the folder with the files `keyed-baseline.sh` writes |
 | `CI_FILES` | the pipeline files and the `scripts` folder, whole: a helper script of the project's own there is counted too |
 | `OVERRIDE_AT_ZERO` | a comma list of `max` rows that take an override tag even when they stand at 0: `comments` (a comment that is needed) and `cap-dependencies-majors-behind` (a pinned major). Every other `max` row at 0 takes none. The list is in the config block, so changing it is a change of the script |
-| `GUARDED_FILES` | files that may not change without the script tag (`04-guards.md` C2): `.gitattributes`, the other scripts in `scripts/`, `kit-config.sh` among them, and the pipeline files of the three hosts. A script the project adds (a secret-scanner installer, a smoke boot script, an audit helper) is guarded only when it is named here: add each one in the PR that adds it |
+| `GUARDED_FILES` | files that may not change without the script tag (`04-guards.md` C2): `.gitattributes`, the code-owners files (`CODEOWNERS` at the root, in `.github/`, `docs/` and `.gitlab/`), the other scripts in `scripts/`, `kit-config.sh` among them, and the pipeline files of the three hosts. A script the project adds (a secret-scanner installer, a smoke boot script, an audit helper) is guarded only when it is named here: add each one in the PR that adds it |
 
 A row names a config value as `@NAME` in its paths column, from this block or from `kit-config.sh` (`@CAPS_FILE`). A spec that is exactly `@NAME` is that config value (the row `analyser-switches` uses it).
 
