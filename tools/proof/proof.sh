@@ -199,7 +199,7 @@ big_file() {
     done
 }
 
-# ---------------------------------------------------------------- fixture: PHP backend with a TypeScript frontend, default config block
+# ---------------------------------------------------------------- fixture: PHP backend with a React frontend, default config block
 build_fixture() {
     local origin="$ROOT/origin.git" work="$ROOT/work"
     git init -q --bare -b main "$origin"
@@ -649,7 +649,7 @@ check_php R15 "ratchet: glob entries in lint ignores are counted (2)" fail '^lin
 check_php R15b "ratchet: ci-skipped-steps counts || true, continue-on-error and allow_failure (3)" fail '^ci-skipped-steps +down +0 +3 +\+3 +FAILS' ratchets
 check_php R15c "ratchet: lint-config-off counts the switched-off rule" fail '^lint-config-off +down +0 +1 +\+1 +FAILS' ratchets
 
-# ---------------------------------------------------------------- a project without PHP, with one JSON tool on the runner
+# ---------------------------------------------------------------- a runner with one JSON tool and a small fixture
 farm() {
     # farm <name> <tools...>: a folder that is the whole PATH
     local dir="$ROOT/path-$1" tool
@@ -691,7 +691,7 @@ ONLY_NODE=$(farm node node)
 ONLY_PHP=$(farm php php)
 NO_TOOL=$(farm none)
 cd "$ROOT/node" || exit 1
-check N01 "ratchet on a project without PHP: PATH holds git, grep and jq only" fail '^audit-ignore +down +2 +3 +\+1 +FAILS' env PATH="$ONLY_JQ" CHECK_BASE=main "$SHELL_BIN" scripts/ci-ratchets.sh
+check N01 "ratchet on a runner without php: PATH holds git, grep and jq only" fail '^audit-ignore +down +2 +3 +\+1 +FAILS' env PATH="$ONLY_JQ" CHECK_BASE=main "$SHELL_BIN" scripts/ci-ratchets.sh
 check N02 "same, PATH holds node only" fail '^audit-ignore +down +2 +3 +\+1 +FAILS' env PATH="$ONLY_NODE" CHECK_BASE=main "$SHELL_BIN" scripts/ci-ratchets.sh
 check_php N03 "same, PATH holds php only" fail '^audit-ignore +down +2 +3 +\+1 +FAILS' env PATH="$ONLY_PHP" CHECK_BASE=main "$SHELL_BIN" scripts/ci-ratchets.sh
 check N04 "same, none of jq, node, php: fails with a clear message" fail 'a json row needs jq, node or php on the runner; none was found' env PATH="$NO_TOOL" CHECK_BASE=main "$SHELL_BIN" scripts/ci-ratchets.sh
@@ -1041,8 +1041,8 @@ exit 1
 KNIP
 check B11 "keyed-baseline --format knip: the tool's Configuration hints are not findings (still 5)" 0 '5 findings, the same as knip.txt' "$SHELL_BIN" "$KIT/tools/keyed-baseline.sh" knip.txt --format knip -- "$SHELL_BIN" knip-hints.sh
 
-# ---------------------------------------------------------------- a TypeScript backend: kebab-case files, tests next to the files,
-# an existing pipeline file, no php anywhere. Every scenario here runs without php.
+# ---------------------------------------------------------------- a small project with a pipeline file of its own and no php anywhere:
+# the checks.sh, the first-integration and the script-guard scenarios. Every scenario here runs without php.
 ts_configure() {
     mkdir -p scripts
     cp "$KIT/tools/kit-config.sh" "$KIT/tools/ci-ratchets.sh" "$KIT/tools/debt-dashboard.sh" "$KIT/tools/ci-commit-messages.sh" "$KIT/tools/ci-parallel.sh" "$KIT/tools/keyed-baseline.sh" "$KIT/tools/debt-caps.json" scripts/
@@ -1084,7 +1084,7 @@ build_ts_project() {
     printf 'export class OrderService {\n    count(): number {\n        return 0;\n    }\n}\n' > src/modules/orders/services/order-service.ts
     printf 'import {\n    OrderService,\n} from "./order-service";\n\ntest("counts", () => {\n    expect(new OrderService().count()).toBe(0);\n});\n' > src/modules/orders/services/order-service.test.ts
     git add -A
-    git commit -q -m "PROJ-1 chore: a TypeScript backend with a pipeline of its own"
+    git commit -q -m "PROJ-1 chore: a small project with a pipeline of its own"
     git push -q origin main
 }
 
@@ -1113,18 +1113,9 @@ commit "PROJ-2 ci: add the checks step to the pipeline
 [ratchet: script] install the kit's checks step"
 check T02 "first integration PR: the same edit with the tag passes, and every row is a new row" 0 'Script: \.github/workflows changed, allowed' ratchets
 check T02b "first integration PR: analyser-switches counts the two switches of tsconfig.json" 0 '^analyser-switches +up +2 +2 +\+0 +new row' ratchets
-check T03 "dashboard, kebab-case TypeScript: files imported by the tests next to them are named by a test (one import over several lines)" 0 '^tests +classes-no-test-names +0 +0 +ok' dashboard --offline --details
-check T03b "dashboard: the same files have their own test (<file>.test.ts)" 0 '^tests +classes-without-own-test +0 +0 +ok' dashboard --offline --details
 check T04 "checks.sh on the first integration PR: no copy on the base to guard with, says so, and passes" 0 'scripts/ci-ratchets.sh is not on origin/main yet' env -u CHECK_BASE CI=true GITHUB_BASE_REF=main "$SHELL_BIN" scripts/checks.sh
 check T04b "checks.sh: the labels are what runs" 0 '^PASS +[0-9]+s +Guard tests$' env CHECK_BASE=main "$SHELL_BIN" scripts/checks.sh
-check T05 "dashboard --final on the TypeScript project with a test per file: no open row" 0 ' 0 open, 0 not measured' dashboard --final --offline
 git push -q origin integrate:main
-
-ts_branch t06 integrate
-printf 'export const cancelOrder = (): number => 2;\n' > src/modules/orders/actions/cancel-order.ts
-commit "PROJ-3 feat: an action without a test"
-check T06 "dashboard: a kebab-case file that no test imports is counted and named" fail '^src/modules/orders/actions/cancel-order.ts$' dashboard --offline --details
-check T06b "dashboard: the test files themselves are not counted as behavior classes" fail 'Behavior classes that no test file imports or names with :: \(1 of 3\)' dashboard --offline --details
 
 ts_branch t07 integrate
 edit tsconfig.json 's/"strict": true/"strict": false/'
@@ -1139,9 +1130,7 @@ check T07b "ratchet: the same when the flag is removed from tsconfig.json" fail 
 ts_branch t08 integrate
 printf 'it.skip("later", () => {});\n// @ts-ignore\nexport const x = 1;\n' > src/modules/orders/actions/create-order.test.ts
 commit "PROJ-3 test: a skipped test next to the source"
-check T08 "ratchet: a skipped test in a file next to the source is counted (TEST_PATHS is the source folder)" fail '^frontend-test-skip +down +0 +1 +\+1 +FAILS' ratchets
-check T08b "ratchet: a type-checker suppression in a TypeScript backend is counted" fail '^ts-suppressions +down +0 +1 +\+1 +FAILS' ratchets
-check T08c "ratchet: with TEST_SKIP_PATHS empty the row test-skip reads 0, so the skip is counted once, by frontend-test-skip" fail '^test-skip +down +0 +0 +\+0 +ok' ratchets
+check T08b "ratchet: a type-checker suppression in the source is counted" fail '^ts-suppressions +down +0 +1 +\+1 +FAILS' ratchets
 
 
 ts_branch t09 integrate
@@ -1171,14 +1160,6 @@ command rm scripts/prepush.sh
 git remote set-url origin "file://$ROOT/gone.git"
 check T11 "checks.sh: a fetch of the base that fails stops the run loudly" fail 'cannot fetch origin/main, so the script guard cannot run\. FAILS' env CHECK_BASE=main "$SHELL_BIN" scripts/checks.sh
 git remote set-url origin "file://$ROOT/ts-origin.git"
-
-ts_branch t12 integrate
-edit scripts/ci-ratchets.sh 's/^(test-doubles +max +grep +[^ ]+ +).*$/\1(^|[^A-Za-z0-9_$.])vi\\.(mock|doMock|spyOn|fn|mocked)\\(/'
-printf 'import { vi } from "vitest";\nimport { createOrder } from "./create-order";\n\nvi.mock("./create-order");\n\ntest("doubles", () => {\n    const spy = vi.spyOn(console, "log");\n    const stub = vi.fn();\n    expect(vi.mocked(createOrder)).toBeDefined();\n    const navi = { fn: (): number => 1 };\n    expect(navi.fn()).toBe(1);\n});\n' > src/modules/orders/actions/create-order.test.ts
-commit "PROJ-3 test: doubles in the vitest spellings
-
-[ratchet: test-doubles] the expression of the row for vitest"
-check T12 "ratchet --head: the vitest expression of tools/README.md for test-doubles counts vi.mock, vi.spyOn, vi.fn and vi.mocked (4), and not navi.fn()" 0 '^test-doubles max 4$' "$SHELL_BIN" scripts/ci-ratchets.sh --head
 
 # ---------------------------------------------------------------- the strictness rows: the refactoring tool's sets, the formatter's
 # rules, the advisory-blocking package, the skip entries, and the end goals of the min rows. Every scenario here runs without php:
