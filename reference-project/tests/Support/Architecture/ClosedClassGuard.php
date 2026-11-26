@@ -12,20 +12,21 @@ use PhpParser\NodeFinder;
 final readonly class ClosedClassGuard
 {
     private const array MESSAGES = [
-        'open-class' => 'is not final: declare it `final`. A real shared base is `abstract`; a concrete class that has to stay open is a decision row of the list of open classes, with its reason',
+        'open-class' => 'is not final: declare it `final`. A real shared base is `abstract`; a concrete class that has to stay open is a decision row with its reason and carries the docblock tag `@final`, the one marker the formatter rule skips',
         'extended-concrete' => 'is concrete and another class extends it: make the parent `abstract` and move what only one child uses into that child, or fold the children into the parent',
-        'stale-open' => 'is on the list of open classes and is final, abstract or gone: delete the line',
+        'stale-open' => 'carries the docblock tag `@final` and is final or abstract: delete the tag',
     ];
 
     /**
+     * A concrete class that has to stay open carries the docblock tag `@final` (a decision row holds its reason): the tag is the one marker, in the
+     * code, that both the formatter rule and this guard read, so there is no list of class names beside the code to keep in step with it.
+     *
      * @param string $source the folder of the application code, relative to the root
-     * @param list<string> $open the counted list of open classes, by resolved name: each one is a decision with a reason, never an exemption that grows
      */
     public function __construct(
         private PhpFileInspector $inspector,
         private string $root,
         private string $source,
-        private array $open = [],
     ) {
     }
 
@@ -37,6 +38,7 @@ final readonly class ClosedClassGuard
         $found = [];
         $concrete = [];
         $extended = [];
+        $tagged = [];
 
         foreach ($this->inspector->phpFiles($this->root . '/' . $this->source) as $file) {
             try {
@@ -58,25 +60,29 @@ final readonly class ClosedClassGuard
                     $extended[$class->extends->toString()] = true;
                 }
 
+                $tag = str_contains((string) $class->getDocComment(), '@final');
+
                 if (! $class->isAbstract()) {
                     $concrete[$name] = $class->isFinal();
+                }
+
+                if ($tag && ($class->isAbstract() || $class->isFinal())) {
+                    $found[] = "stale-open {$name}";
+                }
+
+                if ($tag) {
+                    $tagged[$name] = true;
                 }
             }
         }
 
         foreach ($concrete as $name => $final) {
-            if (! $final && ! in_array($name, $this->open, true)) {
+            if (! $final && ! isset($tagged[$name])) {
                 $found[] = "open-class {$name}";
             }
 
-            if (isset($extended[$name]) && ! in_array($name, $this->open, true)) {
+            if (isset($extended[$name])) {
                 $found[] = "extended-concrete {$name}";
-            }
-        }
-
-        foreach ($this->open as $name) {
-            if (($concrete[$name] ?? true) === true) {
-                $found[] = "stale-open {$name}";
             }
         }
 
