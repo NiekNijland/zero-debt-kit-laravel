@@ -83,7 +83,7 @@ One mechanism per kind of rule (`04-guards.md` C1 and the tables of `catalog/`).
 | Guard over the guards | A guard test without failing examples, passing examples and a real-tree case, or a guard that holds a literal path. A blind guard is worse than none because it reads as proof. |
 | Frontend lint rules | Restricted syntax, imports and properties, typed rules and a small local plugin, with every settled rule named as `error` so a preset that changes cannot drop it. Layers (types, lib, hooks, components, pages) import only downward. |
 | Formatter rules | Style that changes behavior if left open: strict types, strict comparison, closed classes, immutable dates, multibyte string functions, private members. The formatter is held at 21 rules by a ratchet row. |
-| Refactoring-tool sets | The mechanical cleanups (dead code, early return, type declarations, framework sets) being switched off. 19 sets are held by a ratchet row. |
+| Refactoring-tool sets | The mechanical cleanups (dead code, code quality, type declarations, framework sets) being switched off. 18 sets are held by a ratchet row. |
 | Unused code | An unused export, file, public method, class or package. The detector runs on the whole tree with no ignore list. |
 | Type coverage | A parameter, return or property without a type. Held at 100. |
 | Coverage floor | Line coverage that falls. The floor is a number in a committed file, raised to the measured value at the end of every step, never lowered; the end goal is 95 for the backend and the frontend logic. |
@@ -140,7 +140,7 @@ A ratchet row is a name, a direction and a method that counts something in the t
 | `analyser-level` | max | analyser configs below the top level | The analyser runs at its top level on source and tests. |
 | `analyser-switches` | min | strictness switches that are on (7 PHP, 11 TypeScript: 18) | A switch removed or set to false must fail; a `max` row cannot count what is missing. |
 | `refactor-skip` | max | skip entries of the refactoring tool | A skip is an exception to the cleanup. |
-| `refactor-sets` | min | refactoring sets that are on (19) | A set switched off lets the old way return. |
+| `refactor-sets` | min | refactoring sets that are on (18) | A set switched off lets the old way return. |
 | `formatter-rules` | min | strictness rules of the formatter that are on (21) | A rule removed or set to false must fail. |
 | `advisory-block` | min | 1 when the manifest requires the advisory-blocking package | A vulnerable version cannot be installed. |
 | `audit-ignore` | max | advisories the package manager is told to ignore | An ignored advisory is an unfixed one. |
@@ -217,7 +217,7 @@ Same name in every project (`tools/README.md`, "Adding a row"; `04-guards.md` C2
 ### Caps, the end state and the guarded files
 
 - **Caps.** A row that cannot be at zero yet gets a cap in `debt-caps.json`, one key per row, never a number inside a script. A cap only goes down. A cap at 0 is never raised, except `cap-dependencies-majors-behind` (an `OVERRIDE_AT_ZERO` row); above 0, raising one needs `[ratchet: cap-<key>] <reason>`, so new debt of a kind whose cap is 0 is fixed, not capped. The lead lowers every cap to its row at the end of every step, and `--final` fails a cap above its row.
-- **`--final`, the end state.** `debt-dashboard.sh --final` is the exit of step 10 and the scheduled run after it: every row at zero, no cap above its row, `analyser-switches` at its target, and every `min` row with a goal at its number (coverage at 95, 19 refactoring sets, 21 formatter rules, the advisory block). The only rows that may stay above zero are the shrink-only rows: `comments`, `test-doubles`, `event-fake-all`, and rows the owner approved as a dated decision row.
+- **`--final`, the end state.** `debt-dashboard.sh --final` is the exit of step 10 and the scheduled run after it: every row at zero, no cap above its row, `analyser-switches` at its target, and every `min` row with a goal at its number (coverage at 95, 18 refactoring sets, 21 formatter rules, the advisory block). The only rows that may stay above zero are the shrink-only rows: `comments`, `test-doubles`, `event-fake-all`, and rows the owner approved as a dated decision row.
 - **Guarded files and the override tag.** The other scripts, `kit-config.sh`, the pipeline files of the three hosts and `.gitattributes` are guarded files: a change needs `[ratchet: script] <reason>`, and `ci/checks.sh` first runs the base's copy of the ratchet script, so a pull request cannot rewrite its own gate.
 - **The code-owners rule.** The tag is written by the author, so only a person can tell a real reason from one written to get past a guard. The files that carry the guards are covered by a code-owners rule that names a person or a team, and the host requires that review (`ci/CODEOWNERS.example`, `04-guards.md` C2 and C4 point 22, `07-process.md` section 12). The setting itself is the owner's and lives on the host, not in the repository.
 
