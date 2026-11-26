@@ -2,9 +2,8 @@
 
 declare(strict_types=1);
 
-namespace Tests\Support\Unit;
+namespace Tests\Support\Architecture;
 
-use App\Modules\Stock\Support\PostgresAdvisoryLock;
 use PhpParser\Node;
 use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Expr\StaticCall;
@@ -14,46 +13,68 @@ use PhpParser\NodeFinder;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\NameResolver;
 use PhpParser\ParserFactory;
-use ReflectionClass;
-use Tests\Support\Architecture\PhpFileInspector;
 
-final class NoRawTableArchitectureHelpers
+/**
+ * A table or a statement reached without a model. A guard with one allowed file: the file is an argument, so the allowance is counted where the test passes it.
+ */
+final readonly class RawTableGuard
 {
     private const array RAW_METHODS = ['table', 'select', 'selectone', 'selectresultsets', 'scalar', 'statement', 'unprepared', 'raw', 'insert', 'update', 'delete', 'affectingstatement', 'cursor'];
 
     private const array FACADES = ['DB', 'Illuminate\Support\Facades\DB'];
 
-    /**
-     * @return list<string> `file:line` of every raw table or statement in the application code; PostgreSQL advisory locks have no Eloquent form and live in PostgresAdvisoryLock
-     */
-    public static function offenders(): array
-    {
-        $root = dirname(__DIR__, 3);
-        $inspector = new PhpFileInspector();
-        $advisoryLock = new ReflectionClass(PostgresAdvisoryLock::class)->getFileName();
-        $offenders = [];
+    private const string MESSAGE = 'a raw table or statement without a model: reach the table through its Eloquent model; raw SQL belongs in a migration or in the one allowed lock class';
 
-        foreach (['app', 'routes', 'bootstrap', 'config'] as $directory) {
-            foreach ($inspector->phpFiles($root . '/' . $directory, mayBeAbsent: true) as $file) {
-                if ($file === $advisoryLock) {
+    /**
+     * @param list<string> $directories folders under the root that the tree scan reads, relative to it; some may be absent
+     * @param list<string> $allowedFiles files relative to the root that may hold raw SQL (an advisory lock has no Eloquent form)
+     */
+    public function __construct(
+        private PhpFileInspector $inspector,
+        private string $root,
+        private array $directories,
+        private array $allowedFiles,
+    ) {
+    }
+
+    /**
+     * @return list<string> `line N: message` per raw call in the source
+     */
+    public function inSource(string $source): array
+    {
+        return array_map(static fn (int $line): string => 'line ' . $line . ': ' . self::MESSAGE, $this->lines($source));
+    }
+
+    /**
+     * @return list<string> `file:line: message` relative to the root
+     */
+    public function violations(): array
+    {
+        $violations = [];
+
+        foreach ($this->directories as $directory) {
+            foreach ($this->inspector->phpFiles($this->root . '/' . $directory, mayBeAbsent: true) as $file) {
+                $relative = substr($file, strlen($this->root) + 1);
+
+                if (in_array($relative, $this->allowedFiles, true)) {
                     continue;
                 }
 
-                foreach (self::rawCallLines((string) file_get_contents($file)) as $line) {
-                    $offenders[] = substr($file, strlen($root) + 1) . ':' . $line;
+                foreach ($this->lines((string) file_get_contents($file)) as $line) {
+                    $violations[] = $relative . ':' . $line . ': ' . self::MESSAGE;
                 }
             }
         }
 
-        sort($offenders);
+        sort($violations);
 
-        return $offenders;
+        return $violations;
     }
 
     /**
      * @return list<int>
      */
-    public static function rawCallLines(string $source): array
+    private function lines(string $source): array
     {
         $statements = (new NodeTraverser(new NameResolver()))->traverse((new ParserFactory())->createForHostVersion()->parse($source) ?? []);
         $lines = [];

@@ -29,7 +29,7 @@ final readonly class PerTenantStateGuard
 
     private const array CURRENT_TENANT_READS = ['current', 'checkcurrent', 'getcurrentid'];
 
-    private const string TASK = 'a SwitchTenantTask in app/Modules/Tenants/Support, listed in switch_tenant_tasks of config/multitenancy.php';
+    private const string TASK = 'a SwitchTenantTask, listed in switch_tenant_tasks of %s';
 
     public function __construct(
         private PhpFileInspector $inspector,
@@ -115,11 +115,11 @@ final readonly class PerTenantStateGuard
         $provider = $class instanceof Class_ && $class->extends instanceof Name && str_ends_with($class->extends->toString(), 'ServiceProvider');
 
         if (! $provider || ! $method instanceof ClassMethod) {
-            return 'config is written at runtime outside a switch task and outside a service provider: state per tenant is ' . self::TASK . ', state per process is a key in config/*.php';
+            return 'config is written at runtime outside a switch task and outside a service provider: state per tenant is ' . sprintf(self::TASK, $this->registry) . ', state per process is a key in a config file';
         }
 
         if ($this->readsCurrentTenant($method)) {
-            return 'a provider reads the current tenant to set config: make it ' . self::TASK;
+            return 'a provider reads the current tenant to set config: make it ' . sprintf(self::TASK, $this->registry);
         }
 
         return null;

@@ -27,11 +27,11 @@ dataset('queue names written as text', [
 ]);
 
 it('detects a queue that is named with text', function (string $source, string $reason): void {
-    $violations = new QueueNameGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source);
+    $violations = new QueueNameGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', 'config/horizon.php')->inSource($source);
 
     expect($violations)->toHaveCount(1)
         ->and($violations[0])->toContain($reason)
-        ->and($violations[0])->toContain('Queue::X');
+        ->and($violations[0])->toContain('Queue::X', 'config/horizon.php');
 })->with('queue names written as text');
 
 it('accepts a queue named by the enum and a variable that happens to be called queue', function (): void {
@@ -55,9 +55,9 @@ it('accepts a queue named by the enum and a variable that happens to be called q
         }
         PHP;
 
-    expect(new QueueNameGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source))->toBe([]);
+    expect(new QueueNameGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', 'config/horizon.php')->inSource($source))->toBe([]);
 });
 
 it('names every queue in app with a case of the Queue enum', function (): void {
-    expect(new QueueNameGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->violations())->toBe([]);
+    expect(new QueueNameGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', 'config/horizon.php')->violations())->toBe([]);
 });

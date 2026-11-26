@@ -24,19 +24,6 @@ final class TestTierGuard
         'Orchestra\Testbench\TestCase',
     ];
 
-    public const array PURE_LAYERS = [
-        'app/Support',
-        'app/Modules/*/Contracts',
-        'app/Modules/*/Data',
-        'app/Modules/*/Enums',
-        'app/Modules/*/Exceptions',
-        'app/Modules/*/ValueObjects',
-    ];
-
-    public const array FACTORY_LAYERS = [
-        'app/Modules/*/Data',
-    ];
-
     private const array FACTORY_FORBIDDEN_NAMES = [
         'Illuminate\Support\Facades\DB',
         'Illuminate\Support\Facades\Schema',
@@ -49,9 +36,21 @@ final class TestTierGuard
         'Spatie\Permission\Models\\',
     ];
 
+    /**
+     * @param string $testFolder the folder of the tests, relative to the root
+     * @param string $unitFolder the folder of the unit tier, relative to the root
+     * @param string $bootstrapFile the global file of the test framework, relative to the root
+     * @param list<string> $pureLayers globs of the folders that may not name the database layer, relative to the root
+     * @param list<string> $factoryLayers the pure layers of which a class may name a model inside its static factories
+     */
     public function __construct(
         private readonly PhpFileInspector $inspector,
         private readonly string $root,
+        private readonly string $testFolder,
+        private readonly string $unitFolder,
+        private readonly string $bootstrapFile,
+        private readonly array $pureLayers,
+        private readonly array $factoryLayers,
     ) {
     }
 
@@ -63,7 +62,7 @@ final class TestTierGuard
         $booting = array_merge(self::BOOTING_ROOTS, $this->bootingSupportTypes());
         $violations = [];
 
-        foreach ($this->inspector->phpFiles($this->root . '/tests/Unit') as $file) {
+        foreach ($this->inspector->phpFiles($this->root . '/' . $this->unitFolder) as $file) {
             $hits = array_values(array_intersect($this->inspector->referencedNames($file), $booting));
 
             if ($hits !== []) {
@@ -71,10 +70,8 @@ final class TestTierGuard
             }
         }
 
-        $pestFile = $this->root . '/tests/Pest.php';
-
-        foreach ($this->phpFilesMatching($this->root . '/tests', '/->in\(|\b(uses|extend)\(|->use\(/') as $file) {
-            $isGlobalFile = $this->relative($file) === 'tests/Pest.php';
+        foreach ($this->phpFilesMatching($this->root . '/' . $this->testFolder, '/->in\(|\b(uses|extend)\(|->use\(/') as $file) {
+            $isGlobalFile = $this->relative($file) === $this->bootstrapFile;
 
             foreach (PestBindingReader::pestBindings($file) as $binding) {
                 $coversUnit = $binding['targets'] === null
@@ -100,10 +97,10 @@ final class TestTierGuard
     {
         $violations = [];
 
-        foreach (self::PURE_LAYERS as $layer) {
+        foreach ($this->pureLayers as $layer) {
             foreach (Globs::of($this->root . '/' . $layer, GLOB_ONLYDIR) as $directory) {
                 foreach ($this->inspector->phpFiles($directory) as $file) {
-                    $hits = in_array($layer, self::FACTORY_LAYERS, true)
+                    $hits = in_array($layer, $this->factoryLayers, true)
                         ? $this->namesOutsideFactories($file)
                         : array_values(array_filter($this->inspector->referencedNames($file), $this->isDatabaseLayerName(...)));
 
@@ -148,7 +145,7 @@ final class TestTierGuard
 
     private function coversUnitDirectory(string $target): bool
     {
-        return $target === '*' || preg_match('#(^|/)Unit(/|$)#', $target) === 1;
+        return $target === '*' || preg_match('#(^|/)' . preg_quote(basename($this->unitFolder), '#') . '(/|$)#', $target) === 1;
     }
 
     /**
@@ -185,7 +182,7 @@ final class TestTierGuard
      */
     private function supportFiles(): array
     {
-        return $this->phpFilesMatching($this->root . '/tests', '/^\s*(abstract\s+|final\s+|readonly\s+)*(class|trait|interface)\s/m');
+        return $this->phpFilesMatching($this->root . '/' . $this->testFolder, '/^\s*(abstract\s+|final\s+|readonly\s+)*(class|trait|interface)\s/m');
     }
 
     /**

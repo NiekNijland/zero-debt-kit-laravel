@@ -10,6 +10,9 @@ use Tests\Support\SourceSandbox;
 
 uses()->group('arch');
 
+// Where this project keeps the snapshots and the modules; the detector names none of it.
+$where = ['snapshots' => 'tests/Support/Architecture/stored-class-names', 'source' => 'app', 'namespace' => 'App', 'modules' => 'Modules'];
+
 dataset('stored class names out of line', [
     'a new event that is not in the snapshot' => [
         ['app/Modules/Orders/Events/OrderPlacedEvent.php' => "<?php\n", 'tests/Support/Architecture/stored-class-names/events.php' => "<?php\nreturn [];\n"],
@@ -43,11 +46,11 @@ dataset('stored class names out of line', [
     ],
 ]);
 
-it('detects a stored class name that changed without its snapshot, migration or alias', function (array $files, array $aliases, string $reason): void {
+it('detects a stored class name that changed without its snapshot, migration or alias', function (array $files, array $aliases, string $reason) use ($where): void {
     $root = SourceSandbox::create(Narrow::stringMap($files));
 
     try {
-        $violations = new StoredClassNameGuard(new PhpFileInspector(), $root, Narrow::stringMap($aliases))->violations();
+        $violations = new StoredClassNameGuard(new PhpFileInspector(), $root, ...$where, aliases: Narrow::stringMap($aliases))->violations();
 
         expect($violations)->toHaveCount(1)
             ->and($violations[0])->toContain($reason);
@@ -56,7 +59,7 @@ it('detects a stored class name that changed without its snapshot, migration or 
     }
 })->with('stored class names out of line');
 
-it('accepts a listed class, an old name that an alias still carries and a class outside the stored folders', function (): void {
+it('accepts a listed class, an old name that an alias still carries and a class outside the stored folders', function () use ($where): void {
     $root = SourceSandbox::create([
         'app/Modules/Users/Mail/WelcomeMail.php' => "<?php\n",
         'app/Modules/Users/Services/WelcomeService.php' => "<?php\n",
@@ -65,14 +68,27 @@ it('accepts a listed class, an old name that an alias still carries and a class 
     ]);
 
     try {
-        expect(new StoredClassNameGuard(new PhpFileInspector(), $root, ['App\Mail\WelcomeMail' => 'App\Modules\Users\Mail\WelcomeMail'])->violations())->toBe([]);
+        expect(new StoredClassNameGuard(new PhpFileInspector(), $root, ...$where, aliases: ['App\Mail\WelcomeMail' => 'App\Modules\Users\Mail\WelcomeMail'])->violations())->toBe([]);
     } finally {
         SourceSandbox::remove($root);
     }
 });
 
-it('keeps the stored name of every event, job, mail and notification in its snapshot', function (): void {
-    $guard = new StoredClassNameGuard(new PhpFileInspector(), dirname(__DIR__, 2), MovedClassServiceProvider::ALIASES);
+it('reads a tree under a dot directory and names the snapshot relative to the root', function () use ($where): void {
+    $root = SourceSandbox::create(['app/Modules/Orders/Events/OrderPlacedEvent.php' => "<?php\n"], prefix: '.checkout-');
+
+    try {
+        $violations = new StoredClassNameGuard(new PhpFileInspector(), $root, ...$where, aliases: [])->violations();
+    } finally {
+        SourceSandbox::remove($root);
+    }
+
+    expect($violations)->toHaveCount(1)
+        ->and($violations[0])->toStartWith('App\Modules\Orders\Events\OrderPlacedEvent is not in tests/Support/Architecture/stored-class-names/events.php');
+});
+
+it('keeps the stored name of every event, job, mail and notification in its snapshot', function () use ($where): void {
+    $guard = new StoredClassNameGuard(new PhpFileInspector(), dirname(__DIR__, 2), ...$where, aliases: MovedClassServiceProvider::ALIASES);
 
     expect(count($guard->declared('events')))->toBeGreaterThan(0)
         ->and(count($guard->declared('jobs')))->toBeGreaterThan(0)

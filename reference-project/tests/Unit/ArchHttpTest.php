@@ -2,15 +2,16 @@
 
 declare(strict_types=1);
 
-use Illuminate\Database\Eloquent\Model;
-use Tests\Support\ArchChecks;
+use Tests\Support\Architecture\ControllerAuthorizationGuard;
+use Tests\Support\Architecture\ControllerNameGuard;
+use Tests\Support\Architecture\HttpRefusalGuard;
+use Tests\Support\Architecture\ImportSpellingGuard;
 use Tests\Support\Architecture\InertiaPageGuard;
-use Tests\Support\Architecture\PhpCallReader;
 use Tests\Support\Architecture\PhpFileInspector;
+use Tests\Support\Architecture\RedirectGuard;
+use Tests\Support\Architecture\RequestValidationGuard;
 use Tests\Support\Architecture\RouteParameterGuard;
-use Tests\Support\ClassNames;
-use Tests\Support\Globs;
-use Tests\Support\InstancesOf;
+use Tests\Support\SourceSandbox;
 
 uses()->group('arch');
 
@@ -23,180 +24,246 @@ arch('only invokable controllers')
     ->classes()
     ->toHaveMethod('__invoke');
 
-test('validation lives in form requests: nothing else validates a request', function (): void {
-    $root = dirname(__DIR__, 2);
-    $inspector = new PhpFileInspector();
-    $calls = static fn (string $source): array => ArchChecks::requestValidationLines($inspector->calls($source));
+dataset('requests validated by hand', [
+    'validate on the request' => ['<?php $request->validate([]);', 1],
+    'validateWithBag and the helper' => ['<?php $request->validateWithBag(\'x\', []); request()->validate([]);', 2],
+    'the validator facade' => ['<?php Validator::make($a, $b)->validate(); \Illuminate\Support\Facades\Validator::validate($a, $b);', 2],
+]);
 
-    $offenders = [];
+it('detects a request that is validated outside a form request', function (string $source, int $count): void {
+    $violations = new RequestValidationGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', [])->inSource($source);
 
-    foreach ($inspector->phpFiles($root . '/app') as $file) {
-        $class = 'App\\' . str_replace('/', '\\', substr($file, strlen($root . '/app/'), -4));
+    expect($violations)->toHaveCount($count)
+        ->and($violations[0])->toContain('write the rules in a form request');
+})->with('requests validated by hand');
 
-        if (str_starts_with($class, 'App\Http\Requests\\')) {
-            continue;
-        }
+it('accepts a validate call that is not on the request or the validator facade', function (): void {
+    $guard = new RequestValidationGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', []);
 
-        foreach (ArchChecks::requestValidationLines($inspector->callsIn($file)) as $line) {
-            $offenders[] = $class . ' line ' . $line;
-        }
-    }
-
-    expect($offenders)->toBe([])
-        ->and($calls('<?php $request->validate([]);'))->toHaveCount(1)
-        ->and($calls('<?php $request->validateWithBag(\'x\', []); request()->validate([]);'))->toHaveCount(2)
-        ->and($calls('<?php Validator::make($a, $b)->validate(); \Illuminate\Support\Facades\Validator::validate($a, $b);'))->toHaveCount(2)
-        ->and($calls('<?php $a = Auth::guard(\'web\')->validate($credentials); $b = $rule->validate($a, $b, $fail); $this->validate($input);'))->toBe([]);
+    expect($guard->inSource('<?php $a = Auth::guard(\'web\')->validate($credentials); $b = $rule->validate($a, $b, $fail); $this->validate($input);'))->toBe([]);
 });
 
-test('controllers check authorization on the route, not in the action', function (): void {
-    $root = dirname(__DIR__, 2);
-    $inspector = new PhpFileInspector();
-    $lines = static fn (string $source): array => [
-        ...ArchChecks::authorizationLines($inspector->calls($source)),
-        ...ArchChecks::deniedInstantiationLines(PhpCallReader::instantiations($source)),
-    ];
+it('skips the form requests and reads a checkout under a dot directory', function (): void {
+    $root = SourceSandbox::create(['app/Http/Requests/A.php' => "<?php\n\$request->validate([]);\n", 'app/Other.php' => "<?php\n\$request->validate([]);\n"], prefix: '.checkout-');
 
-    // A permission goes on the route, a rule about a model goes in its policy and on the route, a rule about the input goes in the form request,
-    // a check on a row the action locks goes in the action, and the credential of a webhook goes in a middleware.
-    $offenders = [];
-
-    foreach ($inspector->phpFiles($root . '/app/Http/Controllers') as $file) {
-        $class = 'App\Http\Controllers\\' . str_replace('/', '\\', substr($file, strlen($root . '/app/Http/Controllers/'), -4));
-
-        foreach ($lines((string) file_get_contents($file)) as $line) {
-            $offenders[] = $class . ' line ' . $line;
-        }
+    try {
+        $violations = new RequestValidationGuard(new PhpFileInspector(), $root, 'app', ['app/Http/Requests/'])->violations();
+    } finally {
+        SourceSandbox::remove($root);
     }
 
-    expect($offenders)->toBe([])
-        ->and($lines('<?php Gate::authorize(\'update\', $a);'))->toHaveCount(1)
-        ->and($lines('<?php Gate::forUser($u)->authorize(\'update\', $a); $this->authorize(\'x\');'))->toHaveCount(2)
-        ->and($lines('<?php abort_unless($a->can(\'x\'), 404); abort_if($a, 403); abort_unless($a, Response::HTTP_FORBIDDEN);'))->toHaveCount(3)
-        ->and($lines('<?php abort_unless($a, 403, \'No access\'); abort_if($b, Response::HTTP_FORBIDDEN, \'x\');'))->toHaveCount(2)
-        ->and($lines('<?php abort_unless($a->user_id === $b->id, 404);'))->toHaveCount(1)
-        ->and($lines('<?php abort_unless($model instanceof Model, 404); abort_if($a === null, Response::HTTP_NOT_FOUND); abort(404);'))->toBe([])
-        ->and($lines('<?php abort(403); abort(Response::HTTP_FORBIDDEN, \'x\'); \\abort(401);'))->toHaveCount(3)
-        ->and($lines('<?php throw new HttpException(401, \'x\'); throw new \\Symfony\\Component\\HttpKernel\\Exception\\HttpException(Response::HTTP_FORBIDDEN);'))->toHaveCount(2)
-        ->and($lines('<?php throw new AuthorizationException(); throw new AccessDeniedHttpException(); throw new UnauthorizedHttpException(\'Bearer\');'))->toHaveCount(3)
-        ->and($lines('<?php throw new HttpException(409); throw new NotFoundHttpException(); $a = new Response(403);'))->toBe([])
-        ->and($lines('<?php throw_unless($a, AccessDeniedHttpException::class, \'x\'); throw_if($b, \\Illuminate\\Auth\\Access\\AuthorizationException::class); \\throw_if($c, HttpException::class, 403);'))->toHaveCount(3)
-        ->and($lines('<?php throw_unless($a, NotFoundHttpException::class); throw_if($b, HttpException::class, 409); throw_if($c, $exception);'))->toBe([])
-        ->and($lines('<?php $a = Gate::allows(\'update\', $b); $c = Gate::forUser($u)->allows(\'view\', $d);'))->toBe([]);
+    expect($violations)->toHaveCount(1)
+        ->and($violations[0])->toStartWith('app/Other.php: line 2: a request is validated by hand');
 });
 
-test('outside the HTTP layer a refusal is a typed exception, not an HTTP answer', function (): void {
-    $root = dirname(__DIR__, 2);
-    $inspector = new PhpFileInspector();
-    $lines = static fn (string $source): array => ArchChecks::httpRefusalLines($inspector->calls($source), PhpCallReader::instantiations($source));
+it('validates a request in a form request and nowhere else', function (): void {
+    expect(new RequestValidationGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', ['app/Http/Requests/'])->violations())->toBe([]);
+});
 
-    // Controllers have the stricter rule above; a middleware answers the HTTP request itself, so abort(401) or abort(403) is its refusal.
-    $offenders = [];
+dataset('actions that check or refuse access', [
+    'Gate::authorize' => ['<?php Gate::authorize(\'update\', $a);', 1],
+    'authorize through a chain and on this' => ['<?php Gate::forUser($u)->authorize(\'update\', $a); $this->authorize(\'x\');', 2],
+    'abort_unless with a permission check, abort_if with 403' => ['<?php abort_unless($a->can(\'x\'), 404); abort_if($a, 403); abort_unless($a, Response::HTTP_FORBIDDEN);', 3],
+    'abort_unless with a message' => ['<?php abort_unless($a, 403, \'No access\'); abort_if($b, Response::HTTP_FORBIDDEN, \'x\');', 2],
+    'an ownership check' => ['<?php abort_unless($a->user_id === $b->id, 404);', 1],
+    'abort with 401 and 403' => ['<?php abort(403); abort(Response::HTTP_FORBIDDEN, \'x\'); \\abort(401);', 3],
+    'an HttpException with 401 or 403' => ['<?php throw new HttpException(401, \'x\'); throw new \\Symfony\\Component\\HttpKernel\\Exception\\HttpException(Response::HTTP_FORBIDDEN);', 2],
+    'hand-built refusals' => ['<?php throw new AuthorizationException(); throw new AccessDeniedHttpException(); throw new UnauthorizedHttpException(\'Bearer\');', 3],
+    'throw_if and throw_unless' => ['<?php throw_unless($a, AccessDeniedHttpException::class, \'x\'); throw_if($b, \\Illuminate\\Auth\\Access\\AuthorizationException::class); \\throw_if($c, HttpException::class, 403);', 3],
+]);
 
-    foreach ($inspector->phpFiles($root . '/app') as $file) {
-        $relative = substr($file, strlen($root . '/app/'));
+it('detects an action that checks or refuses access itself', function (string $source, int $count): void {
+    $violations = new ControllerAuthorizationGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app/Http/Controllers')->inSource($source);
 
-        if (str_starts_with($relative, 'Http/Controllers/') || str_starts_with($relative, 'Http/Middleware/')) {
-            continue;
-        }
+    expect($violations)->toHaveCount($count)
+        ->and($violations[0])->toContain('put the permission on the route, the rule about a model in its policy');
+})->with('actions that check or refuse access');
 
-        foreach ($lines((string) file_get_contents($file)) as $line) {
-            $offenders[] = 'app/' . $relative . ' line ' . $line;
-        }
+dataset('actions that refuse nothing', [
+    'a not found' => ['<?php abort_unless($model instanceof Model, 404); abort_if($a === null, Response::HTTP_NOT_FOUND); abort(404);'],
+    'other statuses' => ['<?php throw new HttpException(409); throw new NotFoundHttpException(); $a = new Response(403);'],
+    'throw_if with other exceptions' => ['<?php throw_unless($a, NotFoundHttpException::class); throw_if($b, HttpException::class, 409); throw_if($c, $exception);'],
+    'a gate read' => ['<?php $a = Gate::allows(\'update\', $b); $c = Gate::forUser($u)->allows(\'view\', $d);'],
+]);
+
+it('accepts a not found, other statuses and a read of the gate', function (string $source): void {
+    expect(new ControllerAuthorizationGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app/Http/Controllers')->inSource($source))->toBe([]);
+})->with('actions that refuse nothing');
+
+it('reads the controllers below a checkout under a dot directory', function (): void {
+    $root = SourceSandbox::create(['app/Http/Controllers/A.php' => "<?php\nGate::authorize('x');\n"], prefix: '.checkout-');
+
+    try {
+        $violations = new ControllerAuthorizationGuard(new PhpFileInspector(), $root, 'app/Http/Controllers')->violations();
+    } finally {
+        SourceSandbox::remove($root);
     }
 
-    expect($offenders)->toBe([])
-        ->and($lines('<?php abort(403); \\abort(401, \'x\'); abort(Response::HTTP_FORBIDDEN);'))->toHaveCount(3)
-        ->and($lines('<?php abort_if($a, 403); abort_unless($b, Response::HTTP_UNAUTHORIZED, \'x\');'))->toHaveCount(2)
-        ->and($lines('<?php throw new AccessDeniedHttpException(); throw new UnauthorizedHttpException(\'Bearer\'); throw new HttpException(403);'))->toHaveCount(3)
-        ->and($lines('<?php throw_unless($a, AccessDeniedHttpException::class); throw_if($b, HttpException::class, Response::HTTP_FORBIDDEN);'))->toHaveCount(2)
-        ->and($lines('<?php abort(404); abort_if($a, 422); abort_unless($b, Response::HTTP_NOT_FOUND); throw new HttpException(409);'))->toBe([])
-        ->and($lines('<?php throw new AuthorizationException(); throw new OrderAlreadyShippedException(); throw_unless($a, NotFoundHttpException::class);'))->toBe([]);
+    expect($violations)->toHaveCount(1)
+        ->and($violations[0])->toStartWith('app/Http/Controllers/A.php: line 2: an action checks or refuses access itself');
 });
 
-test('controllers and route files redirect with to_route() and back(), not through redirect()', function (): void {
-    $root = dirname(__DIR__, 2);
-    $inspector = new PhpFileInspector();
-    $calls = static fn (string $source): array => ArchChecks::redirectLines($inspector->calls($source));
-    $offenders = [];
+it('checks authorization on the route, not in the action of a controller', function (): void {
+    expect(new ControllerAuthorizationGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app/Http/Controllers')->violations())->toBe([]);
+});
 
-    foreach (['app', 'bootstrap', 'routes'] as $directory) {
-        foreach ($inspector->phpFiles($root . '/' . $directory) as $file) {
-            foreach (ArchChecks::redirectLines($inspector->callsIn($file)) as $line) {
-                $offenders[] = substr($file, strlen($root) + 1) . ' line ' . $line;
-            }
-        }
+dataset('HTTP refusals outside the HTTP layer', [
+    'abort with 403 and 401' => ['<?php abort(403); \\abort(401, \'x\'); abort(Response::HTTP_FORBIDDEN);', 3],
+    'abort_if and abort_unless' => ['<?php abort_if($a, 403); abort_unless($b, Response::HTTP_UNAUTHORIZED, \'x\');', 2],
+    'HTTP exceptions' => ['<?php throw new AccessDeniedHttpException(); throw new UnauthorizedHttpException(\'Bearer\'); throw new HttpException(403);', 3],
+    'throw_if and throw_unless' => ['<?php throw_unless($a, AccessDeniedHttpException::class); throw_if($b, HttpException::class, Response::HTTP_FORBIDDEN);', 2],
+]);
+
+it('detects an HTTP refusal outside the HTTP layer', function (string $source, int $count): void {
+    $violations = new HttpRefusalGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', [])->inSource($source);
+
+    expect($violations)->toHaveCount($count)
+        ->and($violations[0])->toContain('throw a domain exception that extends the authorization exception');
+})->with('HTTP refusals outside the HTTP layer');
+
+it('accepts a not found, a conflict and a domain exception', function (): void {
+    $guard = new HttpRefusalGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', []);
+
+    expect($guard->inSource('<?php abort(404); abort_if($a, 422); abort_unless($b, Response::HTTP_NOT_FOUND); throw new HttpException(409);'))->toBe([])
+        ->and($guard->inSource('<?php throw new AuthorizationException(); throw new OrderAlreadyShippedException(); throw_unless($a, NotFoundHttpException::class);'))->toBe([]);
+});
+
+it('skips the controllers and the middleware and reads a checkout under a dot directory', function (): void {
+    $source = "<?php\nabort(403);\n";
+    $root = SourceSandbox::create(['app/Http/Controllers/A.php' => $source, 'app/Http/Middleware/B.php' => $source, 'app/Domain/C.php' => $source], prefix: '.checkout-');
+
+    try {
+        $violations = new HttpRefusalGuard(new PhpFileInspector(), $root, 'app', ['app/Http/Controllers/', 'app/Http/Middleware/'])->violations();
+    } finally {
+        SourceSandbox::remove($root);
     }
 
-    expect($offenders)->toBe([])
-        ->and($calls('<?php return redirect()->route(\'home\');'))->toHaveCount(1)
-        ->and($calls('<?php return redirect()' . "\n" . '->route(\'login\')->withErrors([]);'))->toHaveCount(1)
-        ->and($calls('<?php return redirect()->back(fallback: \'/\'); return Redirect::route(\'home\');'))->toHaveCount(2)
-        ->and($calls('<?php return \\redirect()->route(\'home\'); return \\Illuminate\\Support\\Facades\\Redirect::route(\'home\'); return \\Redirect::back(); return REDIRECT()->back();'))->toHaveCount(4)
-        ->and($calls('<?php use Illuminate\\Support\\Facades\\Redirect as R; return R::route(\'home\');'))->toHaveCount(1)
-        ->and($calls('<?php return to_route(\'home\'); return back(); return redirect()->to($url); return redirect()->away($url); return redirect()->intended(\'/\'); return redirect(\'/\');'))->toBe([]);
+    expect($violations)->toHaveCount(1)
+        ->and($violations[0])->toStartWith('app/Domain/C.php: line 2: an HTTP refusal outside the HTTP layer');
 });
 
-test('a controller is named <Verb>Controller and sits in a folder named after what it acts on', function (): void {
+it('refuses with a typed exception outside the HTTP layer', function (): void {
+    expect(new HttpRefusalGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', ['app/Http/Controllers/', 'app/Http/Middleware/'])->violations())->toBe([]);
+});
+
+dataset('redirects through the helper', [
+    'the helper route' => ['<?php return redirect()->route(\'home\');', 1],
+    'a chain on a new line' => ['<?php return redirect()' . "\n" . '->route(\'login\')->withErrors([]);', 1],
+    'back with a fallback and the facade' => ['<?php return redirect()->back(fallback: \'/\'); return Redirect::route(\'home\');', 2],
+    'backslashes and capitals' => ['<?php return \\redirect()->route(\'home\'); return \\Illuminate\\Support\\Facades\\Redirect::route(\'home\'); return \\Redirect::back(); return REDIRECT()->back();', 4],
+    'an aliased facade' => ['<?php use Illuminate\\Support\\Facades\\Redirect as R; return R::route(\'home\');', 1],
+]);
+
+it('detects a redirect that goes through redirect()', function (string $source, int $count): void {
+    $violations = new RedirectGuard(new PhpFileInspector(), dirname(__DIR__, 2), ['app'])->inSource($source);
+
+    expect($violations)->toHaveCount($count)
+        ->and($violations[0])->toContain('write to_route(\'name\') for a named route and back() to go back');
+})->with('redirects through the helper');
+
+it('accepts to_route(), back() and the other redirect methods', function (): void {
+    $guard = new RedirectGuard(new PhpFileInspector(), dirname(__DIR__, 2), ['app']);
+
+    expect($guard->inSource('<?php return to_route(\'home\'); return back(); return redirect()->to($url); return redirect()->away($url); return redirect()->intended(\'/\'); return redirect(\'/\');'))->toBe([]);
+});
+
+it('reads the folders below a checkout under a dot directory', function (): void {
+    $root = SourceSandbox::create(['app/A.php' => "<?php\nreturn redirect()->route('a');\n", 'routes/web.php' => "<?php\nreturn to_route('a');\n"], prefix: '.checkout-');
+
+    try {
+        $violations = new RedirectGuard(new PhpFileInspector(), $root, ['app', 'routes'])->violations();
+    } finally {
+        SourceSandbox::remove($root);
+    }
+
+    expect($violations)->toHaveCount(1)
+        ->and($violations[0])->toStartWith('app/A.php: line 2: a redirect through redirect()');
+});
+
+it('redirects with to_route() and back() in controllers and route files', function (): void {
+    expect(new RedirectGuard(new PhpFileInspector(), dirname(__DIR__, 2), ['app', 'bootstrap', 'routes'])->violations())->toBe([]);
+});
+
+dataset('controller names that fail', [
+    'in the controller root' => ['App\Http\Controllers\ShowController', 'a controller sits in the controller root'],
+    'without the suffix' => ['App\Http\Controllers\Order\Show', 'a controller is named <Verb>Controller'],
+    'a verb that is not on the list' => ['App\Http\Controllers\Order\FooController', 'the verb Foo is not one of Show, Store'],
+]);
+
+it('detects a controller that is not named <Verb>Controller in a folder of what it acts on', function (string $type, string $words): void {
+    $guard = new ControllerNameGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app/Http/Controllers', ['Show', 'Store'], 'App\Http\Controllers');
+
+    expect($guard->inType($type))->toContain($words);
+})->with('controller names that fail');
+
+it('accepts a verb controller in a folder, and names a verb that no controller carries and a folder with no controller', function (): void {
+    $guard = new ControllerNameGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app/Http/Controllers', ['Show', 'Store'], 'App\Http\Controllers');
+    $root = SourceSandbox::create([
+        'c/Order/ShowController.php' => "<?php\nnamespace App\\Http\\Controllers\\Order;\nfinal class ShowController {}\n",
+        'empty/.gitkeep' => '',
+    ], prefix: '.checkout-');
+
+    try {
+        $stale = new ControllerNameGuard(new PhpFileInspector(), $root, 'c', ['Show', 'Store'], 'App\Http\Controllers')->violations();
+        $empty = new ControllerNameGuard(new PhpFileInspector(), $root, 'empty', ['Show'], 'App\Http\Controllers')->violations();
+    } finally {
+        SourceSandbox::remove($root);
+    }
+
+    expect($guard->inType('App\Http\Controllers\Order\ShowController'))->toBeNull()
+        ->and($stale)->toBe(['the verb Store is on the list and no controller carries it: remove it from the list'])
+        ->and($empty[0])->toContain('no controller was read');
+});
+
+it('names every controller <Verb>Controller in a folder named after what it acts on', function (): void {
     $verbs = [
         'Cancel', 'Create', 'Destroy', 'Download', 'Edit', 'Export', 'Import', 'Index', 'Receive', 'Restore', 'Search', 'Send', 'Show', 'Store',
         'Update',
     ];
-    $inspector = new PhpFileInspector();
-    $controllers = 0;
-    $used = [];
-    $offenders = [];
 
-    foreach ($inspector->phpFiles(dirname(__DIR__, 2) . '/app/Http/Controllers') as $file) {
-        foreach (array_keys($inspector->declaredTypes($file)) as $type) {
-            $controllers++;
-            $reflection = new ReflectionClass(ClassNames::of($type));
-            $verb = substr($reflection->getShortName(), 0, -strlen('Controller'));
-            $inFolder = $reflection->getNamespaceName() !== 'App\Http\Controllers';
-
-            if (! $inFolder || ! str_ends_with($reflection->getShortName(), 'Controller') || ! in_array($verb, $verbs, true)) {
-                $offenders[] = $type;
-            } else {
-                $used[$verb] = true;
-            }
-        }
-    }
-
-    expect($controllers)->toBeGreaterThan(0)
-        ->and($offenders)->toBe([])
-        ->and(array_values(array_diff($verbs, array_keys($used))))->toBe([]);
+    expect(new ControllerNameGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app/Http/Controllers', $verbs, 'App\Http\Controllers')->violations())->toBe([]);
 });
 
-test('route files import a controller folder and write Folder\Noun\VerbController::class', function (): void {
-    $root = dirname(__DIR__, 2);
-    $offenders = [];
+dataset('imports in the wrong spelling', [
+    'a controller by its own import' => ['controller', "<?php\nuse App\\Http\\Controllers\\Order\\ShowController;\n", 'import the folder and write Folder\Noun\VerbController::class'],
+    'a controller under an alias' => ['controller', "<?php\nuse App\\Http\\Controllers\\Order\\ShowController as Show;\n", 'a route file imports a controller'],
+    'the Inertia response as Response' => ['page', "<?php\nuse Inertia\\Response;\n", 'import it as InertiaResponse'],
+    'the Inertia response under another alias' => ['page', "<?php\nuse Inertia\\Response as Page;\n", 'import it as InertiaResponse'],
+]);
 
-    foreach ([...Globs::of($root . '/routes/*.php'), $root . '/bootstrap/app.php'] as $file) {
-        if (preg_match('/^use App\\\\Http\\\\Controllers\\\\[\w\\\\]*Controller(?: as \w+)?;$/m', (string) file_get_contents($file)) === 1) {
-            $offenders[] = substr($file, strlen($root) + 1);
-        }
-    }
+it('detects a controller import in a route file and the Inertia response under another name', function (string $kind, string $source, string $words): void {
+    $guard = new ImportSpellingGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'App\Http\Controllers', 'Inertia\Response', 'InertiaResponse');
+    $violations = $kind === 'controller' ? $guard->controllerImportInSource($source) : $guard->pageImportInSource($source);
 
-    expect($offenders)->toBe([]);
+    expect($violations)->toHaveCount(1)
+        ->and($violations[0])->toContain($words);
+})->with('imports in the wrong spelling');
+
+it('accepts the folder import and the Inertia response as InertiaResponse', function (): void {
+    $guard = new ImportSpellingGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'App\Http\Controllers', 'Inertia\Response', 'InertiaResponse');
+
+    expect($guard->controllerImportInSource("<?php\nuse App\\Http\\Controllers\\Order;\nuse App\\Http\\Requests\\StoreRequest;\n"))->toBe([])
+        ->and($guard->pageImportInSource("<?php\nuse Inertia\\Response as InertiaResponse;\nuse Illuminate\\Http\\Response;\n"))->toBe([]);
 });
 
-test('the Inertia response is imported as InertiaResponse', function (): void {
-    $root = dirname(__DIR__, 2);
-    $pattern = '/^use Inertia\\\\Response(?! as InertiaResponse;)(?: as \w+)?;$/m';
-    $offenders = [];
+it('reads the Inertia imports below a checkout under a dot directory', function (): void {
+    $root = SourceSandbox::create(['app/A.php' => "<?php\nuse Inertia\\Response;\n", 'app/B.php' => "<?php\nuse Inertia\\Response as InertiaResponse;\n"], prefix: '.checkout-');
 
-    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root . '/app', FilesystemIterator::SKIP_DOTS)) as $file) {
-        $file = InstancesOf::one($file, SplFileInfo::class);
-        if ($file->getExtension() === 'php' && preg_match($pattern, (string) file_get_contents($file->getPathname())) === 1) {
-            $offenders[] = substr($file->getPathname(), strlen($root) + 1);
-        }
+    try {
+        $violations = new ImportSpellingGuard(new PhpFileInspector(), $root, 'App\Http\Controllers', 'Inertia\Response', 'InertiaResponse')->pageImports('app');
+    } finally {
+        SourceSandbox::remove($root);
     }
 
-    expect($offenders)->toBe([])
-        ->and(preg_match($pattern, "use Inertia\\Response;\n"))->toBe(1)
-        ->and(preg_match($pattern, "use Inertia\\Response as Page;\n"))->toBe(1)
-        ->and(preg_match($pattern, "use Inertia\\Response as InertiaResponse;\n"))->toBe(0)
-        ->and(preg_match($pattern, "use Illuminate\\Http\\Response;\n"))->toBe(0);
+    expect($violations)->toHaveCount(1)
+        ->and($violations[0])->toStartWith('app/A.php: the Inertia response is imported under another name');
+});
+
+it('imports a controller folder in the route files and the Inertia response as InertiaResponse', function (): void {
+    $guard = new ImportSpellingGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'App\Http\Controllers', 'Inertia\Response', 'InertiaResponse');
+
+    expect($guard->controllerImports([...$guard->files('routes/*.php'), 'bootstrap/app.php']))->toBe([])
+        ->and($guard->pageImports('app'))->toBe([]);
 });
 
 it('detects a route parameter that is not camelCase', function (string $source, string $reason): void {

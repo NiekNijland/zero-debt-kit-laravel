@@ -14,7 +14,7 @@ use PhpParser\NodeFinder;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\NameResolver;
 use PhpParser\ParserFactory;
-use ReflectionProperty;
+use ReflectionClass;
 
 /**
  * The classes, interfaces and traits of a set of sources, with what a rule about lineage needs: the parent, the
@@ -112,6 +112,25 @@ final class ClassGraph
     }
 
     /**
+     * A class outside the parsed tree is read from its own file, found through the autoloader, so a property of a vendor class goes through the same
+     * parser as the project's and not through a reflection of its members.
+     *
+     * @return 'default'|'instance'|null
+     */
+    private function vendorProperty(string $name, string $property): ?string
+    {
+        $file = new ReflectionClass($name)->getFileName();
+
+        if ($file === false) {
+            return null;
+        }
+
+        $parsed = self::of([$file => (string) file_get_contents($file)])->types[$name] ?? null;
+
+        return $parsed === null ? null : new self([$name => $parsed, ...$this->types])->property($parsed, $property);
+    }
+
+    /**
      * The property as the class, a parent or a trait declares it: 'instance' when it is promoted or has no default
      * (set per object), 'default' when a default stands on it, null when nothing declares it.
      *
@@ -126,8 +145,8 @@ final class ClassGraph
         foreach ($this->lineage($info) as $name => $type) {
             $declared = $type['properties'][$property] ?? null;
 
-            if ($type === null && (class_exists($name) || trait_exists($name)) && property_exists($name, $property)) {
-                $declared = (new ReflectionProperty($name, $property))->hasDefaultValue() ? 'default' : 'instance';
+            if ($type === null && (class_exists($name) || trait_exists($name))) {
+                $declared = $this->vendorProperty($name, $property);
             }
 
             if ($declared === 'instance') {

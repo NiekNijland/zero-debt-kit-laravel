@@ -9,8 +9,6 @@ use Tests\Support\Narrow;
 
 final readonly class StoredClassNameGuard
 {
-    private const string SNAPSHOTS = 'tests/Support/Architecture/stored-class-names';
-
     private const array KINDS = [
         'events' => ['folder' => 'Events', 'duty' => 'the landlord events.name column stores it: add a data migration that renames the rows'],
         'jobs' => ['folder' => 'Jobs', 'duty' => 'queued payloads (jobs, failed_jobs, Horizon) store it: keep the old name in MovedClassServiceProvider::ALIASES for one release'],
@@ -19,11 +17,19 @@ final readonly class StoredClassNameGuard
     ];
 
     /**
+     * @param string $snapshots the folder of the snapshot files, relative to the root
+     * @param string $source the source folder, relative to the root
+     * @param string $namespace the root namespace of the source folder
+     * @param string $modules the folder of the modules, relative to the source folder
      * @param array<string, string> $aliases
      */
     public function __construct(
         private PhpFileInspector $inspector,
         private string $root,
+        private string $snapshots,
+        private string $source,
+        private string $namespace,
+        private string $modules,
         private array $aliases,
     ) {
     }
@@ -36,7 +42,7 @@ final readonly class StoredClassNameGuard
         $violations = [];
 
         foreach (self::KINDS as $kind => $rule) {
-            $snapshot = self::SNAPSHOTS . '/' . $kind . '.php';
+            $snapshot = $this->snapshots . '/' . $kind . '.php';
             $stored = $this->stored($kind);
             $declared = $this->declared($kind);
 
@@ -69,9 +75,9 @@ final readonly class StoredClassNameGuard
     {
         $classes = [];
 
-        foreach (Globs::of($this->root . '/app/Modules/*/' . self::KINDS[$kind]['folder']) as $folder) {
+        foreach (Globs::of($this->root . '/' . $this->source . '/' . $this->modules . '/*/' . self::KINDS[$kind]['folder']) as $folder) {
             foreach ($this->inspector->phpFiles($folder) as $file) {
-                $classes[] = 'App\\' . str_replace('/', '\\', substr($file, strlen($this->root . '/app/'), -4));
+                $classes[] = $this->namespace . '\\' . str_replace('/', '\\', substr($file, strlen($this->root . '/' . $this->source . '/'), -4));
             }
         }
 
@@ -85,7 +91,7 @@ final readonly class StoredClassNameGuard
      */
     public function stored(string $kind): array
     {
-        $file = $this->root . '/' . self::SNAPSHOTS . '/' . $kind . '.php';
+        $file = $this->root . '/' . $this->snapshots . '/' . $kind . '.php';
 
         return is_file($file) ? Narrow::strings(require $file) : [];
     }

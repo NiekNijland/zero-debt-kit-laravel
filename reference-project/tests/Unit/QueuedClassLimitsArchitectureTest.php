@@ -25,7 +25,7 @@ dataset('queued classes without their limits', [
 ]);
 
 it('detects a queued class that does not declare its timeout or its tries', function (string $source, array $reasons): void {
-    $violations = new QueuedClassLimitsGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source);
+    $violations = new QueuedClassLimitsGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', 'config/horizon.php')->inSource($source);
 
     expect($violations)->toHaveCount(count($reasons));
 
@@ -48,9 +48,9 @@ dataset('queued classes with their limits and near misses', [
 ]);
 
 it('accepts a queued class with its limits however they are declared, and the near misses', function (string $source): void {
-    expect(new QueuedClassLimitsGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source))->toBe([]);
+    expect(new QueuedClassLimitsGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', 'config/horizon.php')->inSource($source))->toBe([]);
 })->with('queued classes with their limits and near misses');
 
 it('gives every queued class in app its own timeout and tries', function (): void {
-    expect(new QueuedClassLimitsGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->violations())->toBe([]);
+    expect(new QueuedClassLimitsGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', 'config/horizon.php')->violations())->toBe([]);
 });

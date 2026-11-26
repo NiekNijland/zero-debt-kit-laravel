@@ -8,6 +8,10 @@ use Tests\Support\SourceSandbox;
 
 uses()->group('arch');
 
+// The folders and guides of this project; the detector names none of them.
+$roots = ['.github', '.storybook', 'app', 'bootstrap', 'config', 'database', 'docs', 'lang', 'resources', 'routes', 'scripts', 'tests'];
+$guides = ['AGENTS.md', 'DESIGN.md', 'docs/review-rubric.md'];
+
 dataset('guides that name a path that is gone', [
     'a file from the repository root' => [
         ['AGENTS.md' => "# Guide\n\nCopy `app/Support/Like.php`, not `app/Support/Search.php`.\n", 'app/Support/Like.php' => "<?php\n"],
@@ -27,11 +31,11 @@ dataset('guides that name a path that is gone', [
     ],
 ]);
 
-it('detects a guide that names a path that does not exist', function (array $files, string $reason): void {
+it('detects a guide that names a path that does not exist', function (array $files, string $reason) use ($roots, $guides): void {
     $root = SourceSandbox::create(Narrow::stringMap($files));
 
     try {
-        $violations = new DocumentedPathGuard($root)->violations();
+        $violations = new DocumentedPathGuard($root, $roots, $guides, 'AGENTS.md')->violations();
 
         expect($violations)->toHaveCount(1)
             ->and($violations[0])->toContain($reason)
@@ -41,7 +45,7 @@ it('detects a guide that names a path that does not exist', function (array $fil
     }
 })->with('guides that name a path that is gone');
 
-it('accepts paths that exist, placeholders, wildcards and text that is not a path', function (): void {
+it('accepts paths that exist, placeholders, wildcards and text that is not a path', function () use ($roots, $guides): void {
     $root = SourceSandbox::create([
         'AGENTS.md' => implode("\n", [
             'Copy `app/Support/Like.php` in `app/Support` or `app/Support/`; the page is `Pages/Order/Show.tsx`, the hook `hooks/use-debounce.ts`.',
@@ -59,15 +63,28 @@ it('accepts paths that exist, placeholders, wildcards and text that is not a pat
     ]);
 
     try {
-        expect(new DocumentedPathGuard($root)->violations())->toBe([]);
+        expect(new DocumentedPathGuard($root, $roots, $guides, 'AGENTS.md')->violations())->toBe([]);
     } finally {
         SourceSandbox::remove($root);
     }
 });
 
-it('names only paths that exist in AGENTS.md, DESIGN.md and the review rubric', function (): void {
+it('names the guide relative to the root when the checkout sits under a dot directory', function () use ($roots, $guides): void {
+    $root = SourceSandbox::create(['AGENTS.md' => "Copy `app/Support/Gone.php`.\n", 'app/Support/Like.php' => "<?php\n"], prefix: '.checkout-');
+
+    try {
+        $violations = new DocumentedPathGuard($root, $roots, $guides, 'AGENTS.md')->violations();
+    } finally {
+        SourceSandbox::remove($root);
+    }
+
+    expect($violations)->toHaveCount(1)
+        ->and($violations[0])->toStartWith('AGENTS.md:1: `app/Support/Gone.php` does not exist');
+});
+
+it('names only paths that exist in AGENTS.md, DESIGN.md and the review rubric', function () use ($roots, $guides): void {
     $root = dirname(__DIR__, 2);
 
     expect(DocumentedPathGuard::pathsIn((string) file_get_contents($root . '/AGENTS.md')))->not->toBe([])
-        ->and(new DocumentedPathGuard($root)->violations())->toBe([]);
+        ->and(new DocumentedPathGuard($root, $roots, $guides, 'AGENTS.md')->violations())->toBe([]);
 });

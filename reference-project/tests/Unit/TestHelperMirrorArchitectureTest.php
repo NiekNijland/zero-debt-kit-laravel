@@ -30,7 +30,7 @@ it('reports helpers and scenarios in the mirrored tree that no test at the mirro
     ]);
 
     try {
-        $violations = new TestHelperMirrorGuard(new PhpFileInspector(), $root)->violations();
+        $violations = new TestHelperMirrorGuard(new PhpFileInspector(), $root, 'tests/Support', 'tests', 'Tests\\Support')->violations();
 
         expect($violations)->toHaveCount(5)
             ->and($violations[0])->toStartWith('tests/Support/Feature/Http/Controllers/Order/OrderControllersHelpers.php: there is no tests/Feature/Http/Controllers/Order/OrderControllersTest.php')
@@ -44,6 +44,39 @@ it('reports helpers and scenarios in the mirrored tree that no test at the mirro
     }
 });
 
+it('accepts a helper with its test, a themed class and a detector in a folder that has no mirror', function (): void {
+    $class = static fn (string $namespace, string $name, string $body = ''): string => "<?php\nnamespace Tests\\Support\\" . $namespace . ";\nfinal class " . $name . ' { ' . $body . " }\n";
+    $root = SourceSandbox::create([
+        'tests/Unit/ArchHttpTest.php' => "<?php\n",
+        'tests/Support/Unit/ArchHttpHelpers.php' => $class('Unit', 'ArchHttpHelpers'),
+        'tests/Support/Shops.php' => "<?php\nnamespace Tests\\Support;\nfinal class Shops { }\n",
+        'tests/Support/Architecture/ShopGuard.php' => $class('Architecture', 'ShopGuard'),
+        'tests/Support/Architecture/OrphanHelpers.php' => $class('Architecture', 'OrphanHelpers'),
+    ]);
+
+    try {
+        expect(new TestHelperMirrorGuard(new PhpFileInspector(), $root, 'tests/Support', 'tests', 'Tests\\Support')->violations())->toBe([]);
+    } finally {
+        SourceSandbox::remove($root);
+    }
+});
+
+it('names the helper relative to the root when the checkout sits under a dot directory', function (): void {
+    $root = SourceSandbox::create([
+        'tests/Unit/ArchTest.php' => "<?php\n",
+        'tests/Support/Unit/OrphanHelpers.php' => "<?php\nnamespace Tests\\Support\\Unit;\nfinal class OrphanHelpers { }\n",
+    ], prefix: '.checkout-');
+
+    try {
+        $violations = new TestHelperMirrorGuard(new PhpFileInspector(), $root, 'tests/Support', 'tests', 'Tests\\Support')->violations();
+    } finally {
+        SourceSandbox::remove($root);
+    }
+
+    expect($violations)->toHaveCount(1)
+        ->and($violations[0])->toStartWith('tests/Support/Unit/OrphanHelpers.php: there is no tests/Unit/OrphanTest.php');
+});
+
 it('gives every helper and scenario in the mirrored tree of tests/Support a test at the mirrored path', function (): void {
-    expect(new TestHelperMirrorGuard(new PhpFileInspector(), dirname(__DIR__, 2))->violations())->toBe([]);
+    expect(new TestHelperMirrorGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'tests/Support', 'tests', 'Tests\\Support')->violations())->toBe([]);
 });

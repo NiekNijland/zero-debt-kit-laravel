@@ -29,12 +29,13 @@ final readonly class QueueNameGuard
 {
     private const array QUEUE_SETTERS = ['onqueue', 'allonqueue', 'pushon', 'lateron'];
 
-    private const string ONE_WAY = 'name the queue with a case of App\Modules\Observability\Enums\Queue (Queue::X), which has a Horizon worker in config/horizon.php';
+    private const string ONE_WAY = 'name the queue with a case of App\Modules\Observability\Enums\Queue (Queue::X), which has a Horizon worker in %s';
 
     public function __construct(
         private PhpFileInspector $inspector,
         private string $root,
         private string $source,
+        private string $workerConfig,
     ) {
     }
 
@@ -71,27 +72,27 @@ final readonly class QueueNameGuard
             $first = $call->args[0] ?? null;
 
             if (in_array($call->name->toLowerString(), self::QUEUE_SETTERS, true) && $first instanceof Node\Arg && self::isLiteral($first->value)) {
-                $violations[$call->getStartLine() . ' a'] = $call->getStartLine() . ': ' . $call->name->toString() . '() with a queue name as text: ' . self::ONE_WAY;
+                $violations[$call->getStartLine() . ' a'] = $call->getStartLine() . ': ' . $call->name->toString() . '() with a queue name as text: ' . sprintf(self::ONE_WAY, $this->workerConfig);
             }
         }
 
         foreach ($finder->findInstanceOf($statements, Property::class) as $property) {
             foreach ($property->props as $declared) {
                 if ($declared->name->toString() === 'queue' && self::isLiteral($declared->default)) {
-                    $violations[$declared->getStartLine() . ' b'] = $declared->getStartLine() . ': $queue with a queue name as text: call $this->onQueue(Queue::X) in the constructor; ' . self::ONE_WAY;
+                    $violations[$declared->getStartLine() . ' b'] = $declared->getStartLine() . ': $queue with a queue name as text: call $this->onQueue(Queue::X) in the constructor; ' . sprintf(self::ONE_WAY, $this->workerConfig);
                 }
             }
         }
 
         foreach ($finder->findInstanceOf($statements, Param::class) as $parameter) {
             if ($parameter->flags !== 0 && $parameter->var instanceof Variable && $parameter->var->name === 'queue' && self::isLiteral($parameter->default)) {
-                $violations[$parameter->getStartLine() . ' e'] = $parameter->getStartLine() . ': a promoted $queue with a queue name as text: call $this->onQueue(Queue::X) in the constructor; ' . self::ONE_WAY;
+                $violations[$parameter->getStartLine() . ' e'] = $parameter->getStartLine() . ': a promoted $queue with a queue name as text: call $this->onQueue(Queue::X) in the constructor; ' . sprintf(self::ONE_WAY, $this->workerConfig);
             }
         }
 
         foreach ($finder->findInstanceOf($statements, Assign::class) as $assign) {
             if ($assign->var instanceof PropertyFetch && $assign->var->name instanceof Identifier && $assign->var->name->toString() === 'queue' && self::isLiteral($assign->expr)) {
-                $violations[$assign->getStartLine() . ' c'] = $assign->getStartLine() . ': ->queue set to a queue name as text: ' . self::ONE_WAY;
+                $violations[$assign->getStartLine() . ' c'] = $assign->getStartLine() . ': ->queue set to a queue name as text: ' . sprintf(self::ONE_WAY, $this->workerConfig);
             }
         }
 
@@ -102,7 +103,7 @@ final readonly class QueueNameGuard
 
             foreach ($finder->findInstanceOf($method->stmts ?? [], Node\ArrayItem::class) as $item) {
                 if (self::isLiteral($item->value)) {
-                    $violations[$item->getStartLine() . ' d'] = $item->getStartLine() . ': viaQueues() with a queue name as text: ' . self::ONE_WAY;
+                    $violations[$item->getStartLine() . ' d'] = $item->getStartLine() . ': viaQueues() with a queue name as text: ' . sprintf(self::ONE_WAY, $this->workerConfig);
                 }
             }
         }
