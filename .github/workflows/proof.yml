@@ -5,9 +5,12 @@
 # Action pins: every action is pinned to a full commit sha with its release in a comment. The three shas below were looked up
 # through the GitHub API (git/ref/tags/<tag>, an annotated tag followed to its commit) on 2026-11-26. Re-verify one before
 # changing it; never type a sha from memory.
-#   actions/checkout        v4.2.2  11bd71901bbe5b1630ceea73d27597364c9af683
-#   actions/setup-node      v4.4.0  49933ea5288caeca8642d1e84afbd3f7d6820020
-#   shivammathur/setup-php  2.32.0  9e72090525849c5e82e596468b86eb55e9cc5401
+#   actions/checkout        v7.0.1  3d3c42e5aac5ba805825da76410c181273ba90b1
+#   actions/setup-node      v7.1.0  949feb2413d6458794dcd2491c4babbbce0c15c1
+#   shivammathur/setup-php  2.40.0  eb7c497e18156a6bbabfef1d3a82760b9eda3962
+# All three declare `using: node24` in their action.yml (read through the API on the same day): the older pins (checkout v4.2.2, setup-node
+# v4.4.0, setup-php 2.32.0) were node20 actions, and GitHub's changelog says the runners no longer offer Node 20. UNVERIFIED on a runner: what a node20
+# action does there (a warning, a forced run on Node 24, or a failure); the pins above avoid the question.
 # jq is on both hosted runner images; the "Tools" step prints its version and installs it (apt, brew) only when it is missing.
 # The workflow itself has not been run on a runner yet: the first run on a pull request is its proof.
 
@@ -35,12 +38,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: shivammathur/setup-php@9e72090525849c5e82e596468b86eb55e9cc5401 # 2.32.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.4'
           tools: none
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22.13.1'
       - name: bash -n on every script
@@ -69,14 +72,14 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: shivammathur/setup-php@9e72090525849c5e82e596468b86eb55e9cc5401 # 2.32.0
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.4'
           tools: none
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22.13.1'
       - name: Tools
