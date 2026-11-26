@@ -4,22 +4,28 @@ declare(strict_types=1);
 
 namespace Tests\Support\Architecture;
 
+use Illuminate\Log\Logger;
 use PhpParser\Node;
 use PhpParser\Node\Arg;
+use PhpParser\Node\Expr\Assign;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Expr\NullsafeMethodCall;
 use PhpParser\Node\Expr\StaticCall;
+use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\NodeFinder;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\NameResolver;
 use PhpParser\ParserFactory;
+use Psr\Log\LoggerInterface;
 
 final readonly class LogMessageGuard
 {
     private const array LOG_FACADES = ['Log', 'Illuminate\Support\Facades\Log'];
+
+    private const array LOGGERS = [LoggerInterface::class, Logger::class];
 
     private const array LEVELS = ['debug', 'info', 'notice', 'warning', 'error', 'critical', 'alert', 'emergency'];
 
@@ -53,15 +59,22 @@ final readonly class LogMessageGuard
     {
         $statements = (new NodeTraverser(new NameResolver()))->traverse((new ParserFactory())->createForHostVersion()->parse($source) ?? []);
         $finder = new NodeFinder();
+        $loggers = TypedReceivers::in($statements, self::LOGGERS, ['log']);
+        $held = [];
         $violations = [];
 
+        foreach ($finder->findInstanceOf($statements, Assign::class) as $assign) {
+            if ($assign->var instanceof Variable && is_string($assign->var->name) && $finder->findFirst([$assign->expr], self::readsMessage(...)) instanceof Node) {
+                $held[] = $assign->var->name;
+            }
+        }
+
         foreach ($finder->find($statements, static fn (Node $node): bool => $node instanceof StaticCall || $node instanceof MethodCall || $node instanceof FuncCall) as $call) {
-            $arguments = $call instanceof StaticCall || $call instanceof MethodCall || $call instanceof FuncCall ? self::loggedArguments($call) : [];
+            $arguments = $call instanceof StaticCall || $call instanceof MethodCall || $call instanceof FuncCall ? self::loggedArguments($call, $loggers) : [];
 
             foreach ($arguments as $position => $argument) {
-                $read = $finder->findFirst([$argument], static fn (Node $node): bool => ($node instanceof MethodCall || $node instanceof NullsafeMethodCall)
-                    && $node->name instanceof Identifier
-                    && $node->name->toLowerString() === 'getmessage');
+                $read = $finder->findFirst([$argument], static fn (Node $node): bool => self::readsMessage($node)
+                    || ($node instanceof Variable && is_string($node->name) && in_array($node->name, $held, true)));
 
                 if (! $read instanceof Node) {
                     continue;
@@ -76,10 +89,17 @@ final readonly class LogMessageGuard
         return $violations;
     }
 
+    private static function readsMessage(Node $node): bool
+    {
+        return ($node instanceof MethodCall || $node instanceof NullsafeMethodCall)
+            && $node->name instanceof Identifier
+            && $node->name->toLowerString() === 'getmessage';
+    }
+
     /**
      * @return list<Node>
      */
-    private static function loggedArguments(StaticCall|MethodCall|FuncCall $call): array
+    private static function loggedArguments(StaticCall|MethodCall|FuncCall $call, TypedReceivers $loggers): array
     {
         $values = [];
 
@@ -95,8 +115,15 @@ final readonly class LogMessageGuard
 
         $name = $call->name instanceof Identifier ? $call->name->toLowerString() : '';
         $receiver = $call instanceof MethodCall ? $call->var : $call;
+
+        // Walk down a chain (`Log::channel('a')->withContext([...])->warning(...)`) to what it starts from.
+        while ($receiver instanceof MethodCall || $receiver instanceof NullsafeMethodCall) {
+            $receiver = $receiver->var;
+        }
+
         $onLog = ($receiver instanceof StaticCall && $receiver->class instanceof Name && in_array(ltrim($receiver->class->toString(), '\\'), self::LOG_FACADES, true))
-            || ($receiver instanceof FuncCall && self::isLoggerHelper($receiver));
+            || ($receiver instanceof FuncCall && self::isLoggerHelper($receiver))
+            || $loggers->holds($receiver);
 
         if (! $onLog) {
             return [];
