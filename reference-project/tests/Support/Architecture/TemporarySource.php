@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Support\Architecture;
 
-/**
- * Runs a file-based reader of the inspector over a source string: the source is written to a temporary file for the length of the call.
- */
+use Illuminate\Filesystem\Filesystem;
+
 final class TemporarySource
 {
     /**
      * @template T
-     * @param callable(string): T $read receives the path of the temporary file
+     *
+     * @param callable(string): T $read
      * @return T
      */
     public static function with(string $source, callable $read): mixed
@@ -22,7 +22,7 @@ final class TemporarySource
         try {
             return $read($path);
         } finally {
-            unlink($path);
+            new Filesystem()->delete($path);
         }
     }
 }
