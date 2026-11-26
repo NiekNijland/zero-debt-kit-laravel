@@ -18,6 +18,7 @@ The lead copies this file into the project hand-off folder with the project's ti
 3. Keep scratch scripts and their output in the scratch folder your brief names, and give every analyser run its own cache directory: a cache shared across worktrees breaks.
 4. Run from the repository root of your worktree, never from a subfolder, and look at `git status` before a command that stages everything: a tool's cache folder inside a source folder is committed by `git add -A` and counted by the rows.
 5. A test suite runs against your own database server (your brief names it); never against a database another agent or the lead uses, and never two suites on one database.
+6. Infrastructure names are yours alone: your container names, network aliases, volume names, ports and database name come from your brief and carry your theme, never a default name. Never start, stop, recreate, rename or detach anything you did not create, and never remove a network alias: a builder that did so took the shared database away from every other builder. When your brief names none, ask the lead before you start a container.
 
 ## Git
 
