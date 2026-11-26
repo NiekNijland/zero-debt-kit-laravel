@@ -13,10 +13,12 @@ use PhpParser\ParserFactory;
 
 final readonly class ExitGuard
 {
+    /**
+     * @param list<string> $trees the folders to scan, relative to the root; any of them may be absent
+     */
     public function __construct(
         private PhpFileInspector $inspector,
         private string $root,
-        /** @var list<string> the folders to scan, relative to the root; any of them may be absent */
         private array $trees,
     ) {
     }
