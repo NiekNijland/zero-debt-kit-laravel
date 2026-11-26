@@ -1,6 +1,6 @@
 # Templates for files in the repository
 
-Seven files, and one guard-rows file per guard (section 5b). Worked examples of most are in `reference-project/` (`AGENTS.md`, `app/AGENTS.md`, `tests/AGENTS.md`, `resources/js/AGENTS.md`, `docs/review-rubric.md`, `docs/decisions/0002-one-backend-pattern.md`).
+Seven files, and one guard-rows file per guard (section 5b). Worked examples of most are in the starter (`AGENTS.md`, `app/AGENTS.md`, `tests/AGENTS.md`, `docs/review-rubric.md`, `docs/decisions/0001-one-backend-pattern.md`, `docs/guards/ci-contract.md`) and, for the frontend, in `reference-project/examples/frontend/` (`resources/js/AGENTS.md`).
 
 ---
 

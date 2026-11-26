@@ -6,7 +6,7 @@ Comparisons below come from public documentation and general knowledge, not from
 
 You should use them where they fit: they are good at what the kit calls architecture tests of class shape and layer dependencies. Deptrac and PHPArkitect are Composer dev dependencies (also shipped as PHARs) with rules in a config file; Pest's `arch()` ships presets (`laravel()`, `php()`, `security()`, `strict()`, `relaxed()`) with `ignoring()` for exceptions. These are from their documentation as of this writing; I did not re-check every option.
 
-What the kit adds is not a better dependency checker. It is the program around the guards: deciding the one way per task, writing it down with a file to copy, burning the old way down to zero with counters, and a contract test over the CI files so the pipeline cannot be narrowed. Its guards are plain PHP tests on a shared parser (`reference-project/`), so you can build the same rule in Pest arch or Deptrac if you prefer; the kit's rule is that every guard has failing examples, passing examples and a real-tree case, and that a guard for a rule exists in CI at all. Not verified: whether Pest arch can express every guard in `reference-project/` (probably not the ones that read the guides or the CI files).
+What the kit adds is not a better dependency checker. It is the program around the guards: deciding the one way per task, writing it down with a file to copy, burning the old way down to zero with counters, and a contract test over the CI files so the pipeline cannot be narrowed. Its guards are plain PHP tests on a shared parser (the starter, `reference-project/README.md`), so you can build the same rule in Pest arch or Deptrac if you prefer; the kit's rule is that every guard has failing examples, passing examples and a real-tree case, and that a guard for a rule exists in CI at all. Not verified: whether Pest arch can express every guard in the starter (probably not the ones that read the guides or the CI files).
 
 ## Why not Betterer?
 
@@ -22,7 +22,7 @@ Use them; the kit assumes them. A level is a setting, not a ratchet: nothing sto
 
 ## Is it a Composer package?
 
-No. It is a program an agent runs, with shell tools you copy. A package for the guards and a versioned, checksum-locked script is an idea under consideration, not a promise. The guards in `reference-project/` are an anonymized extract with illustrative names; read its `README.md` before copying one.
+No. It is a program an agent runs, with shell tools you copy. A package for the guards and a versioned, checksum-locked script is an idea under consideration, not a promise. The guards are those of a running starter (`reference-project/README.md`); copy them from there, after the starter's `KIT-FINDINGS.md`.
 
 ## Does it work for stacks other than Laravel and React?
 

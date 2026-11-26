@@ -2,7 +2,7 @@
 
 Optional reading. Each line is a lesson from the runs of this program so far (three Laravel projects, all on Bitbucket) and the place where it became an instruction. A run needs none of it: every instruction is in the numbered files and the catalogs. The file describes no project: it holds no profiles and only the few measured figures that a lesson needs.
 
-Where the reference project falls short of the kit binds a run, so that list is not in this file: it is `reference-project/README.md`, which `04-guards.md` C1 tells you to read before copying.
+Where the reference falls short of the kit binds a run, so that list is not in this file: it is the starter's `KIT-FINDINGS.md` and `reference-project/README.md`, which `04-guards.md` C1 tells you to read before copying.
 
 ## Declaring zero, and measuring
 
@@ -72,7 +72,7 @@ Where the reference project falls short of the kit binds a run, so that list is 
 | The base branch was assumed from the deploy pipeline, and the whole stack had to merge the branch the team really works on. | `02-step-1-discover.md` 1.1 |
 | Six stacked guard PRs read and rewrote the same guide rows: every merge conflicted the next in meaning, every push voided the approvals, and one merge landed on a stack parent and never reached the main line. | `05-program.md` D2 step 3 and D3; `07-process.md` section 9; `03-conventions.md` B2 (one rows file per guard) |
 | Adding the kit took long, mostly in waiting and repair: slow pipelines, late owner questions, a secret-shaped test string that forced a new branch, test databases shared by agents, usage limits hit together. | `04-guards.md` C4 ("CI speed"); `02-step-1-discover.md` 1.10; `08-builder-rules.md`; `07-process.md` section 7 |
-| The same blind sides came back in every review of a guard. | `04-guards.md` C1, "The standing blind-side list"; `reference-project/README.md`, "The guard library" |
+| The same blind sides came back in every review of a guard. | `04-guards.md` C1, "The standing blind-side list"; `reference-project/files-to-copy.md`, "Guards" |
 | A time-boxed exception for an advisory needs its own rule: dated, short, never renewed, for advisories only. | `04-guards.md` C3; `tools/README.md`, "`audit-gate.sh`" |
 | Measured in one pipeline: one step running thirteen checks made each tool two to three times slower than alone; result caches took a format check from 131 s to 4 s; worker counts could not be told apart in the noise. | `04-guards.md` C4 ("What the measurements said"); `ci/checks.sh` (`PARTS`); `ci/prepush.sh` |
 | A chain queued before a class move died after it: a serialized closure names its defining class and every class of its body, and only a run that dispatches on the old tree and processes on the new sees it. | `05-program.md` D4 point 5 and D9; `10-hazards.md`, "Stored names"; `04-guards.md` C1 (register row) |

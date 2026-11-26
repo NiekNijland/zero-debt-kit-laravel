@@ -6,7 +6,7 @@ The lead copies this file into the project hand-off folder with the project's ti
 
 ## Read first
 
-1. This file and your brief, and no other kit file: the brief holds the kit's path and, pasted, every kit section your theme needs. A pointer in your brief to a section that is not pasted, and that you need in order to act, is a gap: ask the lead. The one kit folder you may open is `reference-project/`, under the kit's path, for a worked example that a pasted section names.
+1. This file and your brief, and no other kit file: the brief holds the kit's path and, pasted, every kit section your theme needs. A pointer in your brief to a section that is not pasted, and that you need in order to act, is a gap: ask the lead. The one kit folder you may open is `reference-project/`, under the kit's path, for its `files-to-copy.md` and the examples that a pasted section names; the worked example itself is the starter, by the path the pasted section gives.
 2. The project's `zero-debt-plan.md`: the definition of clean and the decisions table. Decisions are made; never reopen them.
 3. The root `AGENTS.md` and the scoped `AGENTS.md` of every area you touch. They are the target pattern.
 4. A brief without a scratch folder, an explicit file list, the ref to branch from or the kit's path is incomplete: ask the lead before you start.

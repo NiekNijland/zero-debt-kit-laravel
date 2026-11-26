@@ -4,7 +4,7 @@ This file is the React and TypeScript form; tool names here are that stack's. An
 
 Every project converges to these patterns; code that differs is debt (`01-principles.md`, "Who decides what"). Counts are text matches in tracked files, run from the repository root on the main branch. `<src>` is the frontend source folder.
 
-**Reading the Rule column.** Every guard here is a lint rule (`04-guards.md` C1, "Frontend") unless the cell says otherwise: a built-in rule is named, a group name in brackets is its place in the worked example `reference-project/eslint.config.js`, and "local plugin" is a small rule file in the project for what selectors cannot express. The written rules of the worked example are in `reference-project/resources/js/AGENTS.md`. "Review; rubric item N" is a judgement, numbered in `templates/repo-docs.md`.
+**Reading the Rule column.** Every guard here is a lint rule (`04-guards.md` C1, "Frontend") unless the cell says otherwise: a built-in rule is named, a group name in brackets is its place in the worked example `reference-project/examples/frontend/eslint.config.js` (an example that does not run: the starter has no frontend), and "local plugin" is a small rule file in the project for what selectors cannot express. The written rules of the worked example are in `reference-project/examples/frontend/resources/js/AGENTS.md`. "Review; rubric item N" is a judgement, numbered in `templates/repo-docs.md`.
 
 ## Version floor per row
 
@@ -38,12 +38,12 @@ Rows that need a write, a form or a flash message are skipped where the UI has n
 | React compiler rules | `rules-of-hooks`, `exhaustive-deps`, refs and set-state-in-effect as errors | from the linter JSON | the rules as `error` |
 | Formatting | the formatter with the kit's config checks the whole tree in CI (source, stories, scripts, config files) and fails; nothing writes or commits | `npx prettier --check <paths>` | the checks step (`04-guards.md` C4) |
 | File size | at most 400 lines, tests included; exempt by category only (generated types, vendored UI component) | `git ls-files -z '<src>/*.ts' '<src>/*.tsx' \| xargs -0 wc -l \| awk '$2!="total" && $1>400' \| wc -l` | `max-lines` |
-| Function size | at most 80 lines per function, as the backend's method limit | functions over the limit, from the linter with the rule on in a scratch config | `max-lines-per-function` with blank lines and comments skipped; components are held by the next row instead. Not in the reference project |
-| Component logic | at most 40 lines of logic in a component: the lines from the start of its body to its `return`, the markup not counted. More logic is a hook | components over the limit, by the local plugin in a scratch config | a local plugin (`components/max-logic-lines`). Not in the reference project |
+| Function size | at most 80 lines per function, as the backend's method limit | functions over the limit, from the linter with the rule on in a scratch config | `max-lines-per-function` with blank lines and comments skipped; components are held by the next row instead. Not in the starter |
+| Component logic | at most 40 lines of logic in a component: the lines from the start of its body to its `return`, the markup not counted. More logic is a hook | components over the limit, by the local plugin in a scratch config | a local plugin (`components/max-logic-lines`). Not in the starter |
 
 ## Layers
 
-The folders directly under `<src>`, lowest layer first. This set is the kit's, as the module folders are for the backend; a project adds no layer to it without an owner decision row. Not in the reference project, whose layers are not in one table.
+The folders directly under `<src>`, lowest layer first. This set is the kit's, as the module folders are for the backend; a project adds no layer to it without an owner decision row. Not in the starter, whose layers are not in one table.
 
 | Layer (folder) | Holds | May import |
 | --- | --- | --- |

@@ -33,7 +33,7 @@ A ratchet moved the wrong way, or a row was redefined or removed. A row that is 
   [ratchet: <name>] <reason>
 ```
 
-The first output is the message of a guard in `reference-project/`; the second is what `tools/ci-ratchets.sh` prints when a suppression is added (the numbers are illustrative).
+The first output is the message of a guard of the starter (`reference-project/README.md`); the second is what `tools/ci-ratchets.sh` prints when a suppression is added (the numbers are illustrative).
 
 ## What it is
 
@@ -46,7 +46,7 @@ It is one standard: there is no lighter version of done. A reader who only wants
 You do not need the program to get the core effect. Two parts carry most of it: a counter that cannot grow, and a few architecture tests that fail with a message.
 
 1. **The ratchet script.** Copy `tools/ci-ratchets.sh`, `tools/kit-config.sh` and `tools/debt-caps.json` into `scripts/` of your repository (the scripts are called with `bash`, they carry no executable bit). Fill in the config block at the top of `ci-ratchets.sh` (your source, test and frontend folders, the config files of your tools) and the base branch in `kit-config.sh`. Run `bash scripts/ci-ratchets.sh --head` to see every row's value today, and add `bash scripts/ci-ratchets.sh` as a blocking step of your pull-request pipeline. Run `bash scripts/ci-ratchets.sh --self-test` once: it proves each row counts the spellings it must. From then on no counter can grow; the rows are listed under "Every ratchet" and explained in `tools/README.md`. It needs `bash` 3.2 or later, `git`, and `jq`, `node` or `php` for the rows that read JSON.
-2. **Three guards from `reference-project/`**, chosen because they need the least around them (read `reference-project/README.md` first: names in the examples are illustrative, and the PHP guards need the PHP parser package `nikic/php-parser`):
+2. **Three guards from the starter** (`reference-project/files-to-copy.md` lists the paths; they were chosen because they need the least around them, and the PHP guards need the PHP parser package `nikic/php-parser`):
    - the guard over the guides: `tests/Support/Architecture/DocumentedPathGuard.php` with `tests/Unit/DocumentedPathArchitectureTest.php` (every path a guide names exists);
    - the rules guard: `tests/Support/Architecture/GuideRulesGuard.php` with `tests/Unit/GuideRulesArchitectureTest.php` (the guide must keep saying what a rule says);
    - the size guard: `tests/Support/Architecture/FileSizeGuard.php` with `tests/Unit/FileSizeTest.php`.
@@ -57,13 +57,13 @@ What you do not get this way: the layout, the written patterns, the burn-down, t
 
 ## Who it is for
 
-Teams on Laravel and React (Pest, PHPStan, Rector, Pint) that already have decent coverage and static analysis and still see patterns drift, especially when agents write code. The method and the shell tools work for any stack; the catalogs, the reference project and the tool configs are written for Laravel and React. `catalog/other-stacks.md` maps the rows to other stacks, but nothing outside Laravel and React has been run.
+Teams on Laravel and React (Pest, PHPStan, Rector, Pint) that already have decent coverage and static analysis and still see patterns drift, especially when agents write code. The method and the shell tools work for any stack; the catalogs, the starter and the tool configs are written for Laravel and React. `catalog/other-stacks.md` maps the rows to other stacks, but nothing outside Laravel and React has been run.
 
 The kit decides the patterns and the structure, and only techniques differ between projects (`01-principles.md`, "Who decides what"). It is generic: it holds no organisation-specific rule, name, address or token. What an organisation manages for itself (a shared formatter config, shared pipeline images, an autofix commit) is asked in step 1 and stays the organisation's.
 
 ## Every guard
 
-One mechanism per kind of rule (`04-guards.md` C1 and the tables of `catalog/`). The table says what each kind forbids; "the reference" is the worked example under `reference-project/`.
+One mechanism per kind of rule (`04-guards.md` C1 and the tables of `catalog/`). The table says what each kind forbids; "the reference" is the worked example: the running starter, <https://github.com/NiekNijland/zero-debt-laravel> (`reference-project/README.md`).
 
 | Kind of guard | What it forbids, and why it matters |
 | --- | --- |
@@ -125,7 +125,7 @@ One mechanism per kind of rule (`04-guards.md` C1 and the tables of `catalog/`).
 21. the audit of a deploying branch covers production dependencies only;
 22. the files that carry the guards are covered by a code-owners rule that names an owner.
 
-The reference holds the Bitbucket reader, plus GitHub and GitLab readers that are proved on examples only; `04-guards.md` C4 says which points each covers.
+The starter holds a GitHub reader; the Bitbucket and GitLab readers of the earlier extract are no longer shipped (`docs/starter-variants.md`), and the skeletons of all three hosts are proved on examples (`tools/proof/fixtures/ci/`); `04-guards.md` C4 says which points each covers.
 
 ## Every ratchet
 
@@ -266,17 +266,17 @@ More: `docs/adoption-guide.md` (who it is for, what to prepare, what the three g
 
 ## What is proven and what is not
 
-- **The scripts are proven by a proof suite.** `tools/proof/proof.sh` builds scratch repositories and runs more than 450 scenarios against the scripts in `tools/` and `ci/` (it counts scenarios, not features), and `ci-ratchets.sh --self-test` runs 224 regex cases. The proof runs no real analyser, formatter, refactoring tool, coverage tool, unused-code tool or CI host; it replaces the secret scan by `true`.
+- **The scripts are proven by a proof suite.** `tools/proof/proof.sh` builds scratch repositories and runs more than 600 scenarios against the scripts in `tools/` and `ci/` (it counts scenarios, not features), and `ci-ratchets.sh --self-test` runs 224 regex cases. The proof runs no real analyser, formatter, refactoring tool, coverage tool, unused-code tool or CI host; it replaces the secret scan by `true`.
 - **The program has been run on three Laravel applications, all hosted on Bitbucket.** The Bitbucket skeleton ran in real pipelines there, and the lessons of each run are written back into the kit. Only a few measured figures appear in the method files, each marked as one run; the rest of what the runs measured is not published here.
 - **GitHub Actions has run once.** The GitHub skeleton ran on one real repository (a private repository of a free plan, runner form). What was seen and what was not is in `04-guards.md` C4, "What has run". Treat the rest of the GitHub skeleton (the container form, the schedule, a stacked pull request, a required check) as unverified (`docs/adoption-guide.md`, "GitHub first-run notes").
 - **GitLab is untested.** The skeleton exists and is checked against examples only.
 - **Other stacks have not been run.** `catalog/other-stacks.md` maps every row to another stack on paper.
 - **Mutation tools.** The Pest, Infection and Stryker forms were run on scratch projects on 2026-11-26 (Pest 5.3.7, Infection 0.35.12, Stryker 10.1.1); the versions and the recorded outputs are in `tools/README.md`, "Mutation". The proof replays those outputs with a fake `npx` and fake `vendor/bin` scripts. Only the Pest form was also run on a sample of a real application. Not verified: Infection with Xdebug or phpdbg, a Stryker path that holds a comma, and a Stryker runner other than vitest.
-- **The reference project is an anonymized extract**, not a runnable application and not a product; its `README.md` lists where it falls short of the kit.
+- **The reference is a starter, not a product**: a small running application (a notes API) built at the kit's end state; what it lacks (multi-tenancy, a frontend, the Bitbucket and GitLab readers) is in `docs/starter-variants.md`.
 
-## About the reference project
+## About the reference
 
-`reference-project/` is an anonymized extract of an application's guards, configs and guides, rewritten onto an example domain (a small web shop): the names in it are illustrative, the lists and guides are shortened, and the code is not a runnable application. Read it for the shape of a guard, not for a product. Its `README.md` lists where it falls short of the kit.
+The worked example is the strict Laravel starter, <https://github.com/NiekNijland/zero-debt-laravel>: a running Laravel application with the guards, configs, scripts and guides of the kit, and a nightly canary against the kit's `main` (`.github/workflows/starter-canary.yml`, a proposal: not run yet). `reference-project/` is the pointer to it: `README.md`, `files-to-copy.md` (the starter's paths and what each is for) and a few examples that do not run. The starter is pinned to a kit commit and lags the kit; where they differ, the kit wins.
 
 ## Files
 
@@ -296,19 +296,19 @@ More: `docs/adoption-guide.md` (who it is for, what to prepare, what the three g
 | `record-source-project.md` | optional reading: the lessons of the earlier runs and the instruction each became | never needed for a run |
 | `catalog/` | `backend-laravel.md`, `frontend-react.md` and `tests-database-ci-docs.md`: per task the one way, how to count the old way, and the guard; `other-stacks.md`: every one of those rows for any other stack | in step 1 (the mapping of 1.5) only the files of the project's stack: a stack other than Laravel and React reads `other-stacks.md` and, of the other three, only the rows and tables it points to. Then per step, the tables that step names |
 | `templates/` | `project-profile.md`, `zero-debt-plan.md`, `backlog-and-continue.md`, `repo-docs.md` (the `AGENTS.md` set, decision record, review rubric, PR template), `pr-description-and-brief.md` (with the move map format), `tool-configs.md` (formatter and refactoring-tool configs to copy) | when creating them |
-| `tools/` | `ci-ratchets.sh`, `debt-dashboard.sh`, `debt-caps.json`, `kit-config.sh`, `ci-commit-messages.sh`, `ci-parallel.sh`, `keyed-baseline.sh`, `audit-gate.sh`, `mutation.sh`, `map-normalise.sh` and `move-ts.mjs` (what each does: `tools/README.md`), and `tools/proof/proof.sh`, which proves every script in scratch repositories. The reference project's originals of the ratchet script, the dashboard, the caps file, the commit-message check and the parallel runner are in `reference-project/scripts/` | step 1 (the scratch dashboard of 1.6, the mutation sample of 1.7) and step 2 |
+| `tools/` | `ci-ratchets.sh`, `debt-dashboard.sh`, `debt-caps.json`, `kit-config.sh`, `ci-commit-messages.sh`, `ci-parallel.sh`, `keyed-baseline.sh`, `audit-gate.sh`, `mutation.sh`, `map-normalise.sh` and `move-ts.mjs` (what each does: `tools/README.md`), and `tools/proof/proof.sh`, which proves every script in scratch repositories. The starter holds a copy of each of them with its own config block | step 1 (the scratch dashboard of 1.6, the mutation sample of 1.7) and step 2 |
 | `ci/` | `checks.sh`, the one command that the pipeline's checks step (one step per part) and a developer both run, `prepush.sh`, which runs every part side by side before a push, `CODEOWNERS.example`, and the pipeline skeletons `bitbucket-pipelines.yml`, `github-actions.yml` and `gitlab-ci.yml`; a repository that has a pipeline adds their jobs to its own file | step 2 |
 | `AGENTS.md` | instructions for an agent that maintains the kit itself | when changing the kit |
 | `.claude-plugin/`, `skills/` | the Claude Code plugin and marketplace manifests and the four skills | when installing or changing the plugin |
 | `docs/` | `adoption-guide.md`, `faq.md`, `launch-post-draft.md` | before adopting |
 | `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `VERSION`, `CHANGELOG.md`, `UPGRADING.md` | how to contribute, report a vulnerability, behave, and which version a copy is | when contributing or upgrading |
-| `reference-project/` | guards, configs and `AGENTS.md` files of the reference project, a Laravel and React application, as worked examples on an example domain (an anonymized extract, not a runnable application). Its `README.md` lists where that project falls short of the kit | when building a guard: the `README.md` first |
+| `reference-project/` | the pointer to the strict Laravel starter (the worked example), the list of files to copy from it, and a few examples that do not run. `docs/starter-variants.md` is the backlog of what the starter lacks | when building a guard: the `README.md` first |
 
 ## Limits
 
 - No dates, estimates or priorities: order comes from dependencies.
 - It does not decide product questions and does not touch the ticket system.
-- `reference-project/` is another project's end state. Copy the idea and the shape, after reading `reference-project/README.md`; never paste a guard that names classes the target does not have.
+- The starter is a project's end state. Copy from it by `reference-project/files-to-copy.md`, after the starter's `KIT-FINDINGS.md`; never paste a guard that names classes the target does not have.
 - The scripts in `tools/` name no project: each starts with a config block the project fills in. What each needs on the runner and on a developer machine is in `tools/README.md`.
 - The kit is self-contained: nothing outside this folder is needed.
 - The PHP floor is 8.4 (`catalog/backend-laravel.md`, "Version floor per row").

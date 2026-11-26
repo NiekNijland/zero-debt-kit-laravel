@@ -13,7 +13,7 @@ This file is for an agent that maintains this repository. If you are running the
 | `tools/` | the shell and node tools (`ci-ratchets.sh`, `debt-dashboard.sh`, ...); `tools/README.md` documents each |
 | `tools/proof/` | the proof suite: `proof.sh` plus `scenarios.d/` |
 | `ci/` | the pipeline skeletons (Bitbucket, GitHub, GitLab), `checks.sh`, `prepush.sh`, `CODEOWNERS.example` |
-| `reference-project/` | an anonymized extract of guards, configs and guides; illustrative, not runnable |
+| `reference-project/` | the pointer to the strict Laravel starter (the worked example), `files-to-copy.md`, and a few examples that do not run |
 | `.claude-plugin/`, `skills/` | the Claude Code plugin and marketplace, and the skills that point at the numbered files |
 | `docs/` | adoption guide, FAQ, launch post draft |
 

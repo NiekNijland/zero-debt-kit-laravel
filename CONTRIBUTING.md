@@ -4,7 +4,7 @@ Thank you for helping. The kit is one standard for one kind of project (Laravel 
 
 ## Ground rules
 
-- **Generic.** No project, organisation, ticket, person, address or token in any file. Use the example domain of `reference-project/` (a small web shop).
+- **Generic.** No project, organisation, ticket, person, address or token in any file. Use the example domain of the starter (a notes API) or an example domain of your own.
 - **English**, short and concrete. A claim must be checkable in the repository, or marked as unverified.
 - **One standard.** A proposal that adds a smaller or optional version of done will be declined.
 - **Honest scope.** If you ran something, say what, where and what happened. If you did not, say so.
@@ -15,7 +15,7 @@ Thank you for helping. The kit is one standard for one kind of project (Laravel 
 2. **Name the rule** the way the catalog does: per task, the one way, how the old way is counted, the guard. Add it to the right file in `catalog/` and to the tables in `README.md`.
 3. **A row** (`tools/ci-ratchets.sh`): a name, a direction, a method, paths, an expression. It needs self-test cases (what it must count, what it must ignore) and a line in `tools/README.md`, "The rows that ship". The README row names must match the table in the script.
 4. **A proof scenario is required** for any change to a script in `tools/` or `ci/`, in `tools/proof/scenarios.d/`. It must fail without your change. See `AGENTS.md`, "Guarded by the proof".
-5. **A PHP guard** follows `04-guards.md` C1: a detector class, a thin test with failing examples, passing examples and one case over the real tree. Put it under `reference-project/` with illustrative names.
+5. **A PHP guard** follows `04-guards.md` C1: a detector class, a thin test with failing examples, passing examples and one case over the real tree. A guard that the starter lacks goes into `docs/starter-variants.md` as a backlog entry, or, when it can be read without an application, under `reference-project/examples/` marked as an example that does not run; a guard the starter has is fixed in the starter.
 
 ## Genericness check before you open a pull request
 
