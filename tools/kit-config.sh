@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# The values more than one script reads. ci-ratchets.sh, debt-dashboard.sh, ci-commit-messages.sh and checks.sh source this file
+# The values (and, below the block, the branch-name helpers) more than one script reads. ci-ratchets.sh, debt-dashboard.sh, ci-commit-messages.sh and checks.sh source this file
 # from the folder they are in. It is a guarded file: a change needs [ratchet: script] <reason>.
 
 # >>> config: the project sets every value in this block
@@ -16,3 +16,41 @@ CAPS_FILE="scripts/debt-caps.json"
 # of the pipeline with it.
 DATABASE_IMAGE="<engine:major of production>"
 # <<< config
+
+# Shared by ci-ratchets.sh and ci-commit-messages.sh, which read the branch names from the CI environment. A branch name is data
+# from the pull request's author: one that starts with a dash would be read by the version-control tool as an option (an upload-pack
+# option runs a command).
+
+# kit_check_branches: BASE_BRANCH and HEAD_BRANCH are set. Returns 1 with the reason in KIT_BRANCH_ERROR when the base is not a
+# usable branch name; a head branch that is not one is dropped (HEAD_BRANCH="").
+kit_check_branches() {
+    case "$BASE_BRANCH" in
+        -*)
+            KIT_BRANCH_ERROR="the base branch \"$BASE_BRANCH\" starts with a dash"
+            return 1
+            ;;
+    esac
+    if ! git check-ref-format "refs/heads/$BASE_BRANCH" 2> /dev/null; then
+        KIT_BRANCH_ERROR="the base branch \"$BASE_BRANCH\" is not a branch name"
+        return 1
+    fi
+    case "$HEAD_BRANCH" in
+        -*) HEAD_BRANCH="" ;;
+    esac
+    if [ -n "$HEAD_BRANCH" ] && ! git check-ref-format "refs/heads/$HEAD_BRANCH" 2> /dev/null; then
+        HEAD_BRANCH=""
+    fi
+    return 0
+}
+
+# kit_deepen <number of commits|all>: fetch more history of the base branch (a failure returns 1) and, as a courtesy, of the head
+# branch (a pull request from a fork has none on this remote: HEAD_BRANCH is dropped, no failure). "--" ends the options.
+kit_deepen() {
+    local option="--deepen=$1"
+    [ "$1" != "all" ] || option="--unshallow"
+    git fetch -q "$option" -- "$REMOTE" "$BASE_BRANCH" 2> /dev/null || return 1
+    if [ -n "$HEAD_BRANCH" ] && ! git fetch -q "$option" -- "$REMOTE" "$HEAD_BRANCH" 2> /dev/null; then
+        HEAD_BRANCH=""
+    fi
+    return 0
+}

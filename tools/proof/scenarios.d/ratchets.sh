@@ -111,6 +111,19 @@ commit "PROJ-5 test: a skip with a tag
 [ratchet: test-skip] a row at 0 takes none"
 check_php RX22 "E-002: a row that is not on the list takes no override at 0" fail '^test-skip +down +0 +1 +\+1 +FAILS' ratchets
 
+# G-01: the first advisory exception is a 0 -> 1 move of a max row at 0; the row is in OVERRIDE_AT_ZERO, so its commit takes the tag
+branch x14b
+printf '{"exceptions": [{"id": "PKSA-1"}]}\n' > scripts/audit-exceptions.json
+commit "PROJ-5 chore: an advisory exception with a tag
+
+[ratchet: audit-exceptions] PKSA-1 has no fix yet"
+check_php RX22b "G-01: audit-exceptions 0 -> 1 with the tag passes (the row is in OVERRIDE_AT_ZERO)" 0 '^audit-exceptions +down +0 +1 +\+1 +allowed' ratchets
+branch x14c
+printf '{"exceptions": [{"id": "PKSA-1"}]}\n' > scripts/audit-exceptions.json
+commit "PROJ-5 chore: an advisory exception without a tag"
+check_php RX22c "G-01: audit-exceptions 0 -> 1 without the tag fails" fail '^audit-exceptions +down +0 +1 +\+1 +FAILS' ratchets
+check_php RX22d "G-18: the failure text does not claim that no row at 0 takes an override: it names OVERRIDE_AT_ZERO" fail 'takes no override unless it is in OVERRIDE_AT_ZERO' ratchets
+
 # ---------------------------------------------------------------- A-07: shallow fork clones and branch names that look like options
 branch x15
 echo "note" > docs/note.md
@@ -122,6 +135,18 @@ check_php RX30 "A-07: a shallow clone of a fork PR whose head branch is not on t
 command rm -f "$ROOT/PWNED"
 check_php RX31 "A-07: a head branch that starts with a dash is never read as a git option" 0 'not-created' "$SHELL_BIN" -c "CI=1 CHECK_BASE=main GITHUB_HEAD_REF='--upload-pack=touch $ROOT/PWNED; git-upload-pack' '$SHELL_BIN' scripts/ci-ratchets.sh > /dev/null 2>&1; [ ! -e '$ROOT/PWNED' ] && echo not-created"
 check RX32 "A-07: a base branch that starts with a dash fails before git is run with it" fail 'starts with a dash' env CHECK_BASE='--upload-pack=x' "$SHELL_BIN" scripts/ci-ratchets.sh
+# G-03: the same hardening in the commit-message check, on a fresh shallow clone (the ratchet run above deepened the first one)
+command rm -rf "$ROOT/shallow-fork2"
+git clone -q --depth 1 --branch x15 "file://$ROOT/origin.git" "$ROOT/shallow-fork2"
+cd "$ROOT/shallow-fork2" || exit 1
+check RX30b "G-03: the commit check on a shallow fork clone, head branch not on the remote, still deepens" 0 'commits between origin/main' env CI=1 CHECK_BASE=main GITHUB_HEAD_REF=forkuser-branch "$SHELL_BIN" scripts/ci-commit-messages.sh
+cd "$ROOT" || exit 1
+command rm -rf "$ROOT/shallow-fork2" "$ROOT/PWNED2"
+git clone -q --depth 1 --branch x15 "file://$ROOT/origin.git" "$ROOT/shallow-fork2"
+cd "$ROOT/shallow-fork2" || exit 1
+check RX31b "G-03: a head branch that starts with a dash is never read as a git option by the commit check" 0 'not-created' "$SHELL_BIN" -c "CI=1 CHECK_BASE=main GITHUB_HEAD_REF='--upload-pack=touch $ROOT/PWNED2; git-upload-pack' '$SHELL_BIN' scripts/ci-commit-messages.sh > /dev/null 2>&1; [ ! -e '$ROOT/PWNED2' ] && echo not-created"
+check RX32b "G-03: a base branch that starts with a dash fails the commit check before git is run with it" fail 'starts with a dash' env CHECK_BASE='--upload-pack=x' "$SHELL_BIN" scripts/ci-commit-messages.sh
+check RX32c "G-03: the head branch with a shell metacharacter and IFS tricks is no command either" 0 'not-created' "$SHELL_BIN" -c "CI=1 CHECK_BASE=main GITHUB_HEAD_REF='x\${IFS}y;touch\${IFS}$ROOT/PWNED2' '$SHELL_BIN' scripts/ci-commit-messages.sh > /dev/null 2>&1; [ ! -e '$ROOT/PWNED2' ] && echo not-created"
 cd "$ROOT/work" || exit 1
 
 # ---------------------------------------------------------------- A-08, A-18: names outside ASCII
