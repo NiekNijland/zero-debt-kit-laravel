@@ -274,9 +274,9 @@ The two includes the row counts are `conf/bleedingEdge.neon` (the checks of the 
 
 These eleven options merge into the project's own `compilerOptions` (module, JSX, paths and the rest stay the project's). The block holds no comment: a switch that is commented out is not counted, and the row would drop. Verify a copy with the expression of the script (`ANALYSER_SWITCHES`): `grep -o -E "$ANALYSER_SWITCHES" phpstan.neon tsconfig.json | wc -l` prints 18, which is the target `--final` holds the row at.
 
-## Dependency bot (`renovate.json`)
+## Dependency bot (`renovate.json`, or `.github/dependabot.yml`)
 
-One bot in every project, on every host: Renovate. The file is committed at the repository root.
+One bot in every project, never two: Renovate is the kit's, and the file is committed at the repository root. A GitHub project that already runs Dependabot (step 1 reads it, `02-step-1-discover.md` 1.1) keeps it and takes the Dependabot form below; the rules are the same and only the spelling differs.
 
 ```json
 {
@@ -299,6 +299,44 @@ One bot in every project, on every host: Renovate. The file is committed at the 
 ```
 
 `rangeStrategy` set to `bump` raises the lower limit in the manifest with every update, which is what `composer bump` does by hand (`catalog/tests-database-ci-docs.md`, "Manifest floor"). Majors are off: a major is a PR of the program or of the owner, and the dashboard row `dependencies-majors-behind` shows it. The one exception is the `github-actions` manager (a rule after the first one, which wins): an action's runtime deprecations arrive as majors, so a pinned action must be able to take them, and `helpers:pinGitHubActionDigests` keeps every `uses:` line pinned to a commit sha and moves the sha with each release (the version stays in the comment after it). A project on Bitbucket or GitLab has no such manager and both lines do nothing there; the file stays the same on every host. `<TICKET>` is the ticket the profile names for the bot, so the commit-message check passes (`07-process.md` section 10). The option names were not read in an installed copy of the bot: verify in step 1 against the bot's documentation.
+
+**The Dependabot form** (`.github/dependabot.yml`, GitHub only). The same rules: in-range updates one PR each in the commit-message form, the manifest floor raised with each, majors off for the manifests and on for the actions, every `uses:` pin moved with its release.
+
+```yaml
+version: 2
+updates:
+  - package-ecosystem: composer
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    versioning-strategy: increase
+    commit-message:
+      prefix: "<TICKET> chore(deps)"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: tuesday
+    versioning-strategy: increase
+    commit-message:
+      prefix: "<TICKET> chore(deps)"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: wednesday
+    commit-message:
+      prefix: "<TICKET> chore(deps)"
+```
+
+`versioning-strategy: increase` raises the lower limit in the manifest, as Renovate's `rangeStrategy: bump` does. `ignore` with the major update type is the Renovate rule that turns majors off; the `github-actions` entry has none, so a major of an action is a pull request. The `github-actions` ecosystem is what moves the sha pins: with the ecosystem present, Dependabot opens a pull request for a `uses:` line pinned to a full sha and keeps the release in the comment after it (`# v7.0.1`); the project that ran it had the ecosystem from the start and read the file only, so the pull request itself is documented behaviour, not seen here (UNVERIFIED). `commit-message.prefix` is Dependabot's own key; whether it puts the `: ` after the prefix itself was not read: open the first pull request, read its title against `ci-commit-messages.sh`, and put the colon in the prefix if it is missing (`"<TICKET> chore(deps):"`). `cooldown` (a delay in days before a new release is proposed) is an option the project may add; the kit does not require it. Add `/.github/dependabot.yml` to the code-owners file beside `/renovate.json` (`ci/CODEOWNERS.example`). Contract point 16 (`04-guards.md` C4) holds either file.
 
 ## Rules that can change behavior
 
