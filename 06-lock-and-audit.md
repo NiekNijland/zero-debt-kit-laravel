@@ -6,7 +6,7 @@
 When a counter reaches zero:
 
 1. **Delete the list.** The guard no longer reads a list at all; the list file, its "no new" and "no stale" tests and the ratchet row the project added for it are removed in the same PR (the commit that removes the row from the table carries `[ratchet: <name>] list emptied and deleted`, `04-guards.md` C2). There is one form: no empty list file stays behind. A guard fails when a list comes back, without naming any file: the guard folder holds detectors and registers only, so the guard fails every other data file in it, and it fails an analyser baseline include, a bulk-suppressions file and a keyed-baseline file wherever one appears (`catalog/tests-database-ci-docs.md`, "CI and dependencies", row "Lists stay deleted").
-2. The rows of the start set stay, at 0 (`04-guards.md` C2).
+2. The rows of the start set stay: `max` rows at 0 (a shrink-only row at the count of its decision row, `01-principles.md`, "Shrink-only rows"), `min` rows at their goal (`04-guards.md` C3).
 3. Remove the bulk suppressions or the analyser baseline entries for that rule; when a baseline file is empty, delete it and its include in the same PR. Its row `analyser-baseline` is of the start set: it stays, at 0.
 4. Delete the codemod script, unless a later step re-runs it.
 5. Update the one-pattern row: it now says "no list".
@@ -49,3 +49,4 @@ The scan is repeated, not done once: each round asks the same question of the ru
 - `CONTINUE.md` says the program is closed and lists what the owner still does by hand. Deploy-bound steps belong to the owner: orphan checks before a foreign-key migration, new secrets in the secret manager, re-issued tokens, restarting what ran in a recreated container, production checks, visual checks at phone and desktop width.
 - Clean up worktrees (check `git status` in each first), local branches and scratch files.
 - **Feed the kit.** Write what this run learned into `10-hazards.md`, as a trap that ends in its instruction, and, where the order or a rule proved wrong, change the kit itself. A way chosen for a task the catalog did not cover becomes a catalog row (`03-conventions.md` B1), with its row in `catalog/other-stacks.md`. The tooling table a run built for a stack the kit had none for goes into `catalog/other-stacks.md`, "Tooling in another stack", and its formatter config into `templates/tool-configs.md`. Strip everything that names the project. The kit should be better after every project.
+- **Commit the kit's text.** When the lessons are written into the kit, the kit repository is clean and committed (and pushed where the owner allows it), and the closing report names the commit.

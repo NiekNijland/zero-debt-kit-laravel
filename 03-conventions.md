@@ -97,7 +97,7 @@ The rest is settled where it is written:
 | Secret scan, smoke suite, one local command, object-level access sweep, mutation testing, contract fixtures | `02-step-1-discover.md` 1.7 |
 | The scheduled job | `04-guards.md` C4 |
 | Force push; a revert | never: `07-process.md` sections 10 and 5 |
-| A row that may stay above zero | `01-principles.md`, "Shrink-only rows" |
+| What may stay above zero | only the rows of `01-principles.md`, "Shrink-only rows"; any other row stays above zero only through the owner's approval of a decision row with an end date |
 
 **Asked, never settled by the kit.** Where a formatter config comes from, whether the pipeline writes (an autofix commit) or only checks, and which shared images, deployer and merge-back bots stay are the organisation's: step 1 asks with the kit's reasons (`02-step-1-discover.md` 1.1) and the answer is a decision row. The kit's own answer (the config in the repository, check-only CI) is the default for a project that has none of its own.
 
