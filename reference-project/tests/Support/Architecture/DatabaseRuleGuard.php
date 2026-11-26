@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Support\Architecture;
 
-use App\Modules\Tenants\Support\NullableTenantScope;
-use App\Modules\Tenants\Support\TenantScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Model;
 use PhpParser\Node;
@@ -38,10 +36,17 @@ final class DatabaseRuleGuard
 
     private const string STRING_RULE = '/(?:^|\|)(exists|unique):/';
 
+    /**
+     * @param string $source the folder the rules are read in, relative to the root
+     * @param array{scope: class-string, nullableScope: class-string, column: string}|null $tenant the facts of a multi-tenant project: the global scope that binds a
+     *     model to a tenant, the scope that also lets rows of no tenant through, and the column both filter on. Without it (a single-tenant project) only the
+     *     model-class half of the rule runs.
+     */
     public function __construct(
         private readonly PhpFileInspector $inspector,
         private readonly string $root,
-        private string $source,
+        private readonly string $source,
+        private readonly ?array $tenant = null,
     ) {
     }
 
@@ -116,21 +121,29 @@ final class DatabaseRuleGuard
             return "Rule::{$rule}() without a model class as its first argument: " . $this->replacement($rule);
         }
 
-        $scope = $this->tenantScope($model);
+        if ($this->tenant === null) {
+            return null;
+        }
 
-        if ($scope === null || $this->constrainsTenant($chain, $scope === NullableTenantScope::class)) {
+        $scope = $this->tenantScope($model);
+        $nullable = $scope === $this->tenant['nullableScope'];
+
+        if ($scope === null || $this->constrainsTenant($chain, $nullable)) {
             return null;
         }
 
         $short = new ReflectionClass($model)->getShortName();
-        $global = $scope === NullableTenantScope::class ? ", or ->whereNull('tenant_id') for the rows of no tenant" : '';
+        $column = $this->tenant['column'];
+        $global = $nullable ? ", or ->whereNull('{$column}') for the rows of no tenant" : '';
 
-        return "Rule::{$rule}({$short}::class) without tenant_id in its chain: {$short} belongs to a tenant and the rule skips the scope of the model, so add ->where('tenant_id', \$this->tenant()->id){$global}";
+        return "Rule::{$rule}({$short}::class) without {$column} in its chain: {$short} belongs to a tenant and the rule skips the scope of the model, so add ->where('{$column}', <the id of the current tenant>){$global}";
     }
 
     private function replacement(string $rule): string
     {
-        return "write Rule::{$rule}(Model::class, 'column'), with ->where('tenant_id', \$this->tenant()->id) when the model belongs to a tenant";
+        $tenant = $this->tenant === null ? '' : ", with ->where('{$this->tenant['column']}', <the id of the current tenant>) when the model belongs to a tenant";
+
+        return "write Rule::{$rule}(Model::class, 'column'){$tenant}";
     }
 
     /**
@@ -172,11 +185,13 @@ final class DatabaseRuleGuard
             }
         }
 
-        return match (true) {
-            in_array(TenantScope::class, $scopes, true) => TenantScope::class,
-            in_array(NullableTenantScope::class, $scopes, true) => NullableTenantScope::class,
-            default => null,
-        };
+        foreach ([$this->tenant['scope'] ?? null, $this->tenant['nullableScope'] ?? null] as $tenantScope) {
+            if ($tenantScope !== null && in_array($tenantScope, $scopes, true)) {
+                return $tenantScope;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -185,6 +200,7 @@ final class DatabaseRuleGuard
     private function constrainsTenant(array $chain, bool $nullable): bool
     {
         $constraints = $nullable ? [...self::CONSTRAINTS, 'wherenull'] : self::CONSTRAINTS;
+        $tenantColumn = $this->tenant['column'] ?? '';
 
         foreach ($chain as $call) {
             $first = $call->args[0] ?? null;
@@ -196,8 +212,8 @@ final class DatabaseRuleGuard
             $value = $first->value;
             $columns = $value instanceof Closure || $value instanceof ArrowFunction ? (new NodeFinder())->findInstanceOf([$value], String_::class) : [$value];
 
-            foreach ($columns as $column) {
-                if ($column instanceof String_ && ($column->value === 'tenant_id' || str_ends_with($column->value, '.tenant_id'))) {
+            foreach ($columns as $candidate) {
+                if ($candidate instanceof String_ && ($candidate->value === $tenantColumn || str_ends_with($candidate->value, '.' . $tenantColumn))) {
                     return true;
                 }
             }

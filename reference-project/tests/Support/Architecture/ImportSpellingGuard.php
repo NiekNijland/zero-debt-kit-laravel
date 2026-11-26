@@ -8,22 +8,17 @@ use RuntimeException;
 use Tests\Support\Globs;
 
 /**
- * Two import spellings, read from the `use` lines of a file: a route file imports a controller folder and writes `Folder\Noun\VerbController::class`
- * (never a controller by its own import), and the Inertia response is imported as `InertiaResponse` (never as `Response`, which is the HTTP response's name).
+ * The import spelling of a route file, read from its `use` lines: it imports a controller folder and writes `Folder\Noun\VerbController::class`, never a
+ * controller by its own import. The Inertia half of the old guard is `InertiaImportGuard`, for the projects that have pages.
  */
 final readonly class ImportSpellingGuard
 {
     /**
      * @param string $controllers the controller namespace, as written in a `use`, with single backslashes and no trailing backslash
-     * @param string $page the class name of the Inertia response, with single backslashes
-     * @param string $pageAlias the alias that the Inertia response is imported as
      */
     public function __construct(
-        private PhpFileInspector $inspector,
         private string $root,
         private string $controllers,
-        private string $page,
-        private string $pageAlias,
     ) {
     }
 
@@ -56,24 +51,6 @@ final readonly class ImportSpellingGuard
         $pattern = '/^use ' . preg_quote($this->controllers, '/') . '\\\\[\w\\\\]*Controller(?: as \w+)?;$/m';
 
         return preg_match($pattern, $source) === 1 ? ['a route file imports a controller: import the folder and write Folder\Noun\VerbController::class'] : [];
-    }
-
-    /**
-     * @return list<string>
-     */
-    public function pageImportInSource(string $source): array
-    {
-        $pattern = '/^use ' . preg_quote($this->page, '/') . '(?! as ' . $this->pageAlias . ';)(?: as \w+)?;$/m';
-
-        return preg_match($pattern, $source) === 1 ? ['the Inertia response is imported under another name: import it as ' . $this->pageAlias . ', because Response is the HTTP response'] : [];
-    }
-
-    /**
-     * @return list<string>
-     */
-    public function pageImports(string $folder): array
-    {
-        return FolderScan::over($this->inspector, $this->root, [$folder], fn (string $path, string $source): array => $this->pageImportInSource($source));
     }
 
     /**
