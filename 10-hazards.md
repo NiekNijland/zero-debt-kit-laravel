@@ -127,3 +127,6 @@ Traps of one framework are in its catalog: `catalog/backend-laravel.md`, "Framew
 - A path-less `git checkout -- .` or `git restore .` reverts every uncommitted edit of the worktree. Commit work in progress before any branch operation; move a file between branches by committing it where it belongs.
 - A worktree whose `vendor` was cloned from another checkout keeps the packages of the branch it was installed for. After every branch switch run `composer install` before measuring: a stale package fails the analyser with a signature error that looks like a bug in the change.
 - zsh reads `$name:text` as a modifier: write branch refspecs as `"${branch}:refs/heads/${branch}"`.
+- A chain-merge waiter script must run as a background job, not under a time-limited monitor, which kills it at expiry. Match pipelines to a PR head by the 12-character prefix the pipelines API returns and read at least 60 recent pipelines; a full-hash comparison over the newest 15 never finds a green run.
+- Red pipelines on the heads of merged chain PRs (push runs on branches the merge already deleted, "The branch was not found") are noise; judge the chain by the pipelines of the main line.
+- Before ending a step, `git status` in the kit repository is clean and pushed, and the report names the commit; the feedback file and the kit text drift apart otherwise.
