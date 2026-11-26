@@ -9,6 +9,10 @@ services:
         tags:
             - phpstan.functionParameterClosureThisExtension
     -
+        class: Tests\Support\PHPStan\PestUsesCallClosureThis
+        tags:
+            - phpstan.methodParameterClosureThisExtension
+    -
         class: Tests\Support\PHPStan\PestTestFunction
         tags:
             - phpstan.broker.dynamicFunctionReturnTypeExtension
@@ -30,6 +34,10 @@ services:
             - shipmonk.deadCode.memberUsageProvider
 
 parameters:
+
+    # The bleeding-edge include of phpstan.neon turns this on, and it fails every call on Pest's expectation (method.internalClass). A stub cannot do it.
+    featureToggles:
+        internalTag: false
 
     stubFiles:
         - phpstan/tests.stub

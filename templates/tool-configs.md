@@ -2,7 +2,7 @@
 
 Formatting is a code pattern like any other: every project formats the same way, so a file looks the same in every repository and a move between projects produces no formatting diff. These configs are the default for a project that has none of its own: copy them as they are in step 2 (`05-program.md` D2); the one line that differs between projects is named under the frontend formatter, and the rules that can change behavior are listed at the end. The configs show the end state: every rule on.
 
-**A config the organisation manages is not replaced.** Where the formatter (or linter) config is hosted by the organisation and fetched from a URL, that URL stays the source: never copy the file into the repository, never commit it, never drop the URL from the script that runs the formatter. Step 1 asks (`02-step-1-discover.md` 1.1) and the profile names the URL. The kit's concern is then only that the check runs on the whole tree, check-only, and blocks. The strictness rules the hosted config lacks are decision rows; the counting rows of "Rules that can change behavior" stay, and a rule that is already on there is found by measuring (a counting row at 0 confirmed by a parser). A measured "no file changes under the kit's config" is not a reason to swap: the swap is a governance question, not a formatting one. Elsewhere in a project that has its own repository-local config, a rule it wants changed is a change to the kit, not a local override.
+**A config the organisation manages is not replaced.** Where the formatter (or linter) config is hosted by the organisation and fetched from a URL, that URL stays the source: never copy the file into the repository, never commit it, never drop the URL from the script that runs the formatter. Step 1 asks (`02-step-1-discover.md` 1.1) and the profile names the URL. The kit's concern is then only that the check runs on the whole tree, check-only, and blocks. The strictness rules the hosted config lacks are decision rows (an organisation-hosted config held 2 of the 21 rules, `declare_strict_types` and `visibility_required`, so expect nineteen decision rows to start); the counting rows of "Rules that can change behavior" stay, and a rule that is already on there is found by measuring (a counting row at 0 confirmed by a parser). A measured "no file changes under the kit's config" is not a reason to swap: the swap is a governance question, not a formatting one. Elsewhere in a project that has its own repository-local config, a rule it wants changed is a change to the kit, not a local override.
 
 ## PHP formatter (`pint.json`)
 
@@ -207,14 +207,13 @@ return RectorConfig::configure()
         codingStyle: true,
         typeDeclarations: true,
         privatization: true,
-        earlyReturn: true,
     )
     ->withPhpSets();
 ```
 
 - `withPhpSets()` without an argument takes the language sets up to the PHP version of the manifest; `withComposerBased(laravel: true)` takes the framework rules of the installed framework version. Neither names a version, so an upgrade needs no edit here.
 - The route files are not in the paths: importing names turns every controller reference of a route file into an import line, and a route file reads best with the names where the routes are. The formatter and the analyser do read the route files.
-- No `withSkip()`, no `withSkipPath()`: a rule that miscompiles an idiom is handled by fixing the idiom by hand before the pass (`05-program.md` D2, step 2). That holds for the rules that add the override marker too: the kit prescribes the marker (`catalog/backend-laravel.md`, "Overriding a method"). The ratchet row `refactor-skip` holds every skip entry at zero; the `min` row `refactor-sets` counts the 19 switches above (`REFACTOR_SETS` in the ratchet script) and `--final` holds it at 19.
+- No `withSkip()`, no `withSkipPath()`: a rule that miscompiles an idiom is handled by fixing the idiom by hand before the pass (`05-program.md` D2, step 2). That holds for the rules that add the override marker too: the kit prescribes the marker (`catalog/backend-laravel.md`, "Overriding a method"). The ratchet row `refactor-skip` holds every skip entry at zero; the `min` row `refactor-sets` counts the 18 switches above (`REFACTOR_SETS` in the ratchet script) and `--final` holds it at 18. `earlyReturn` is not among them: Rector 2.9 deprecates the argument ("no longer applied"; its rules moved into `codeQuality`), so a flag for it would be counted and do nothing.
 - The tool runs before the formatter (`composer lint`, `catalog/tests-database-ci-docs.md`, "Composer scripts"): the `codingStyle` set and the formatter touch the same constructs, and the dry run of the checks step is clean only on a tree the formatter has formatted after it. A rule of the two that keeps undoing the other is reported as a kit change, never skipped.
 
 ## PHP analyser and type checker (`phpstan.neon`, `tsconfig.json`)
@@ -253,6 +252,27 @@ parameters:
 ```
 
 The two includes the row counts are `conf/bleedingEdge.neon` (the checks of the next major, today) and the date library's `extension.neon`; the other three includes and the `level` are not counted by this row. A baseline file and an `ignoreErrors` entry stay absent (`catalog/backend-laravel.md`, "Types").
+
+**The analyser config for the tests** (`phpstan-tests.neon`) includes the file above, so it has every switch too, and adds the test paths, the Pest extensions and the dead-code detector. It sets one toggle off, because the bleeding-edge include turns it on and it fails every Pest expectation as a call on an internal class (`method.internalClass`):
+
+```neon
+includes:
+    - phpstan.neon
+    - vendor/pestphp/pest/extension.neon
+    - vendor/shipmonk/dead-code-detector/rules.neon
+
+parameters:
+    featureToggles:
+        internalTag: false
+
+    paths:
+        - tests
+
+    level: 10
+```
+
+The include of `conf/bleedingEdge.neon` stays in `phpstan.neon`, so the row `analyser-switches` and the contract test (`04-guards.md` C4, point 15) read it there; the toggle is the one thing the test config turns off, and a stub file cannot do it (stub validation does not see a vendor class named in `@mixin`). Verified on Pest 5 with the bleeding-edge include: 1,040 `method.internalClass` errors without the toggle, none with it. The services of the test config (the Pest type extensions) are in `catalog/tests-database-ci-docs.md`, "Top level in tests". An extension class that a `services:` block names is found through the autoloader: after adding one, `composer dump-autoload -o` (the skeleton optimizes the autoloader, which does not know a new class until it is dumped).
+
 
 ```json
 {
@@ -324,6 +344,18 @@ The row definitions: `tools/README.md`, "Adding a row", point 6.
 A site nobody can classify is a decision row; it is never left for the formatter. The rule goes on when the row is 0, and its PR holds no rewrite.
 
 **Idioms the refactoring tool's sets miscompile on a Pest project.** The first whole-tree pass changes three idioms (tests fail while the analyser stays green): (a) `typeDeclarations` adds `: Expectation` and `use Pest\Mixins\Expectation` to an arrow function that returns `expect(...)`: that mixin is a docblock class, the runtime object is `Pest\Expectation`, so the call is a `TypeError` when it runs and silent when it does not; (b) it types the parameter of `Http::fake(function ($request)` as `array`; (c) `deadCode` removes a condition on a variable captured by reference (`use (&$flag)`) that is assigned after the closure is made, in tests and in source. Fix each idiom by hand before the pass; after the pass grep the whole diff for each class (a wrong return type on a closure no test calls passes the suite) and read the diff of removed conditions by hand.
+
+**Idioms the framework sets miscompile.** The `rector-laravel` sets rewrite an idiom into a facade call or a container call that throws where it runs. No skip is allowed, so each idiom is replaced by a spelling the sets leave alone, before the first pass. Each row was run in a project:
+
+| The idiom | What the set writes | What it breaks | The spelling that stays |
+| --- | --- | --- | --- |
+| `$app['env'] = 'production';` (`ContainerArrayAccessToMethodCallRector`) | `$app->bind('env', 'production');` | `BindingResolutionException` when the environment is read | `$app->detectEnvironment(static fn (): string => 'production');` |
+| `unlink($path);` (`UnlinkFuncCallToFileFacadeDeleteRector`) | `File::delete($path);` | "A facade root has not been set" in a test of the unit tier, which boots no application | `new Filesystem()->delete($path);` (`Illuminate\Filesystem\Filesystem`, a plain class); a guard or helper that deletes a temporary file goes through the one support class that owns temporary files |
+| `$_SERVER['PATH']` (`ServerVariableToRequestFacadeRector`) | `Request::server('PATH')` | the same facade error, in a unit test | `Arr::get($_SERVER, 'PATH')` |
+| a class name in a string, for example in a guard's list of booting base classes (`StringClassNameToClassConstantRector`) | `X::class` | a guard that lists a booting class as `X::class` becomes a support type of that class, and its own test fails it | build the name from two parts (`'Illuminate\\Foundation\\Testing\\' . 'RefreshDatabase'`), and in an example string that holds source code write the backslash in front of a constant, or the string changes meaning when the constant is joined to it |
+
+A copy of a guard's test goes through the same sets: after the pass, run the guard's failing examples, because an example whose string was rewritten can pass for the wrong reason. A new idiom that a run finds is added to this table.
+
 
 Three more can change behavior and are not formatter rules that can be switched off per site:
 
