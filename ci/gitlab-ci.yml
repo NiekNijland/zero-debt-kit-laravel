@@ -77,6 +77,10 @@ backend-tests:
   interruptible: true
   timeout: <maximum minutes> minutes
   variables:
+    # The variable of the engine of DATABASE_IMAGE (the guard reads the engine from it): the official image exits at start
+    # without it. postgres: POSTGRES_PASSWORD   mysql: MYSQL_ROOT_PASSWORD   mariadb: MARIADB_ROOT_PASSWORD (value ci, user
+    # postgres or root). Keep the one of the engine, in every job with a service; a project without a database has no service
+    # and no DB_HOST. The mysql and mariadb names are the images' documented ones, UNVERIFIED here: the GitLab skeleton has not run.
     POSTGRES_PASSWORD: ci
     DB_HOST: database
   services:
@@ -103,7 +107,7 @@ smoke:
   interruptible: true
   timeout: <maximum minutes> minutes
   variables:
-    POSTGRES_PASSWORD: ci
+    POSTGRES_PASSWORD: ci # the variable of the engine, as in backend-tests
     DB_HOST: database
   services:
     - name: <the image of DATABASE_IMAGE in scripts/kit-config.sh>
@@ -119,7 +123,7 @@ scheduled:
   stage: verify
   timeout: <maximum minutes> minutes
   variables:
-    POSTGRES_PASSWORD: ci
+    POSTGRES_PASSWORD: ci # the variable of the engine, as in backend-tests
     DB_HOST: database
   services:
     - name: <the image of DATABASE_IMAGE in scripts/kit-config.sh>

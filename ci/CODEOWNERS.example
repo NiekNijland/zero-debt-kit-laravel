@@ -12,10 +12,24 @@
 # Bitbucket Cloud has no such file: default reviewers on the repository and the merge checks "minimum number of approvals"
 # and "minimum number of default reviewers" do the same, and the profile names them (07-process.md section 12).
 #
+# Who can approve (read this before you enable the setting). On GitHub the author of a pull request cannot approve it (documented
+# behaviour, UNVERIFIED on this repository). The kit's agents push and open pull requests with whatever credentials the session
+# holds: when those are the owner's own, every pull request that touches a guard file is the owner's and no approval of the owner
+# counts, so the pull request cannot merge without a bypass. Three states, in the order of how much of the rule they keep:
+#   1. The agents work under a second identity (a machine user or a GitHub App) and the owner, a person, approves. The author may
+#      be a bot; only the owner of the files may not be. This keeps the rule whole.
+#   2. A second person is a code owner and approves. This keeps the rule whole.
+#   3. A solo owner puts the owner's own account in the bypass list of a ruleset (or leaves administrators able to bypass). The
+#      rule then stops every identity that has no bypass, and stops nothing when the agents use the owner's token: a merge by that
+#      token is a bypass. Write that state in the profile as it is. The rule is not weakened by this paragraph; it is not met.
+# The ruleset option "Require approval of the most recent reviewable push" (the person who pushed last cannot approve) belongs to
+# the same question; how it treats commits an agent pushed under the owner's name is UNVERIFIED.
+#
 # This file does nothing until the host enforces it, and that setting is not in the repository:
-#   GitHub: Settings, Branches, the rule of the main branch and of every other deploying branch, "Require a pull request before
-#           merging", "Require review from Code Owners", and "Do not allow bypassing the above settings" (an admin who can
-#           bypass can merge without the review).
+#   GitHub: Settings, Branches (or Rules, Rulesets), the rule of the main branch and of every other deploying branch, "Require a
+#           pull request before merging" with the option that asks for review from code owners (the exact label differs between
+#           branch protection and rulesets: UNVERIFIED, read it in the settings page), and no bypass for administrators (an admin
+#           who can bypass can merge without the review).
 #   GitLab: Settings, Repository, Protected branches, "Require approval from code owners" on the main branch and every other
 #           deploying branch (a feature of paid tiers: where the plan lacks it, Settings, Merge requests, approval rules
 #           with the owners as approvers and "Prevent editing approval rules in merge requests").

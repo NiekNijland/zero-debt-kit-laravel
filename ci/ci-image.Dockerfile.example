@@ -1,0 +1,28 @@
+# A starting point for the CI image of ci/github-actions.yml ("THE IMAGE" in its header). Not built or run by the kit: fill every
+# <placeholder>, build it, publish it, and write its digest into the container: blocks. Copy to docker/ci/Dockerfile.
+#
+#   docker build -t ghcr.io/<owner>/<image>:<tag> docker/ci
+#   docker push ghcr.io/<owner>/<image>:<tag>
+#   docker buildx imagetools inspect ghcr.io/<owner>/<image>:<tag>      # the digest to write as image: <name>@sha256:<digest>
+#
+# What the workflow needs from it: bash, git 2.18 or newer, curl, tar, sha256sum, ca-certificates, a glibc distribution, root as
+# the user (so no USER line), the project's PHP with its extensions, Composer and Node at the versions the project pins, and
+# optionally gh (the scheduled job installs a pinned one when it is missing). Pin the base image by digest here too.
+
+FROM php:<version, for example 8.4>-cli-bookworm@sha256:<digest of the base image>
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends bash git curl ca-certificates tar unzip jq \
+    && rm -rf /var/lib/apt/lists/*
+
+# The PHP extensions the project's tests load, for example: RUN docker-php-ext-install pdo_pgsql pcntl
+RUN <install the extensions of the project>
+
+# Composer: copy the binary from the official image at a pinned version.
+COPY --from=composer:<version, for example 2.9> /usr/bin/composer /usr/local/bin/composer
+
+# Node at the version the project pins: install it from the tarball of nodejs.org and check the download against SHASUMS256.txt of
+# that release, or copy it from an official node image of that version. Then the same for any browser the smoke suite needs.
+RUN <install Node at a pinned version>
+
+# No USER line: the jobs run as root. An image with another user needs  options: --user root  in each container: block.

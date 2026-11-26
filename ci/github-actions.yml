@@ -28,18 +28,47 @@
 # concurrency group cancels the run it replaces. An edit of the title or the description starts a run too; that is the price.
 # Do not set persist-credentials: false on the checkout: checks.sh fetches the base with the credentials the checkout leaves.
 # Do not add secrets to the env of the checks job: the job runs the pull request's own scripts.
+# The files that carry the guards, this one included, need the review of an owner who is a person (ci/CODEOWNERS.example). A pull
+# request runs its own copy of this file, so that review is the only barrier for a change to the workflow itself; without it
+# the guard of this file is advice (04-guards.md C4, point 22).
 #
 # Required status checks (Settings, Branches, the rule of the main branch and of every other deploying branch): require
 # checks-result, backend-tests, frontend-tests and smoke, not the four "checks (<part>)" names. A new part of PARTS is then
 # required without anyone editing the rule, and a name can be picked only after it ran once (open a draft pull request first).
 # Everything runs inside one image pinned by digest (container:), as on the other hosts, so baselines and analyser results
-# do not move with the runner image; the label ubuntu-24.04 only names the machine that starts the container. The image needs
-# bash, git, curl and tar. A service of a container job is reached by its name: DB_HOST=database (GitLab: the same alias).
+# do not move with the runner image; the label ubuntu-24.04 only names the machine that starts the container. A service of a
+# container job is reached by its name: DB_HOST=database (GitLab: the same alias).
+#
+# THE IMAGE (nothing in GitHub supplies it; it is the project's). Where it comes from: one image that holds the project's PHP with
+# its extensions, Composer, Node and the tools below. ci/ci-image.Dockerfile.example is a starting point. Build it in the
+# repository (a Dockerfile under docker/ci/), publish it to a registry the runner can read, take its digest from the registry
+# (the page of the package, or "docker buildx imagetools inspect <image>:<tag>") and write image: <name>@sha256:<digest>. The
+# guard fails a container without a digest. The dependency bot (templates/tool-configs.md) keeps the digest current.
+#   What the image must hold: bash, git 2.18 or newer (older, or none: actions/checkout falls back to a download without history
+#   and fetch-depth: 0 does nothing), curl, tar, sha256sum (coreutils), ca-certificates, a glibc distribution (Debian or Ubuntu;
+#   an Alpine image is a known trouble spot for the runner's own Node, UNVERIFIED), and for the scheduled job gh (the job
+#   installs a pinned one when the image has none).
+#   User: the install step of gitleaks writes /usr/local/bin and the runner mounts its work folders into the container, so the
+#   image runs as root (no USER line in the Dockerfile), or the job says  options: --user root  under container:. A non-root
+#   image needs its own install path and is not covered here (UNVERIFIED on a runner).
+#   A private image (for example ghcr.io/<owner>/<image>): the workflow token needs permissions: packages: read and every
+#   container: block needs credentials, both shown commented below (once, in the first block). A public image needs neither. A pull request from a fork gets a
+#   read-only token and cannot pull a private image with it (UNVERIFIED); this file does not support pull requests from forks.
+#   Without an image of its own (a first run on a small repository): a public image of the PHP version plus
+#   shivammathur/setup-php and actions/setup-node in the jobs works, and it gives up the digest-pinned toolchain; that is an
+#   owner exception to point 7 of 04-guards.md C4 and goes in the profile. The image placeholder below is what the guard reads.
 # The scheduled run: schedule fires only from the default branch's copy of this file, in UTC, and can start late at the top of
 # the hour (hence the odd minute); in a public repository GitHub switches it off after 60 days without activity, and the
 # person who last edited the cron is notified of a failed run. There is no manual trigger: "Re-run jobs" in the UI is the way.
-# Pin every action to a full commit sha with a comment of its release (# v4.2.2); the dependency bot keeps them current
-# (templates/tool-configs.md). Full history (fetch-depth: 0) on every checkout: the guard group reads history too (point 6).
+# Pin every action to a full commit sha with a comment of its release (# v7.0.1); the dependency bot keeps them current
+# (templates/tool-configs.md). Look the sha up through the API (gh api repos/<owner>/<repo>/git/ref/tags/<tag>; an annotated tag
+# answers with a tag object that points at the commit) and never type one from memory. Use a release whose action.yml says
+# using: node24: GitHub's changelog says the runners no longer offer Node 20, and what a node20 action does there is UNVERIFIED.
+# Full history (fetch-depth: 0) on every checkout: the guard group reads history too (point 6).
+# No secrets.* anywhere in this file (the guard fails one); the token of a job is the workflow token, github.token.
+# A run of the same pull request that GitHub cancels (an older run, replaced by a newer one) still runs checks-result, which then
+# reports a failure for that older run until the newer one reports; whether the merge box ever shows it is UNVERIFIED. If it does,
+# set cancel-in-progress to  github.event_name == 'pull_request' && github.event.action != 'edited'  (an edit then queues).
 # Step 9 of the program adds to backend-tests, on pull requests only: bash scripts/mutation.sh --changed (CHECK_BASE is set).
 # A project without a database leaves the services blocks and DB_HOST out.
 
@@ -69,6 +98,7 @@ concurrency:
 
 permissions:
   contents: read
+  # A private image from the GitHub registry also needs:  packages: read  (and credentials: under container:, see "THE IMAGE").
 
 defaults:
   run:
@@ -80,7 +110,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: <maximum minutes>
     container:
-      image: <image with bash, git, curl, tar and the project's toolchain, pinned by digest>
+      image: <image name>@sha256:<digest> # the project's CI image, or a public image of its PHP version; see THE IMAGE above
+      # credentials:                    # a private image only (and permissions: packages: read above)
+      #   username: ${{ github.actor }}
+      #   password: ${{ secrets.GITHUB_TOKEN }}
+      # options: --user root            # when the image's own user is not root
     strategy:
       fail-fast: false
       matrix:
@@ -88,15 +122,15 @@ jobs:
     env:
       CHECK_BASE: ${{ github.base_ref }}
     steps:
-      - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v4.2.2>
+      - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v7.0.1>
         with:
           fetch-depth: 0
       - run: <install dependencies from the lock file>
       - name: Install gitleaks
-        if: matrix.part == 'repo'
+        if: matrix.part == 'repo' # the part that holds the Secret scan of PARTS: move this condition with that task
         env:
           GITLEAKS_VERSION: <version, for example 8.30.1>
-          GITLEAKS_SHA256: <sha256 of the linux_x64 tarball, copied from checksums.txt of that release>
+          GITLEAKS_SHA256: <sha256 of the linux_x64 tarball, copied from gitleaks_<version>_checksums.txt of that release>
         run: |
           curl -sSfL -o gitleaks.tgz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
           echo "${GITLEAKS_SHA256}  gitleaks.tgz" | sha256sum -c -
@@ -121,13 +155,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: <maximum minutes>
     container:
-      image: <image with bash, git, curl, tar and the project's toolchain, pinned by digest>
+      image: <image name>@sha256:<digest> # the project's CI image, or a public image of its PHP version; see THE IMAGE above
     strategy:
       fail-fast: false
       matrix:
         part: [gate, static, guards, repo]
     steps:
-      - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v4.2.2>
+      - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v7.0.1>
         with:
           fetch-depth: 0
       - run: <install dependencies from the lock file>
@@ -138,33 +172,43 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: <maximum minutes>
     container:
-      image: <image with bash, git, curl, tar and the project's toolchain, pinned by digest>
+      image: <image name>@sha256:<digest> # the project's CI image, or a public image of its PHP version; see THE IMAGE above
     env:
       CHECK_BASE: ${{ github.base_ref }}
       DB_HOST: database
     services:
       database:
         image: <the image of DATABASE_IMAGE in scripts/kit-config.sh>
+        # The variable and the health command follow the engine of that image (04-guards.md C4, point 10; the guard reads the
+        # engine from DATABASE_IMAGE). The official images exit at start without their password variable, and GitHub then fails
+        # the job at "Initialize containers", before a step runs. Keep the pair of the engine, delete the others (the same in
+        # every services block of this file); a container job reaches the service by name on its default port, no ports: needed.
+        #   postgres  POSTGRES_PASSWORD: ci          health  pg_isready -U postgres      (user postgres)
+        #   mysql     MYSQL_ROOT_PASSWORD: ci        health  mysqladmin ping -h 127.0.0.1 -uroot -pci      (user root)
+        #   mariadb   MARIADB_ROOT_PASSWORD: ci      health  healthcheck.sh --connect --innodb_initialized (user root)
+        # The mysql and mariadb pairs are the images' documented variables and health tools, UNVERIFIED on a runner; the postgres
+        # pair is the documented one too. A project without a database has no services block and no DB_HOST.
         env:
           POSTGRES_PASSWORD: ci
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
-      - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v4.2.2>
+      - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v7.0.1>
         with:
           fetch-depth: 0
       - run: <install dependencies from the lock file>
-      - run: <backend test command, with coverage held at the committed floor (tools/README.md, "Coverage")>
+      - run: <backend test command, writing a clover coverage report>
+      - run: bash scripts/checks.sh --coverage <path of the clover report> # holds the coverage at the committed floor (tools/README.md, "Coverage")
 
   frontend-tests:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     timeout-minutes: <maximum minutes>
     container:
-      image: <image with bash, git, curl, tar and the project's toolchain, pinned by digest>
+      image: <image name>@sha256:<digest> # the project's CI image, or a public image of its PHP version; see THE IMAGE above
     steps:
-      - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v4.2.2>
+      - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v7.0.1>
         with:
           fetch-depth: 0
       - run: <install dependencies from the lock file>
@@ -175,19 +219,20 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: <maximum minutes>
     container:
-      image: <image with bash, git, curl, tar and the project's toolchain, pinned by digest>
+      image: <image name>@sha256:<digest> # the project's CI image, or a public image of its PHP version; see THE IMAGE above
     env:
       DB_HOST: database
     services:
       database:
         image: <the image of DATABASE_IMAGE in scripts/kit-config.sh>
+        # the variable and the health command of the engine, as in backend-tests
         env:
           POSTGRES_PASSWORD: ci
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
-      - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v4.2.2>
+      - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v7.0.1>
         with:
           fetch-depth: 0
       - run: <install dependencies from the lock file>
@@ -199,25 +244,41 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: <maximum minutes>
     container:
-      image: <image with bash, git, curl, tar and the project's toolchain, pinned by digest>
+      image: <image name>@sha256:<digest> # the project's CI image, or a public image of its PHP version; see THE IMAGE above
     permissions:
       contents: read
       actions: read
     env:
       GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
       DB_HOST: database
     services:
       database:
         image: <the image of DATABASE_IMAGE in scripts/kit-config.sh>
+        # the variable and the health command of the engine, as in backend-tests
         env:
           POSTGRES_PASSWORD: ci
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
-      - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v4.2.2>
+      - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v7.0.1>
         with:
           fetch-depth: 0
       - run: <install dependencies from the lock file>
+      # The dashboard row for the CI duration runs "gh run list" (GH_TOKEN, GH_REPO and actions: read above). Hosted runners carry gh,
+      # a container does not unless its image holds it: without gh the row reads "?" and says nothing else. Pin the version and
+      # check the download, as for gitleaks; delete the step when the image has gh.
+      - name: Install gh
+        env:
+          GH_VERSION: <version, for example 2.106.0>
+          GH_SHA256: <sha256 of the linux_amd64 tarball, copied from gh_<version>_checksums.txt of that release>
+        run: |
+          command -v gh > /dev/null && exit 0
+          curl -sSfL -o gh.tgz "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz"
+          echo "${GH_SHA256}  gh.tgz" | sha256sum -c -
+          tar -xzf gh.tgz --strip-components=2 "gh_${GH_VERSION}_linux_amd64/bin/gh"
+          install -m 0755 gh /usr/local/bin/gh
+          rm gh.tgz gh
       - run: bash scripts/checks.sh --scheduled
       - run: bash scripts/mutation.sh
