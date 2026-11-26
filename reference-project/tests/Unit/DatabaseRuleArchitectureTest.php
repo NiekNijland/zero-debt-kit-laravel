@@ -75,11 +75,44 @@ it('keeps the model-class half of the rule in a project with no tenant', functio
         ->and($guard->inSource($model))->toBe([]);
 });
 
-it('drops the tenant half of the rule when no tenant is given (needs a model of the application that carries the tenant scope: reasoned, not run without the application)', function () use ($tenant): void {
-    $source = "<?php\nuse App\\Models\\Tenant\\User;\nuse Illuminate\\Validation\\Rule;\n\$r = Rule::exists(User::class, 'id');\n";
+dataset('rules on a scoped model', [
+    'no tenant column in the chain' => ["Rule::exists(ZdkScopedNote::class, 'id')", 'Rule::exists(ZdkScopedNote::class) without tenant_id in its chain'],
+    'the tenant column only as the checked column' => ["Rule::unique(ZdkScopedNote::class, 'tenant_id')->where('type', 'x')", 'Rule::unique(ZdkScopedNote::class) without tenant_id in its chain'],
+    'the rows of no tenant of a model that always has one' => ["Rule::exists(ZdkScopedNote::class, 'id')->whereNull('tenant_id')", 'Rule::exists(ZdkScopedNote::class) without tenant_id in its chain'],
+]);
 
-    expect(new DatabaseRuleGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app', $tenant)->inSource($source))->toHaveCount(1)
-        ->and(new DatabaseRuleGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app')->inSource($source))->toBe([]);
+it('fails a rule on a model with the tenant scope that skips the tenant (the model is declared in a sandbox file, so the example runs without the application)', function (string $rule, string $words): void {
+    $root = SourceSandbox::create(['app/ZdkScopedNote.php' => "<?php\nnamespace Zdk;\nuse Illuminate\\Database\\Eloquent\\Attributes\\ScopedBy;\nuse Illuminate\\Database\\Eloquent\\Model;\n#[ScopedBy(ZdkTenantScope::class)]\nfinal class ZdkScopedNote extends Model {}\n"]);
+
+    try {
+        class_exists('Zdk\\ZdkScopedNote', false) || require $root . '/app/ZdkScopedNote.php';
+        $violations = (new DatabaseRuleGuard(new PhpFileInspector(), $root, 'app', ['scope' => 'Zdk\\ZdkTenantScope', 'nullableScope' => 'Zdk\\ZdkNullableTenantScope', 'column' => 'tenant_id']))
+            ->inSource("<?php\nnamespace Zdk;\nuse Illuminate\\Validation\\Rule;\n\$r = " . $rule . ";\n");
+    } finally {
+        SourceSandbox::remove($root);
+    }
+
+    expect($violations)->toHaveCount(1)
+        ->and($violations[0])->toContain($words);
+})->with('rules on a scoped model');
+
+it('accepts a rule on a model with the tenant scope that names the tenant, and drops the tenant half without a tenant argument', function (): void {
+    $root = SourceSandbox::create(['app/ZdkScopedNote.php' => "<?php\nnamespace Zdk;\nuse Illuminate\\Database\\Eloquent\\Attributes\\ScopedBy;\nuse Illuminate\\Database\\Eloquent\\Model;\n#[ScopedBy(ZdkTenantScope::class)]\nfinal class ZdkScopedNote extends Model {}\n"]);
+
+    try {
+        class_exists('Zdk\\ZdkScopedNote', false) || require $root . '/app/ZdkScopedNote.php';
+        $facts = ['scope' => 'Zdk\\ZdkTenantScope', 'nullableScope' => 'Zdk\\ZdkNullableTenantScope', 'column' => 'tenant_id'];
+        $named = "<?php\nnamespace Zdk;\nuse Illuminate\\Validation\\Rule;\n\$r = Rule::exists(ZdkScopedNote::class, 'id')->where('tenant_id', \$id);\n";
+        $skipped = "<?php\nnamespace Zdk;\nuse Illuminate\\Validation\\Rule;\n\$r = Rule::exists(ZdkScopedNote::class, 'id');\n";
+        $withTenant = new DatabaseRuleGuard(new PhpFileInspector(), $root, 'app', $facts);
+        $withoutTenant = new DatabaseRuleGuard(new PhpFileInspector(), $root, 'app');
+    } finally {
+        SourceSandbox::remove($root);
+    }
+
+    expect($withTenant->inSource($named))->toBe([])
+        ->and($withTenant->inSource($skipped))->toHaveCount(1)
+        ->and($withoutTenant->inSource($skipped))->toBe([]);
 });
 
 it('reads a tree under a dot directory and names the file relative to the root', function () use ($tenant): void {

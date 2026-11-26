@@ -24,6 +24,13 @@ it('detects a migration that names an application class', function (string $sour
         ->and($messages[0])->toContain($words);
 })->with('migrations that name a class');
 
+it('reads the live enums from the argument, not from their names', function (): void {
+    $guard = new MigrationClassGuard(dirname(__DIR__, 2), 'database/migrations', ['App\Modules\Notes\Enums\Ability'], 'App\\');
+
+    expect($guard->inSource("<?php\n\$a = Ability::VIEW;\n"))->toContain('a migration uses the live permission or role class: write the name as a string, so a rename of the class cannot break a migration that has run')
+        ->and($guard->inSource("<?php\n\$a = Permission::VIEW;\n"))->toBe([]);
+});
+
 dataset('migrations that name no class', [
     'a plain migration' => ["<?php\nuse Illuminate\\Database\\Migrations\\Migration;\nreturn new class extends Migration {};\n"],
     'a word that ends like the namespace' => ["<?php\n\$a = 'MyApp\\\\Models';\n"],

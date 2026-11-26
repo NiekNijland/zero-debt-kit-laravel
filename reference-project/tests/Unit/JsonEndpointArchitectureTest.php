@@ -86,6 +86,24 @@ it('names the file and the replacement of a hand-written JSON answer, in a check
         ->and($violations[0])->toStartWith('app/Support/Hand.php: line 3: a JSON answer that is not a Data object: return a Data object');
 });
 
+it('skips a controller that answers with a page and fails the same controller when no page response is given (the controller is declared in a sandbox file)', function (): void {
+    $root = SourceSandbox::create([
+        'app/Http/Controllers/Probe/ShowController.php' => "<?php\nnamespace App\\Http\\Controllers\\Probe;\nuse Illuminate\\Http\\JsonResponse;\nfinal class ShowController\n{\n    public function __invoke(): \\Zdk\\Page|JsonResponse\n    {\n        return new JsonResponse(['a' => 1]);\n    }\n}\n",
+    ]);
+
+    try {
+        class_exists('App\\Http\\Controllers\\Probe\\ShowController', false) || require $root . '/app/Http/Controllers/Probe/ShowController.php';
+        $withPages = new JsonEndpointGuard(new PhpFileInspector(), $root, 'app', 'app/Http/Controllers', 'Zdk\\Page')->violations();
+        $withoutPages = new JsonEndpointGuard(new PhpFileInspector(), $root, 'app', 'app/Http/Controllers')->violations();
+    } finally {
+        SourceSandbox::remove($root);
+    }
+
+    expect($withPages)->toBe([])
+        ->and($withoutPages)->toHaveCount(1)
+        ->and($withoutPages[0])->toStartWith('app/Http/Controllers/Probe/ShowController.php: line 8: a JSON answer that is not a Data object');
+});
+
 it('throws on an application folder that does not exist', function (): void {
     expect(fn (): array => new JsonEndpointGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'app-renamed', 'app/Http/Controllers')->violations())
         ->toThrow(InvalidArgumentException::class, 'does not exist');
