@@ -8,11 +8,33 @@ No version is tagged yet; v0.10.0 will be the first tag. The versions before 0.9
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-26
+
+The reference is the running starter, not an extract. No script of `tools/` changed; the proof gained and lost scenarios.
+
 ### Changed
+- `reference-project/` is a pointer to the strict Laravel starter (<https://github.com/NiekNijland/zero-debt-laravel>): `README.md`,
+  `files-to-copy.md` (the starter's paths and what each is for, read at the starter commit it names) and a few examples that do not
+  run (`examples/php`: the transaction middleware, the counted list, the stored-name register guard; `examples/frontend`: the
+  eslint, knip and tsconfig configs and the frontend `AGENTS.md` files). The anonymized extract of 294 files is gone: its guards the
+  starter has now come from the starter, which runs them; the rest is in the backlog `docs/starter-variants.md` (multi-tenant,
+  frontend, the Bitbucket and GitLab readers of the CI contract, the older and register-form guards, three coverage tests). Every
+  reference in the docs, the catalogs, the templates and the proof was updated; a "not in the reference project" row that the
+  starter now has (the config test, the strictness provider, the hermetic base set-up, the coverage floor and the strictness rows)
+  points at the starter's file.
+- Proof: `tools/proof/fixtures/ci/CiHostExamples.php` is the fixture of the scenarios `CX27`, `PF03` and `RG06` (the skeletons with
+  their placeholders filled). Those three had read a path that no longer held the file and were skipped silently; they run now. The
+  scenarios over the starter's guard folder (`RG03`, `RG04`, `RG08`, `RG09`, `TX51`) run when `STARTER_DIR` names a checkout of the
+  starter. `RG07`, which read the Bitbucket-era GitHub guard, is gone. `RG01` and `RG02` read the examples.
 - Docs: the opening claims say what the guards enforce (a counter only goes down; an override is a tagged commit that a code owner
   reads); the at-zero rule is stated once, with its `OVERRIDE_AT_ZERO` exceptions; the mutation tools are described as verified.
 - The plugin manifest has a version, the marketplace a description; the proof scenario `DOCX01` to `DOCX07` checks the numbers the
   docs claim.
+
+### Added
+- `docs/starter-variants.md`: the backlog of what the starter lacks.
+- `.github/workflows/starter-canary.yml`: a proposal (not run): the starter checked out, the kit's scripts applied to it by the
+  doctor and its static and guard parts run, nightly and by hand.
 
 ## [0.10.0] - 2026-11-26
 
