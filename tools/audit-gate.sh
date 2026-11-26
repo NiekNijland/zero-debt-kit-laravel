@@ -27,12 +27,15 @@ MAX_DAYS=7
 # Composer: "advisoryId". Another package manager's audit names its id under another key: change it here, and verify in step 1
 # that the key holds one id per advisory.
 ID_PATTERN='"advisoryId"[[:space:]]*:[[:space:]]*"([^"]+)"'
+# One extended regular expression that a complete audit document contains: the key that holds the advisories (Composer prints
+# it always, an empty object or list when there are none). A document without it is an error message, not an audit.
+DOCUMENT_PATTERN='"advisories"[[:space:]]*:'
 # <<< config
 
 set -uo pipefail
 
 TODAY="${AUDIT_GATE_TODAY:-}"
-[ -n "$TODAY" ] || TODAY=$(date +%Y-%m-%d)
+[ -n "$TODAY" ] || TODAY=$(date -u +%Y-%m-%d)
 AUDIT=$(cat)
 
 # Days since a fixed day for a YYYY-MM-DD date, or "bad" when it is not a real date.
@@ -48,14 +51,23 @@ days_of() {
     }'
 }
 
-case "$AUDIT" in
-    "{"* | "["*) ;;
-    *)
-        echo "Audit gate: the audit printed no JSON on standard input, so nothing was audited. FAILS" >&2
-        echo 1
-        exit 1
-        ;;
+not_an_audit() {
+    echo "Audit gate: $1, so nothing was audited. FAILS" >&2
+    echo 1
+    exit 1
+}
+
+# The first and the last character must be the two ends of one JSON value, the document must name the advisories, and a JSON
+# parser (jq, when it is installed) must read the whole text: a truncated or foreign document is not a clean audit.
+TRIMMED=$(printf '%s' "$AUDIT" | tr -d '[:space:]')
+case "$TRIMMED" in
+    "{"*"}" | "["*"]") ;;
+    *) not_an_audit "the audit printed no complete JSON document on standard input" ;;
 esac
+printf '%s' "$AUDIT" | grep -q -E -e "$DOCUMENT_PATTERN" || not_an_audit "the audit's JSON has no key matching $DOCUMENT_PATTERN"
+if command -v jq > /dev/null 2>&1; then
+    printf '%s' "$AUDIT" | jq -e . > /dev/null 2>&1 || not_an_audit "the audit's JSON cannot be parsed (truncated?)"
+fi
 
 TODAY_DAYS=$(days_of "$TODAY")
 if [ "$TODAY_DAYS" = "bad" ]; then
@@ -82,11 +94,21 @@ if [ -r "$EXCEPTIONS_FILE" ]; then
             *'"id"'*) ;;
             *) continue ;;
         esac
+        if [ "$(grep -o '"id"' <<< "$line" | wc -l | tr -d ' ')" -gt 1 ]; then
+            problem "a line of $EXCEPTIONS_FILE holds more than one entry: one entry per line: $line"
+            continue
+        fi
         id=$(field id "$line")
         reason=$(field reason "$line")
         added=$(field added "$line")
         expires=$(field expires "$line")
-        if [ -z "$id" ] || [ -z "$reason" ] || [ -z "$added" ] || [ -z "$expires" ]; then
+        case "$id" in
+            *[[:space:]]*)
+                problem "the id \"$id\" in $EXCEPTIONS_FILE holds a space: one entry covers one advisory"
+                continue
+                ;;
+        esac
+        if [ -z "$id" ] || [ -z "${reason//[[:space:]]/}" ] || [ -z "$added" ] || [ -z "$expires" ]; then
             problem "an entry in $EXCEPTIONS_FILE lacks id, reason, added or expires: $line"
             continue
         fi
@@ -129,7 +151,7 @@ while IFS= read -r id; do
             UNCOVERED=$((UNCOVERED + 1))
             ;;
     esac
-done < <(printf '%s' "$AUDIT" | { grep -o -E "$ID_PATTERN" || [ $? -eq 1 ]; } | sed -E "s/$ID_PATTERN/\1/")
+done < <(printf '%s' "$AUDIT" | { grep -o -E "$ID_PATTERN" || [ $? -eq 1 ]; } | sed -E "s/$ID_PATTERN/\1/" | sort -u)
 
 TOTAL=$((UNCOVERED + PROBLEMS))
 echo "$TOTAL"
