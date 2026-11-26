@@ -3,8 +3,19 @@
 # Builds scratch repositories in a fresh folder, runs every scenario, prints the table.
 # KIT is the kit folder (default: two folders up from this file). PROOF_OUT is where the
 # scratch repositories, proof-<label>.log (full output) and proof-<label>.table go (default: a new temporary folder).
+# PROOF_ONLY=<extended regular expression on the scenario id> runs only the scenarios whose id matches (for example PROOF_ONLY='^DX'
+# or 'R0[1-3]'); the others are not run and not counted. PROOF_LIST=1 prints the scenario ids and runs nothing. Without either, every
+# scenario runs. The exit status is the same: 0 when no scenario that ran was wrong.
 
 set -uo pipefail
+
+if [ "${PROOF_LIST:-}" = 1 ]; then
+    # The ids as written in the scenario files (a few are built from a variable, such as S-$script).
+    _here=$(cd "$(dirname "$0")" && pwd)
+    grep -h -o -E '^[[:space:]]*check(_php)?[[:space:]]+"?[A-Za-z0-9_$-]+' "$_here/proof.sh" "$_here"/scenarios.d/*.sh |
+        sed -E 's/^[[:space:]]*check(_php)?[[:space:]]+"?//' | grep -v '^[$]' | sort -u
+    exit 0
+fi
 
 SHELL_BIN="${1:-/bin/bash}"
 LABEL="${2:-bash}"
@@ -35,6 +46,9 @@ HAVE_PHP=0
 check() {
     local id="$1" scenario="$2" want_exit="$3" want_text="$4" output status got verdict
     shift 4
+    if [ -n "${PROOF_ONLY:-}" ] && ! grep -q -E -e "$PROOF_ONLY" <<< "$id"; then
+        return 0
+    fi
     output=$("$@" 2>&1)
     status=$?
     {
@@ -60,6 +74,9 @@ check() {
 
 # check_php: a scenario that needs php on the PATH (the default fixture counts a NEON file). Without php it is skipped, not failed.
 check_php() {
+    if [ -n "${PROOF_ONLY:-}" ] && ! grep -q -E -e "$PROOF_ONLY" <<< "$1"; then
+        return 0
+    fi
     if [ "$HAVE_PHP" -eq 1 ]; then
         check "$@"
         return
