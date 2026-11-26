@@ -62,7 +62,8 @@ not_an_audit() {
 TRIMMED=$(printf '%s' "$AUDIT" | tr -d '[:space:]')
 case "$TRIMMED" in
     "{"*"}" | "["*"]") ;;
-    *) not_an_audit "the audit printed no complete JSON document on standard input" ;;
+    "{"* | "["*) not_an_audit "the audit's JSON is incomplete (cut off, or not one document)" ;;
+    *) not_an_audit "the audit printed no JSON on standard input" ;;
 esac
 printf '%s' "$AUDIT" | grep -q -E -e "$DOCUMENT_PATTERN" || not_an_audit "the audit's JSON has no key matching $DOCUMENT_PATTERN"
 if command -v jq > /dev/null 2>&1; then

@@ -14,7 +14,7 @@ tx_gate() {
 # ---------------------------------------------------------------- audit-gate.sh (B-01 to B-04)
 GOOD_AUDIT='{"advisories":{"a/b":[{"advisoryId":"PKSA-1","title":"x"}]},"abandoned":[]}'
 export AUDIT_EXCEPTIONS_FILE="$TX/no-such-exceptions.json"
-check TX01 "audit-gate: a truncated audit document fails, it is not zero advisories" fail 'no complete JSON document|cannot be parsed' tx_gate '{"advisories":{"a/b":[{"advisoryId":"PKS'
+check TX01 "audit-gate: a truncated audit document fails, it is not zero advisories" fail 'JSON is incomplete|cannot be parsed' tx_gate '{"advisories":{"a/b":[{"advisoryId":"PKS'
 check TX02 "audit-gate: a JSON error object without the advisories key fails" fail 'no key matching' tx_gate '{"error":"boom"}'
 check TX03 "audit-gate: an empty object fails" fail 'no key matching' tx_gate '{}'
 check TX04 "audit-gate: an audit with no advisory passes (control)" 0 '^0$' tx_gate '{"advisories":[],"abandoned":[]}'
