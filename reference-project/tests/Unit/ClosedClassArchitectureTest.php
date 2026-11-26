@@ -36,6 +36,8 @@ dataset('classes that are open', [
     'a tagged parent that another class extends: nothing exempts a concrete parent' => [['app/Modules/Orders/Support/Cart.php' => "/** @final */\nclass Cart {}", 'app/Modules/Orders/Support/GiftCart.php' => 'final class GiftCart extends Cart {}'], ['extended-concrete App\Modules\Orders\Support\Cart'], 'make the parent `abstract`'],
     'the tag on a final class' => [['app/Modules/Orders/Support/Cart.php' => "/** @final */\nfinal class Cart {}"], ['stale-open App\Modules\Orders\Support\Cart'], 'carries the docblock tag `@final` and is final or abstract: delete the tag'],
     'the tag on an abstract class' => [['app/Modules/Orders/Support/Base.php' => "/** @final */\nabstract class Base {}"], ['stale-open App\Modules\Orders\Support\Base'], 'delete the tag'],
+    'a docblock word that only starts with the tag' => [['app/Modules/Orders/Support/Cart.php' => "/** not @finalized */\nclass Cart {}"], ['open-class App\Modules\Orders\Support\Cart'], 'is not final: declare it `final`'],
+    'an anonymous class that extends a concrete class' => [['app/Modules/Orders/Support/Cart.php' => 'final class Cart {}', 'app/Modules/Orders/Support/Maker.php' => 'final class Maker { public function make(): object { return new class extends Cart {}; } }'], ['extended-concrete App\Modules\Orders\Support\Cart'], 'make the parent `abstract`'],
     'a file the parser cannot read' => [['app/Broken.php' => "<?php\nfinal class Broken {\n"], ['unreadable app/Broken.php: Syntax error, unexpected EOF on line 3'], 'unreadable app/Broken.php'],
 ]);
 
@@ -51,6 +53,8 @@ dataset('classes that are closed', [
     'an abstract base with a final child' => [['app/Modules/Orders/Support/Base.php' => 'abstract class Base {}', 'app/Modules/Orders/Support/Cart.php' => 'final class Cart extends Base {}']],
     'an interface, a trait and an enum' => [['app/Modules/Orders/Support/Shape.php' => 'interface Shape {}', 'app/Modules/Orders/Support/HasShape.php' => 'trait HasShape {}', 'app/Modules/Orders/Support/Mode.php' => "enum Mode: string { case FAST = 'fast'; }"]],
     'an anonymous class' => [['app/Modules/Orders/Support/Maker.php' => 'final class Maker { public function make(): object { return new class {}; } }']],
+    'an anonymous class that extends an abstract base' => [['app/Modules/Orders/Support/Base.php' => 'abstract class Base {}', 'app/Modules/Orders/Support/Maker.php' => 'final class Maker { public function make(): object { return new class extends Base {}; } }']],
+    'the tag at the end of a docblock line and before other words' => [['app/Modules/Orders/Support/Cart.php' => "/** @final */\nclass Cart {}", 'app/Modules/Orders/Support/Money.php' => "/**\n * @final: the framework proxies it\n */\nclass Money {}"]],
     'a class named like the keyword' => [['app/Modules/Orders/Support/AbstractFactory.php' => 'final class AbstractFactory {}']],
     'a concrete class that stays open, with the tag and a decision row' => [['app/Modules/Orders/Support/Cart.php' => "/**\n * @final decision row 12: the framework proxies it\n */\nclass Cart {}"]],
     'a child of a vendor class that is not ours' => [['app/Modules/Orders/Support/Failure.php' => 'final class Failure extends \RuntimeException {}']],
