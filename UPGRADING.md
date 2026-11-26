@@ -17,7 +17,7 @@ A row is added to the table, or a config key is set, by a decision in a pull req
 
 ## Move a project from version A to version B
 
-1. Update your clone of the kit to version B (`git -C <kit> checkout v<B>`, or pull). Read `CHANGELOG.md` from A to B: it names the
+1. Update your clone of the kit to version B (`git -C <kit> checkout v<B>` once the release is tagged, or a commit hash; or pull). Read `CHANGELOG.md` from A to B: it names the
    scripts that changed, the config keys that are new, and the rows that are new.
 2. In the project, from a branch: `bash scripts/doctor.sh --kit <kit>` (or, from the kit, `bash tools/doctor.sh --project <project>`).
    Read the report:
@@ -58,5 +58,5 @@ The ratchet step compares the scripts with the base branch: a change of `ci-ratc
 
 ## Releasing the kit (maintainers)
 
-Move the `[Unreleased]` entries of `CHANGELOG.md` under the new version and date, set `VERSION`, run the full proof, commit, tag `v<version>`.
+Move the `[Unreleased]` entries of `CHANGELOG.md` under the new version and date, set `VERSION` and the `version` of `.claude-plugin/plugin.json` to the same number, run the full proof (its scenario `DOCX02` fails when `VERSION`, `plugin.json` and the newest changelog heading differ), commit, tag `v<version>`. A plugin with an explicit `version` reaches users only when that number is bumped.
 A change of a script's behaviour or of a config key is a minor version at least, so a project can see in the changelog what it must set.

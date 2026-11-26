@@ -14,7 +14,7 @@ These are known and written down in `tools/README.md`; they are properties of th
 
 - **Ratchet methods that execute PR code.** The `return`, `const` and `call` methods of `tools/ci-ratchets.sh` run PHP code from the pull request to count a row. On a runner that builds forks or holds secrets, use the other methods only.
 - **The base's script gates the head.** `ci/checks.sh` runs the base branch's copy of the ratchet script, so a pull request cannot rewrite its own gate. The script tag (`[ratchet: script]`) is written by the author; only a code-owners rule that names a person or team, with the host requiring that review, tells a real reason from a written one. That setting lives on the host and is the project owner's.
-- **Agents run with their own privileges.** A skill or start prompt is instructions an agent follows. Review a plugin's files before installing it, pin to a release tag, and read a diff before updating.
+- **Agents run with their own privileges.** A skill or start prompt is instructions an agent follows. Review a plugin's files before installing it, pin to a release tag (v0.10.0 once tagged) or a commit hash, and read a diff before updating.
 - **The proof suite** builds scratch repositories and runs the scripts in them; it replaces the secret scan by `true` and runs no real analyser or CI host.
 
 ## Supported versions

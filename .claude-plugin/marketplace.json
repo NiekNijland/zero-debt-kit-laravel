@@ -1,5 +1,6 @@
 {
   "name": "zero-debt-kit",
+  "description": "Zero-debt cleanup kit for Laravel repositories.",
   "owner": { "name": "zero-debt-kit contributors" },
   "plugins": [
     {
