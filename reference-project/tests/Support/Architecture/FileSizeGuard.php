@@ -4,42 +4,73 @@ declare(strict_types=1);
 
 namespace Tests\Support\Architecture;
 
-use Tests\Support\RecursiveFiles;
+use PhpParser\Node\Expr\Array_;
+use PhpParser\Node\Stmt\Declare_;
+use PhpParser\Node\Stmt\Nop;
+use PhpParser\Node\Stmt\Return_;
+use PhpParser\ParserFactory;
+use Throwable;
 
-final class FileSizeGuard
+/**
+ * A PHP file has at most 400 lines, tests included. The one category that is exempt is a data file: a file whose only
+ * statement is `return [...]` (a list of translations, a generated table). The category is read from the code, so no
+ * folder is named here and a data folder that gets a class in it is checked again.
+ */
+final readonly class FileSizeGuard
 {
-    private const array ROOTS = ['app', 'resources', 'tests'];
+    public const int LIMIT = 400;
 
-    private const array EXEMPT_DATA = ['resources/translations'];
+    /**
+     * @param list<string> $folders the folders to scan, relative to the root
+     */
+    public function __construct(
+        private PhpFileInspector $inspector,
+        private string $root,
+        private array $folders,
+    ) {
+    }
 
     /**
      * @return list<string>
      */
-    public static function oversized(string $root): array
+    public function violations(): array
     {
-        $files = [];
+        $violations = [];
 
-        foreach (self::ROOTS as $directory) {
-            foreach (RecursiveFiles::in($root . '/' . $directory) as $file) {
-                if ($file->getExtension() === 'php' && ! self::isExemptData($root, $file->getPathname()) && substr_count((string) file_get_contents($file->getPathname()), "\n") > 400) {
-                    $files[] = (string) realpath($file->getPathname());
+        foreach ($this->folders as $folder) {
+            foreach ($this->inspector->phpFiles($this->root . '/' . $folder) as $file) {
+                $violation = $this->inSource(substr($file, strlen($this->root) + 1), (string) file_get_contents($file));
+
+                if ($violation !== null) {
+                    $violations[] = $violation;
                 }
             }
         }
 
-        sort($files);
-
-        return $files;
+        return $violations;
     }
 
-    private static function isExemptData(string $root, string $path): bool
+    public function inSource(string $path, string $source): ?string
     {
-        foreach (self::EXEMPT_DATA as $directory) {
-            if (str_starts_with($path, $root . '/' . $directory . '/')) {
-                return true;
-            }
+        $lines = substr_count($source, "\n");
+
+        if ($lines <= self::LIMIT || self::isData($source)) {
+            return null;
         }
 
-        return false;
+        return $path . ' has ' . $lines . ' lines, the limit is ' . self::LIMIT . ': split it by behavior (a test into <Class><Topic>Test.php, a class into the classes it already holds), not by size; a file that only returns a list of data is exempt';
+    }
+
+    private static function isData(string $source): bool
+    {
+        try {
+            $statements = (new ParserFactory())->createForHostVersion()->parse($source) ?? [];
+        } catch (Throwable) {
+            return false;
+        }
+
+        $statements = array_values(array_filter($statements, static fn ($statement): bool => ! $statement instanceof Declare_ && ! $statement instanceof Nop));
+
+        return count($statements) === 1 && $statements[0] instanceof Return_ && $statements[0]->expr instanceof Array_;
     }
 }
