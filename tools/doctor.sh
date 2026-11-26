@@ -27,7 +27,8 @@
 # --upgrade-plan prints the steps that bring the bodies to the kit's version and keep the project's config block. It changes
 # nothing. With --apply it also does it: the kit's body with the project's config values and ratchet-table rows and task commands
 # put back, written only under scripts/ (a temporary file, then a rename). A changed script that GUARDED_FILES lists is a guarded file: the commit needs
-# [ratchet: script] <reason> and a code-owner review (UPGRADING.md).
+# [ratchet: script] <reason> and a code-owner review (UPGRADING.md); and each ratchet row it carried from the kit needs its own
+# [ratchet: <row>] <reason> line (the plan and --apply print one per row).
 #
 # Exit 0: nothing diverged. Exit 1: a body differs, a required script is missing, a project-only kit script exists or a config
 # key is missing or extra. Exit 64: a usage error. Writes nothing without --apply.
@@ -533,6 +534,14 @@ else
     if [ "$DIVERGED" -eq 1 ]; then echo "Diverged: yes."; else echo "Diverged: no (config values that are the project's own are not a divergence)."; fi
 fi
 
+# carried_tags <rows>: one commit-message line per ratchet row that --apply carries from the kit. A carried row is a change inside the
+# table, so the gate fails it as "redefined" unless a commit that touches the script carries its own `[ratchet: <row>] <reason>`.
+carried_tags() {
+    for row in $1; do
+        echo "    [ratchet: $row] take the kit's changed row from v$KIT_VERSION"
+    done
+}
+
 # ---------------------------------------------------------------- the upgrade plan, and --apply
 if [ "$PLAN" -eq 1 ]; then
     {
@@ -551,6 +560,12 @@ if [ "$PLAN" -eq 1 ]; then
         fi
         echo "  Then: commit with the tag [ratchet: script] <reason> in the message: a changed script that GUARDED_FILES"
         echo "  (in the config block of ci-ratchets.sh) lists is a guarded file (by default every script but prepush.sh and doctor.sh), and a code owner reviews the pull request (UPGRADING.md)."
+        carried=$(cat "$TMP/out/ci-ratchets.sh.stalerows" 2> /dev/null | tr -s ' \n' ' ' | sed 's/^ //; s/ $//')
+        if [ -n "$carried" ] && [ "$APPLY" -eq 0 ]; then
+            echo "  --apply carries ratchet rows the kit changed; each is a change inside the table, so the gate fails it as 'redefined, FAILS'"
+            echo "  unless a commit that touches scripts/ci-ratchets.sh carries its own line (one per row, besides [ratchet: script]):"
+            carried_tags "$carried" >&2
+        fi
         echo "  Then run: bash $SCRIPTS_DIR/ci-ratchets.sh --self-test and bash $SCRIPTS_DIR/checks.sh --part gate"
     } >&2
 fi
@@ -619,6 +634,15 @@ if [ "$APPLY" -eq 1 ]; then
         if [ -n "$CHANGED" ]; then
             echo "Applied: $SCRIPTS_DIR/ changed:$CHANGED"
             echo "Every changed guarded file needs the commit tag [ratchet: script] <reason> and a code-owner review."
+            carried=$(cat "$TMP/out/ci-ratchets.sh.stalerows" 2> /dev/null | tr -s ' \n' ' ' | sed 's/^ //; s/ $//')
+            case " $CHANGED " in
+                *" ci-ratchets.sh "*)
+                    if [ -n "$carried" ]; then
+                        echo "Ratchet rows carried from the kit: each needs its own tag line in a commit that touches scripts/ci-ratchets.sh, or the gate fails it as 'redefined, FAILS'. Put these lines in the commit message:"
+                        carried_tags "$carried"
+                    fi
+                    ;;
+            esac
             echo "A script that was missing keeps the kit's placeholders in its config block: set them before it runs."
         else
             echo "Applied: nothing changed."
