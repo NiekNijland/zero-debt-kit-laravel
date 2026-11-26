@@ -155,3 +155,72 @@ it('keeps the workflow directory of the repository within the contract', functio
 
     expect($guard->violations())->toBe([]);
 });
+
+// A host without enforcement (a private repository on a free plan has no branch protection, no ruleset and no enforced code owners):
+// the file stays and the test still reads it, so it differs from `hostEnforced`, which excuses a missing file (Bitbucket).
+it('keeps asserting the code-owners file where the host enforces nothing: the file is required, and what is not enforced is written in the profile', function (): void {
+    $guard = new CodeOwnersGuard('/no/such/CODEOWNERS', CiHostExamples::guardedPaths());
+
+    expect(implode("\n", $guard->violations()))->toContain('no code-owners file')
+        ->and($guard->inCodeOwners(CiHostExamples::codeOwners()))->toBe([])
+        ->and(implode("\n", $guard->inCodeOwners(CiExamples::change(CiHostExamples::codeOwners(), "/scripts/ @lead\n", ''))))->toContain('scripts/checks.sh is covered by no code-owners rule');
+});
+
+// The runner form: no container, the toolchain from setup-php and setup-node, the services at 127.0.0.1 on a published port.
+dataset('GitHub runner workflows that get the runner form wrong', [
+    'a service that publishes no port' => [fn (): string => CiHostVariants::inGithubRunnerJob('backend-tests', "        ports:\n          - '5432:5432'\n", ''), 'publishes no port and the job runs on the runner'],
+    'a service reached by its name' => [fn (): string => CiHostVariants::inGithubRunnerJob('smoke', 'DB_HOST: 127.0.0.1', 'DB_HOST: database'), 'a runner job reaches a service at 127.0.0.1'],
+    'no host variable at all' => [fn (): string => CiHostVariants::inGithubRunnerJob('smoke', "      DB_HOST: 127.0.0.1\n", ''), 'is not the DB_HOST of its job'],
+    'a host that is localhost, which may resolve to ::1' => [fn (): string => CiHostVariants::inGithubRunnerJob('backend-tests', 'DB_HOST: 127.0.0.1', 'DB_HOST: localhost'), 'a runner job reaches a service at 127.0.0.1'],
+    'composer without setup-php' => [fn (): string => CiHostVariants::inGithubRunnerJob('backend-tests', "      - uses: shivammathur/setup-php@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb # v2\n        with:\n          php-version: '8.4'\n          extensions: mbstring, pdo_pgsql\n          tools: composer:v2\n          coverage: pcov\n", ''), 'job `backend-tests` runs on the runner and runs PHP tools but has no `shivammathur/setup-php@<sha>` step'],
+    'the checks script without setup-php' => [fn (): string => CiHostVariants::inGithubRunnerJob('checks', "      - uses: shivammathur/setup-php@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb # v2\n        with:\n          php-version: '8.4'\n          extensions: mbstring, pdo_pgsql\n          tools: composer:v2\n", ''), 'job `checks` runs on the runner and runs PHP tools'],
+    'npm without setup-node' => [fn (): string => CiHostVariants::inGithubRunnerJob('frontend-tests', "      - uses: actions/setup-node@cccccccccccccccccccccccccccccccccccccccc # v7.1.0\n        with:\n          node-version-file: .nvmrc\n", ''), 'job `frontend-tests` runs on the runner and runs Node tools but has no `actions/setup-node@<sha>` step'],
+    'the checks script of a frontend project without setup-node, nothing else of Node in the job' => [fn (): string => CiExamples::changeAfter(CiHostVariants::inGithubRunnerJob('checks-main', "      - uses: actions/setup-node@cccccccccccccccccccccccccccccccccccccccc # v7.1.0\n        with:\n          node-version-file: .nvmrc\n", ''), "\n  checks-main:\n", "      - run: npm ci\n", ''), 'job `checks-main` runs on the runner and runs Node tools'],
+    'a setup action on a tag' => [fn (): string => CiHostVariants::inGithubRunnerJob('smoke', 'shivammathur/setup-php@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb # v2', 'shivammathur/setup-php@v2'), 'not pinned to a full commit sha'],
+    'a service image that is not the production engine' => [fn (): string => CiHostVariants::inGithubRunnerJob('backend-tests', 'image: postgres:17', 'image: postgres:16'), 'is not DATABASE_IMAGE'],
+    'a service without a health check' => [fn (): string => CiHostVariants::inGithubRunnerJob('smoke', "        options: >-\n          --health-cmd \"pg_isready -U postgres\"\n          --health-interval 5s --health-timeout 5s --health-retries 12\n", ''), 'no health check of its engine'],
+    'a service without a password' => [fn (): string => CiHostVariants::inGithubRunnerJob('smoke', "        env:\n          POSTGRES_PASSWORD: ci\n", ''), 'no password variable of its engine'],
+    'a runner on a moving label' => [fn (): string => CiHostVariants::inGithubRunnerJob('smoke', 'runs-on: ubuntu-24.04', 'runs-on: ubuntu-latest'), 'a moving label'],
+    'a container job that reaches its service at 127.0.0.1' => [fn (): string => CiHostVariants::inGithubJob('backend-tests', 'DB_HOST: database', 'DB_HOST: 127.0.0.1'), 'a container job reaches a service by its name'],
+]);
+
+it('accepts the runner form with its placeholders filled, and fails each way to get it wrong', function (Closure $workflow, string $reason): void {
+    $violations = str_contains($workflow(), 'container:') ? CiHostVariants::githubViolations($workflow()) : CiHostVariants::githubRunnerViolations($workflow());
+
+    expect(CiHostVariants::githubRunnerViolations(CiHostExamples::githubRunnerWorkflow()))->toBe('')
+        ->and($violations)->toContain($reason);
+})->with('GitHub runner workflows that get the runner form wrong');
+
+it('accepts the runner form for each engine, MongoDB with its Redis service included, and reads the host from a URI', function (): void {
+    foreach (['postgres', 'mysql', 'mariadb', 'mongo'] as $engine) {
+        expect(CiHostVariants::githubRunnerViolations(CiHostVariants::githubRunnerWorkflowFor($engine), CiHostVariants::githubRunnerGuardFor($engine)))->toBe('');
+    }
+
+    $mongo = CiHostVariants::githubRunnerWorkflowFor('mongo');
+    $guard = CiHostVariants::githubRunnerGuardFor('mongo');
+
+    expect(CiHostVariants::githubRunnerViolations(CiExamples::change($mongo, 'MONGODB_URI: mongodb://127.0.0.1:27017', 'MONGODB_URI: mongodb://mongodb:27017'), $guard))->toContain('a runner job reaches a service at 127.0.0.1')
+        ->and(CiHostVariants::githubRunnerViolations(CiExamples::change($mongo, "        options: >-\n          --health-cmd \"redis-cli ping\"\n", "        options: >-\n          --health-cmd \"pg_isready -U postgres\"\n"), $guard))->toContain('no health check of its engine (redis-cli)')
+        ->and(CiHostVariants::githubRunnerViolations(CiExamples::change($mongo, "          --health-cmd \"mongosh --quiet --eval 'db.runCommand({ping:1})'\"\n", "          --health-cmd \"redis-cli ping\"\n"), $guard))->toContain('no health check of its engine (mongosh or mongo )')
+        ->and(CiHostVariants::githubRunnerViolations(CiExamples::change($mongo, 'image: redis:7', 'image: redis:6'), $guard))->toContain('or one of the auxiliary service images (`redis:7`)')
+        ->and(CiHostVariants::githubRunnerViolations($mongo, CiHostVariants::githubRunnerGuard('mongo:8', [], 'MONGODB_URI')))->toContain('image is not DATABASE_IMAGE')
+        ->and(CiHostVariants::githubRunnerViolations(CiExamples::change($mongo, "          - '6379:6379'\n", ''), $guard))->toContain('publishes no port and the job runs on the runner');
+});
+
+// The weekly mutation run: a second cron, and the mutation step on that cron only.
+it('accepts a mutation step on one of the crons of the schedule and fails one on a cron that is not scheduled', function (): void {
+    $weekly = static fn (string $cron): string => CiExamples::change(CiExamples::change(CiHostExamples::githubWorkflow(), "    - cron: '17 3 * * *'\n", "    - cron: '17 3 * * *'\n    - cron: '23 4 * * 0'\n"), "      - run: bash scripts/mutation.sh\n", "      - run: bash scripts/mutation.sh\n        if: github.event.schedule == '" . $cron . "'\n");
+
+    expect(CiHostVariants::githubViolations($weekly('23 4 * * 0')))->toBe('')
+        ->and(CiHostVariants::githubViolations($weekly('23 4 * * 1')))->toContain('the mutation step of job `scheduled` has a condition that is not')
+        ->and(CiHostVariants::githubViolations(CiExamples::change($weekly('23 4 * * 0'), "if: github.event.schedule == '23 4 * * 0'", "if: github.event_name == 'schedule'")))->toContain('the mutation step of job `scheduled` has a condition that is not');
+});
+
+it('names MongoDB and Redis as engines that start without a password', function (): void {
+    expect(DatabaseEngine::of('mongo:8'))->toBe('mongo')
+        ->and(DatabaseEngine::of('mongodb/mongodb-atlas-local:8'))->toBe('mongo')
+        ->and(DatabaseEngine::of('redis:alpine'))->toBe('redis')
+        ->and(DatabaseEngine::needsPassword('mongo'))->toBeFalse()
+        ->and(DatabaseEngine::needsPassword('redis'))->toBeFalse()
+        ->and(DatabaseEngine::needsPassword('postgres'))->toBeTrue();
+});

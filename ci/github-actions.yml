@@ -9,6 +9,10 @@
 # smoke] and if: github.event_name == 'push'. Never check out and run pull-request code from a workflow_run or
 # pull_request_target workflow: they run with secrets.
 #
+# Two forms of this file. This one runs every job in a container pinned by digest (the project's CI image). ci/github-actions-runner.yml
+# runs the jobs on the runner with setup-php and setup-node and has no image: use it where no such image exists (a first run, a small
+# repository). Pick one per repository, never both; the contract test reads either (04-guards.md C4, points 7 and 10).
+#
 # The checks job is a matrix over the parts of PARTS in scripts/checks.sh (bash scripts/checks.sh --list-parts): one entry per part.
 # The pull_request trigger has no path filter: the checks job runs on every pull request, a docs-only one too.
 # A path filter may go on a test job, never on the checks job. No job commits or pushes.
@@ -35,6 +39,10 @@
 # Required status checks (Settings, Branches, the rule of the main branch and of every other deploying branch): require
 # checks-result, backend-tests, frontend-tests and smoke, not the four "checks (<part>)" names. A new part of PARTS is then
 # required without anyone editing the rule, and a name can be picked only after it ran once (open a draft pull request first).
+# Unenforced mode: a private repository on a free plan has no branch protection, no ruleset and no enforced code owners (the API
+# answers 403 "Upgrade to GitHub Pro", observed on one repository). Nothing then stops a merge, so the lead merges only when
+# gh pr checks shows every check green, the aggregate checks-result included; CODEOWNERS stays in the repository and point 22 reads
+# the file only; the profile says what is not enforced (07-process.md section 12). The skeleton is the same in both modes.
 # Everything runs inside one image pinned by digest (container:), as on the other hosts, so baselines and analyser results
 # do not move with the runner image; the label ubuntu-24.04 only names the machine that starts the container. A service of a
 # container job is reached by its name: DB_HOST=database (GitLab: the same alias).
@@ -54,15 +62,24 @@
 #   A private image (for example ghcr.io/<owner>/<image>): the workflow token needs permissions: packages: read and every
 #   container: block needs credentials, both shown commented below (once, in the first block). A public image needs neither. A pull request from a fork gets a
 #   read-only token and cannot pull a private image with it (UNVERIFIED); this file does not support pull requests from forks.
-#   Without an image of its own (a first run on a small repository): a public image of the PHP version plus
-#   shivammathur/setup-php and actions/setup-node in the jobs works, and it gives up the digest-pinned toolchain; that is an
-#   owner exception to point 7 of 04-guards.md C4 and goes in the profile. The image placeholder below is what the guard reads.
+#   Without an image of its own: use the runner form, ci/github-actions-runner.yml (setup-php and setup-node pinned by sha, no
+#   registry, no digest, gh and git preinstalled). It gives up the digest-pinned toolchain, which is an owner exception to point 7
+#   of 04-guards.md C4 and goes in the profile; the baselines are then made on the same runner image label. The image placeholder
+#   below is what the guard reads in this form.
+# Actions minutes: read the plan and what is left before the schedule is chosen (04-guards.md C4, "GitHub Actions cost"). A whole-tree
+# mutation run every night can break a free allowance by itself. The weekly variant keeps the daily dashboard run and moves the
+# mutation line to a cron of its own: add a second entry under schedule:  - cron: '23 4 * * 0'  (Sunday, an odd minute), and put
+#   if: github.event.schedule == '23 4 * * 0'
+# on the step  - run: bash scripts/mutation.sh  of the scheduled job. The contract test accepts that condition when the cron is
+# one of the crons of the file, and nothing else (a condition that is never true would switch the run off unseen).
 # The scheduled run: schedule fires only from the default branch's copy of this file, in UTC, and can start late at the top of
 # the hour (hence the odd minute); in a public repository GitHub switches it off after 60 days without activity, and the
 # person who last edited the cron is notified of a failed run. There is no manual trigger: "Re-run jobs" in the UI is the way.
 # Pin every action to a full commit sha with a comment of its release (# v7.0.1); the dependency bot keeps them current
-# (templates/tool-configs.md). Look the sha up through the API (gh api repos/<owner>/<repo>/git/ref/tags/<tag>; an annotated tag
-# answers with a tag object that points at the commit) and never type one from memory. Use a release whose action.yml says
+# (templates/tool-configs.md). Look the sha up and never type one from memory: gh api repos/<owner>/<repo>/tags --jq '.[0:4][] | .name + " " + .commit.sha'
+# prints the newest tags with the commit each points at (an annotated tag included; floating tags such as v7 are in the list too:
+# take the release, not the floating name). gh api repos/<owner>/<repo>/git/ref/tags/<tag> answered 404 for some tags and, for an
+# annotated one, gives a tag object, not the commit. Use a release whose action.yml says
 # using: node24: GitHub's changelog says the runners no longer offer Node 20, and what a node20 action does there is UNVERIFIED.
 # Full history (fetch-depth: 0) on every checkout: the guard group reads history too (point 6).
 # No secrets.* anywhere in this file (the guard fails one); the token of a job is the workflow token, github.token.
@@ -126,6 +143,9 @@ jobs:
         with:
           fetch-depth: 0
       - run: <install dependencies from the lock file>
+      # The container runs as root, so install needs no sudo. A job on the runner (ci/github-actions-runner.yml) runs as a user that
+      # cannot write /usr/local/bin: there the line is  sudo install -m 0755 gitleaks /usr/local/bin/gitleaks  (observed: it fails
+      # without). The checksum of the tarball is in gitleaks_<version>_checksums.txt of the release (the file name carries the version).
       - name: Install gitleaks
         if: matrix.part == 'repo' # the part that holds the Secret scan of PARTS: move this condition with that task
         env:
@@ -186,6 +206,12 @@ jobs:
         #   postgres  POSTGRES_PASSWORD: ci          health  pg_isready -U postgres      (user postgres)
         #   mysql     MYSQL_ROOT_PASSWORD: ci        health  mysqladmin ping -h 127.0.0.1 -uroot -pci      (user root)
         #   mariadb   MARIADB_ROOT_PASSWORD: ci      health  healthcheck.sh --connect --innodb_initialized (user root)
+        #   mongo     no variable needed             health  mongosh --quiet --eval "db.runCommand({ping:1})"      (mongo:8 holds mongosh)
+        #   redis     no variable needed             health  redis-cli ping      (a second service beside the database, named as
+        #             an auxiliary image in the contract test; DATABASE_IMAGE can hold only the database)
+        # A MongoDB or Redis application reads its host from its own variable (MONGODB_URI, REDIS_HOST): set it by the service name
+        # here, and the contract test takes that variable name as an argument instead of DB_HOST. ci/github-actions-runner.yml has the
+        # same blocks with ports for a job on the runner.
         # The mysql and mariadb pairs are the images' documented variables and health tools, UNVERIFIED on a runner; the postgres
         # pair is the documented one too. A project without a database has no services block and no DB_HOST.
         env:
@@ -236,6 +262,9 @@ jobs:
         with:
           fetch-depth: 0
       - run: <install dependencies from the lock file>
+      # The production drivers, not the production environment: where the application forces https in production (a URL::forceHttps()
+      # call), a stack served over plain http renders blank pages (assets on https). Boot it with APP_ENV=staging and the drivers
+      # of production (cache store, queue, database engine) set by name, and let the smoke suite assert the drivers.
       - run: <boot the stack with seeded data and the production drivers (cache store, queue, database engine)>
       - run: <smoke suite command, in a browser where the project has a frontend, after installing that browser at a pinned version>
 

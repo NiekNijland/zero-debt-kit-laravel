@@ -55,7 +55,7 @@ final readonly class GithubChecksRules
             }
         }
 
-        return [...$violations, ...self::aggregateRules($jobs), ...$this->testRules($jobs), ...$this->scheduledRules($jobs)];
+        return [...$violations, ...self::aggregateRules($jobs), ...$this->testRules($jobs), ...$this->scheduledRules($jobs, self::crons($workflow))];
     }
 
     /**
@@ -200,10 +200,24 @@ final readonly class GithubChecksRules
     }
 
     /**
-     * @param array<string, array<mixed>> $jobs
+     * The cron expressions of the `schedule` trigger.
+     *
+     * @param array<mixed> $workflow
      * @return list<string>
      */
-    private function scheduledRules(array $jobs): array
+    private static function crons(array $workflow): array
+    {
+        $schedule = GithubWorkflowReader::triggers($workflow)['schedule'] ?? [];
+
+        return array_values(array_filter(array_map(static fn (mixed $entry): mixed => is_array($entry) ? $entry['cron'] ?? null : null, is_array($schedule) ? $schedule : []), 'is_string'));
+    }
+
+    /**
+     * @param array<string, array<mixed>> $jobs
+     * @param list<string>                $crons the cron expressions of the workflow
+     * @return list<string>
+     */
+    private function scheduledRules(array $jobs, array $crons): array
     {
         $scheduled = array_filter($jobs, static fn (array $job): bool => in_array(CiContractGuard::CHECKS . ' --scheduled', GithubWorkflowReader::lines($job), true));
 
@@ -220,6 +234,14 @@ final readonly class GithubChecksRules
 
             if (! in_array(self::MUTATION_LINE, GithubWorkflowReader::lines($job), true)) {
                 $violations[] = 'job `' . $id . '` does not run `' . self::MUTATION_LINE . '`: the whole-tree mutation run belongs to the scheduled job';
+            }
+
+            foreach (GithubWorkflowReader::steps($job) as $step) {
+                $condition = isset($step['if']) ? trim((string) $step['if']) : null;
+
+                if (($step['run'] ?? null) === self::MUTATION_LINE && $condition !== null && (preg_match('/^github\.event\.schedule == \'([^\']+)\'$/', $condition, $match) !== 1 || ! in_array($match[1], $crons, true))) {
+                    $violations[] = 'the mutation step of job `' . $id . '` has a condition that is not `github.event.schedule == \'<one of the crons of the schedule trigger>\'`: a weekly run is that condition on the cron of its own, and any other condition may never be true';
+                }
             }
         }
 
