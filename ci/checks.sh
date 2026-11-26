@@ -23,7 +23,7 @@ DASHBOARD_MODE=""
 # The committed coverage floor: one line "threshold: <whole number>". The min ratchet row coverage-floor holds the number.
 COVERAGE_FLOOR_FILE="scripts/coverage-floor.txt"
 # The parts of the checks step, "<part>::<task names split by |>": one pipeline step per part (04-guards.md C4). The part gate
-# holds the guard of the ratchet script, the ratchets and the dashboard and names no task. Every task of TASKS below is in
+# holds the guard of the ratchet script, the ratchets, their self-test and the dashboard and names no task. Every task of TASKS below is in
 # exactly one part and every name here is a task; the script stops when that is not so.
 PARTS=(
     "gate::"
@@ -37,6 +37,8 @@ PARTS=(
 set -euo pipefail
 
 # A placeholder left in this file, in kit-config.sh or in the config block of ci-commit-messages.sh stops every run.
+# That includes --list-parts, so scripts/prepush.sh fails before it starts. Only a line that is not a comment is read: a <word> in a command that
+# is not a placeholder (grep -E 'a<b>c') is written without the angle brackets, or the pattern is built from two strings.
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLACEHOLDER_FILES=("${BASH_SOURCE[0]}")
 for file in kit-config.sh ci-commit-messages.sh; do
@@ -208,6 +210,9 @@ if [ -z "$RUN" ]; then
 fi
 
 if [ -z "$PART" ] || [ "$PART" = "gate" ]; then
+    # The expressions of the ratchet rows against their fixture: a row whose regex stopped matching fails here, not silently.
+    # It reads no base, so it runs on a push to the main branch too.
+    bash scripts/ci-ratchets.sh --self-test
     bash scripts/debt-dashboard.sh $DASHBOARD_MODE --offline --details
 fi
 if [ "$PART" = "gate" ]; then
