@@ -105,6 +105,6 @@ it('keeps the registers of stored names in step with the application code', func
     $guard = new StoredNameRegisterGuard($inspector, $root, 'app', 'app/AGENTS.md', 'database/stored-names', 'database/stored-names/aliases.tsv', 'App', 'App\\Modules\\');
 
     expect($inspector->phpFiles($root . '/app'))->not->toBe([])
-        ->and(file_get_contents($root . '/database/stored-names/queued-classes.txt'))->toContain('App\Modules\Orders\Jobs\SendReceiptJob')
+        ->and($guard->registered('queued-classes'))->toContain('App\Modules\Orders\Jobs\SendReceiptJob')
         ->and($guard->findings())->toBe([]);
 });

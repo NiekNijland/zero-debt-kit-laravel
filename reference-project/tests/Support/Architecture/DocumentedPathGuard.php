@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Support\Architecture;
 
+use RuntimeException;
 use Tests\Support\RecursiveFiles;
 
 final readonly class DocumentedPathGuard
@@ -55,6 +56,24 @@ final readonly class DocumentedPathGuard
         }
 
         return $violations;
+    }
+
+    /**
+     * The paths one guide names, with their lines: the guard reads the file itself, so a test can ask whether the guide names
+     * anything at all without reading the file.
+     *
+     * @param string $guide the guide file, relative to the root
+     * @return list<array{int, string}>
+     */
+    public function pathsInGuide(string $guide): array
+    {
+        $file = $this->root . '/' . $guide;
+
+        if (! is_file($file)) {
+            throw new RuntimeException("the guide {$guide} does not exist under the root");
+        }
+
+        return self::pathsIn((string) file_get_contents($file));
     }
 
     /**
