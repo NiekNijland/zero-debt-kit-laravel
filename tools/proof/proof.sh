@@ -1371,6 +1371,16 @@ check N02 "map-normalise --forward maps old names to new ones" 0 '^App\\New\\Foo
     check K01 "ci/checks.sh with its placeholders still in it refuses to run" fail 'still holds placeholders' env CHECK_BASE=main "$SHELL_BIN" scripts/checks.sh
 }
 
+# Scenario files of tools/proof/scenarios.d/ run here with the helpers above (check, check_php, branch, commit, edit, build_fixture).
+# Each file builds its own scratch repositories under "$ROOT" and leaves the working directory as it found it.
+for scenario_file in "$HERE"/scenarios.d/*.sh; do
+    [ -f "$scenario_file" ] || continue
+    START_DIR=$(pwd)
+    # shellcheck disable=SC1090
+    . "$scenario_file"
+    cd "$START_DIR" || exit 1
+done
+
 echo
 echo "bash under test: $("$SHELL_BIN" -c 'echo $BASH_VERSION')"
 column -t -s '|' "$TABLE" 2> /dev/null || cat "$TABLE"
