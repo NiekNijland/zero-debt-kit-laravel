@@ -6,10 +6,12 @@ namespace Tests\Support\Architecture;
 
 /**
  * The skeletons of ci/github-actions.yml and ci/gitlab-ci.yml with every placeholder filled, and a code-owners file that covers the
- * guard files: what the contract tests of the GitHub and GitLab forms change one line of. Keep them equal to the skeletons.
+ * guard files: what the contract tests of the GitHub and GitLab forms change one line of. Keep them equal to the skeletons: the proof scenario CX27 fills the placeholders of each skeleton and compares.
  */
 final class CiHostExamples
 {
+    public const string CHECKOUT_PIN = 'actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # v7.0.1';
+
     public static function githubWorkflow(): string
     {
         return <<<'YAML'
@@ -48,7 +50,7 @@ final class CiHostExamples
                 env:
                   CHECK_BASE: ${{ github.base_ref }}
                 steps:
-                  - uses: actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # v4.2.2
+                  - uses: actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # v7.0.1
                     with:
                       fetch-depth: 0
                   - run: composer install
@@ -87,7 +89,7 @@ final class CiHostExamples
                   matrix:
                     part: [gate, static, guards, repo]
                 steps:
-                  - uses: actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # v4.2.2
+                  - uses: actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # v7.0.1
                     with:
                       fetch-depth: 0
                   - run: composer install
@@ -111,11 +113,12 @@ final class CiHostExamples
                       --health-cmd "pg_isready -U postgres"
                       --health-interval 5s --health-timeout 5s --health-retries 12
                 steps:
-                  - uses: actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # v4.2.2
+                  - uses: actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # v7.0.1
                     with:
                       fetch-depth: 0
                   - run: composer install
                   - run: composer test:unit
+                  - run: bash scripts/checks.sh --coverage coverage/clover.xml
 
               frontend-tests:
                 if: github.event_name != 'schedule'
@@ -124,7 +127,7 @@ final class CiHostExamples
                 container:
                   image: php:8.4@sha256:0000000000000000000000000000000000000000000000000000000000000000
                 steps:
-                  - uses: actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # v4.2.2
+                  - uses: actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # v7.0.1
                     with:
                       fetch-depth: 0
                   - run: composer install
@@ -147,7 +150,7 @@ final class CiHostExamples
                       --health-cmd "pg_isready -U postgres"
                       --health-interval 5s --health-timeout 5s --health-retries 12
                 steps:
-                  - uses: actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # v4.2.2
+                  - uses: actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # v7.0.1
                     with:
                       fetch-depth: 0
                   - run: composer install
@@ -165,6 +168,7 @@ final class CiHostExamples
                   actions: read
                 env:
                   GH_TOKEN: ${{ github.token }}
+                  GH_REPO: ${{ github.repository }}
                   DB_HOST: database
                 services:
                   database:
@@ -175,10 +179,21 @@ final class CiHostExamples
                       --health-cmd "pg_isready -U postgres"
                       --health-interval 5s --health-timeout 5s --health-retries 12
                 steps:
-                  - uses: actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # v4.2.2
+                  - uses: actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # v7.0.1
                     with:
                       fetch-depth: 0
                   - run: composer install
+                  - name: Install gh
+                    env:
+                      GH_VERSION: 2.106.0
+                      GH_SHA256: 0000000000000000000000000000000000000000000000000000000000000000
+                    run: |
+                      command -v gh > /dev/null && exit 0
+                      curl -sSfL -o gh.tgz "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz"
+                      echo "${GH_SHA256}  gh.tgz" | sha256sum -c -
+                      tar -xzf gh.tgz --strip-components=2 "gh_${GH_VERSION}_linux_amd64/bin/gh"
+                      install -m 0755 gh /usr/local/bin/gh
+                      rm gh.tgz gh
                   - run: bash scripts/checks.sh --scheduled
                   - run: bash scripts/mutation.sh
             YAML . "\n";

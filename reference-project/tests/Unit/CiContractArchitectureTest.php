@@ -3,13 +3,11 @@
 declare(strict_types=1);
 
 use Tests\Support\Architecture\CiContractGuard;
+use Tests\Support\Architecture\ChecksParts;
 use Tests\Support\Architecture\CiExamples;
 use Tests\Support\Architecture\CiSafetyGuard;
 
-function ciPipelineGuard(): CiContractGuard
-{
-    return new CiContractGuard('', ['main'], 'composer test:unit');
-}
+uses()->group('arch');
 
 dataset('pipelines that narrow a check or skip a run', [
     'a check that succeeds anyway' => [fn (): string => CiExamples::change(CiExamples::pipeline(), "- bash scripts/checks.sh --part static\n", "- bash scripts/checks.sh --part static || true\n"), 'pull-requests has no step on the pattern **'],
@@ -28,18 +26,18 @@ dataset('pipelines that narrow a check or skip a run', [
 ]);
 
 it('detects a pipeline that narrows a check or skips a run', function (Closure $pipeline, string $reason): void {
-    $violations = ciPipelineGuard()->inPipeline($pipeline());
+    $violations = CiExamples::pipelineGuard()->inPipeline($pipeline(), CiExamples::checks());
 
     expect(implode("\n", $violations))->toContain($reason);
 })->with('pipelines that narrow a check or skip a run');
 
 it('accepts the pipeline with the five runs, in a brace pattern and with an alias of a step', function (): void {
     $braced = CiExamples::change(CiExamples::pipeline(), "    main:\n", "    '{main,develop}':\n");
-    $guard = new CiContractGuard('', ['main', 'develop'], 'composer test:unit');
+    $unused = CiExamples::pipeline() . "definitions:\n  steps:\n    - step: &unused\n        name: Checks\n        script:\n          - bash scripts/checks.sh || true\n";
 
-    expect(ciPipelineGuard()->inPipeline(CiExamples::pipeline()))->toBe([])
-        ->and($guard->inPipeline($braced))->toBe([])
-        ->and(ciPipelineGuard()->inPipeline(CiExamples::pipeline() . "definitions:\n  steps:\n    - step: &unused\n        name: Checks\n        script:\n          - bash scripts/checks.sh || true\n"))->toBe([]);
+    expect(CiExamples::pipelineGuard()->inPipeline(CiExamples::pipeline(), CiExamples::checks()))->toBe([])
+        ->and(CiExamples::pipelineGuard(['main', 'develop'])->inPipeline($braced, CiExamples::checks()))->toBe([])
+        ->and(CiExamples::pipelineGuard()->inPipeline($unused, CiExamples::checks()))->toBe([]);
 });
 
 dataset('scripts that weaken the checks step', [
@@ -49,7 +47,30 @@ dataset('scripts that weaken the checks step', [
     'a placeholder' => [fn (): string => CiExamples::change(CiExamples::checks(), 'vendor/bin/pint --test', '<formatter in check mode>'), 'still holds a <placeholder>'],
     'a commit' => [fn (): string => CiExamples::change(CiExamples::checks(), "bash scripts/ci-parallel.sh", "git commit -am autofix\nbash scripts/ci-parallel.sh"), 'a command writes to the repository'],
     'a check that succeeds anyway' => [fn (): string => CiExamples::change(CiExamples::checks(), 'vendor/bin/pint --test"', 'vendor/bin/pint --test || true"'), 'succeed anyway'],
+    'a linter that may print warnings' => [fn (): string => CiExamples::change(CiExamples::checks(), 'npx eslint . --max-warnings 0', 'npx eslint .'), 'does not run with `--max-warnings 0`'],
+    'a check over the changed files only' => [fn (): string => CiExamples::change(CiExamples::checks(), 'vendor/bin/pint --test', 'vendor/bin/pint --test --dirty'), 'takes a list of changed files'],
+    'an install that is no lock-file install' => [fn (): string => CiExamples::change(CiExamples::checks(), "bash scripts/ci-parallel.sh", "npm install\nbash scripts/ci-parallel.sh"), 'does not come from the lock file'],
+    'a lint run with a content cache' => [fn (): string => CiExamples::change(CiExamples::checks(), 'npx eslint . --max-warnings 0', 'npx eslint . --max-warnings 0 --cache'), 'has a content cache'],
+    'an audit of a deploying branch that covers the development tools' => [fn (): string => CiExamples::change(CiExamples::checks(), 'composer audit --locked --no-dev', 'composer audit --locked'), 'does not cover production dependencies only'],
+    'an audit of a pull request that skips the development tools' => [fn (): string => CiExamples::change(CiExamples::checks(), 'composer audit --locked --format=json | bash scripts/audit-gate.sh"' . "\n    )\nfi", 'composer audit --locked --no-dev --format=json | bash scripts/audit-gate.sh"' . "\n    )\nfi"), 'covers production dependencies only: the full audit runs there'],
+    'one audit for both runs' => [fn (): string => CiExamples::change(CiExamples::checks(), "if [ \"\$RUN\" = \"--main\" ]; then", "if [ \"\$RUN\" = \"--other\" ]; then"), 'no separate "Audit" task'],
 ]);
+
+dataset('checks scripts without a readable PARTS table', [
+    'no PARTS block' => [fn (): string => CiExamples::change(CiExamples::checks(), 'PARTS=(', 'NOTPARTS=('), 'holds no PARTS=('],
+    'an empty PARTS block' => [fn (): string => (string) preg_replace('/^PARTS=\(.*?^\)/ms', "PARTS=(\n)", CiExamples::checks()), 'names no part'],
+]);
+
+it('says so when the checks script holds no table of parts to read', function (Closure $script, string $reason): void {
+    expect(fn () => CiExamples::pipelineGuard()->inPipeline(CiExamples::pipeline(), $script()))->toThrow(LogicException::class, $reason);
+})->with('checks scripts without a readable PARTS table');
+
+it('reads the parts from the checks script, so a part added there and forgotten in the pipeline fails', function (): void {
+    $script = CiExamples::change(CiExamples::checks(), "    \"guards::Guard tests\"\n", "    \"guards::Guard tests\"\n    \"frontend::\"\n");
+
+    expect(implode("\n", CiExamples::pipelineGuard()->inPipeline(CiExamples::pipeline(), $script)))->toContain('--part frontend` without a condition')
+        ->and(ChecksParts::of($script))->toBe(['gate', 'static', 'guards', 'frontend', 'repo']);
+});
 
 it('detects a checks script that weakens the checks step', function (Closure $script, string $reason): void {
     $violations = new CiSafetyGuard('develop')->inChecks($script(), CiExamples::kitConfig());
@@ -75,6 +96,6 @@ it('accepts the checks script, comments that name a banned command and a writing
 it('keeps the pipeline and the checks script as the contract says', function (): void {
     $root = dirname(__DIR__, 2);
 
-    expect(new CiContractGuard($root . '/bitbucket-pipelines.yml', ['develop'], 'composer test:unit')->violations())->toBe([])
+    expect(new CiContractGuard($root . '/bitbucket-pipelines.yml', $root . '/scripts/checks.sh', ['develop'], 'composer test:unit')->violations())->toBe([])
         ->and(new CiSafetyGuard('develop')->inChecks((string) file_get_contents($root . '/scripts/checks.sh'), (string) file_get_contents($root . '/scripts/kit-config.sh')))->toBe([]);
 });

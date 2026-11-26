@@ -12,13 +12,13 @@ final readonly class CiContractGuard
 
     /**
      * @param list<string> $deployBranches the branches that deploy: each one runs the checks, the tests and the smoke run
-     * @param list<string> $parts          the parts of the checks step (`scripts/checks.sh --list-parts`): each has its own step
+     * @param string       $checksScript   the project's checks script, whose PARTS table names the parts: each has its own step
      */
     public function __construct(
         private string $pipelineFile,
+        private string $checksScript,
         private array $deployBranches,
         private string $backendTestCommand,
-        private array $parts = ['gate', 'static', 'guards', 'repo'],
     ) {
     }
 
@@ -31,34 +31,39 @@ final readonly class CiContractGuard
             return ['the pipeline file does not exist: copy the skeleton of the kit that fits the host'];
         }
 
-        return $this->inPipeline((string) file_get_contents($this->pipelineFile));
+        if (! is_file($this->checksScript)) {
+            return ['the checks script ' . $this->checksScript . ' does not exist: the parts of the checks step are read from it'];
+        }
+
+        return $this->inPipeline((string) file_get_contents($this->pipelineFile), (string) file_get_contents($this->checksScript));
     }
 
     /**
      * @return list<string>
      */
-    public function inPipeline(string $yaml): array
+    public function inPipeline(string $yaml, string $checksText): array
     {
         $pipeline = Yaml::parse($yaml);
         $runs = is_array($pipeline) && is_array($pipeline['pipelines'] ?? null) ? $pipeline['pipelines'] : [];
         $clone = is_array($pipeline) && is_array($pipeline['clone'] ?? null) ? $pipeline['clone'] : [];
         $image = is_array($pipeline) ? $pipeline['image'] ?? null : null;
 
-        return [...$this->runViolations($runs, $clone), ...$this->stepViolations($runs, $clone, $image)];
+        return [...$this->runViolations($runs, $clone, ChecksParts::of($checksText)), ...$this->stepViolations($runs, $clone, $image)];
     }
 
     /**
      * @param array<mixed> $runs
      * @param array<mixed> $clone
+     * @param list<string> $parts
      * @return list<string>
      */
-    private function runViolations(array $runs, array $clone): array
+    private function runViolations(array $runs, array $clone, array $parts): array
     {
         $violations = [];
         $pullRequests = self::section($runs, 'pull-requests');
         $checked = [];
 
-        foreach ($this->parts as $part) {
+        foreach ($parts as $part) {
             $steps = array_filter($pullRequests['**'] ?? [], static fn (array $step): bool => in_array(self::CHECKS . ' --part ' . $part, self::lines($step), true) && ! isset($step['condition']));
 
             if ($steps === []) {
@@ -75,7 +80,7 @@ final readonly class CiContractGuard
             $steps = array_merge(...array_values($covering) ?: [[]]);
             $tests = array_filter($steps, fn (array $step): bool => in_array($this->backendTestCommand, self::lines($step), true));
 
-            foreach ($this->parts as $part) {
+            foreach ($parts as $part) {
                 if (! array_any($steps, static fn (array $step): bool => in_array(self::CHECKS . ' --main --part ' . $part, self::lines($step), true))) {
                     $violations[] = 'the deploying branch ' . $branch . ' has no step that runs exactly `' . self::CHECKS . ' --main --part ' . $part . '`';
                 }

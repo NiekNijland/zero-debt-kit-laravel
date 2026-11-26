@@ -8,6 +8,14 @@ use LogicException;
 
 final class CiExamples
 {
+    /**
+     * @param list<string> $deployBranches
+     */
+    public static function pipelineGuard(array $deployBranches = ['main']): CiContractGuard
+    {
+        return new CiContractGuard('', '', $deployBranches, 'composer test:unit');
+    }
+
     public static function pipeline(): string
     {
         return <<<'YAML'
@@ -85,6 +93,12 @@ final class CiExamples
     {
         return <<<'SH'
             # The one command.
+            PARTS=(
+                "gate::"
+                "static::Format|Refactor|Analyser|Type coverage|Lint"
+                "guards::Guard tests"
+                "repo::Audit|Commit messages|Secret scan"
+            )
             set -euo pipefail
             bash "$GUARD/ci-ratchets.sh" --guard scripts/ci-ratchets.sh
             bash scripts/ci-ratchets.sh
@@ -96,7 +110,17 @@ final class CiExamples
                 "Type coverage::vendor/bin/pest --type-coverage --min=100"
                 "Lint::npx eslint . --max-warnings 0"
                 "Guard tests::vendor/bin/pest --group arch"
-                "Audit::composer audit --locked --format=json | bash scripts/audit-gate.sh"
+            )
+            if [ "$RUN" = "--main" ]; then
+                TASKS+=(
+                    "Audit::composer audit --locked --no-dev --format=json | bash scripts/audit-gate.sh"
+                )
+            else
+                TASKS+=(
+                    "Audit::composer audit --locked --format=json | bash scripts/audit-gate.sh"
+                )
+            fi
+            TASKS+=(
                 "Commit messages::bash scripts/ci-commit-messages.sh"
                 "Secret scan::gitleaks git --redact --no-banner"
             )
