@@ -22,6 +22,7 @@ Filled in during step 1 from the repository and the hosting API. Mark each line 
 - Frontend language, framework, versions, and the distance to the floor:
 - Test framework per language (PHP: Pest or PHPUnit, one), parallel or not:
 - Static analysis, level, extensions:
+- Test method spelling (step 1: read the formatter config, a hosted one included, for the rule on test method casing, and follow it; `catalog/tests-database-ci-docs.md`, "One spelling in a test"): <PHPUnit `test_snake_case` / `testCamelCase` / Pest `it`>, and the rule or file that decides it:
 - Formatter, refactoring tool, their configs (and any config agents must not touch; where the formatter config is hosted by the organisation, that is named here and in the CI table, and is never copied into the repository):
 - PHP extensions or system tools the developer host lacks and the pipeline image has (baselines are generated in the image):
 - Are the agent guide files (`AGENTS.md`, `CLAUDE.md`) tracked in git, or ignored:

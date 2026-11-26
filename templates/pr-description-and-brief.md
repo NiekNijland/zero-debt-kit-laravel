@@ -76,6 +76,7 @@ You work from that copy of the builder rules and this brief; every kit section t
 - The guard that holds this theme in this repository: <test file>. The ratchet rows this theme moves: <names>.
 - A guard to write, only if named here: <mechanism, file>, with the spellings of the construct it must fail on: <list>. The lead adds its row.
 - Fix patterns: <the one shared list, the same text in every brief of this round>.
+- Test spelling for every test you add or move: <the one spelling the profile records, copied word for word; also the declaration form: `it(...)` or a `test` method, the casing, no `#[Test]` or `@test`>. The same text in every brief of this round, whatever spelling the old tests use.
 - The one-pattern row to add or change: <row>.
 
 ## Proof you must be able to show
