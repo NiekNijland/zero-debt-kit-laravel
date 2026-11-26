@@ -69,7 +69,7 @@ final readonly class CiSafetyGuard
         $violations = [];
 
         if (preg_match('/--changed\b|--dirty\b|--since\b|\bgit\s+diff\b|CHANGED_FILES/', $text) === 1) {
-            $violations[] = 'a command of checks.sh takes a list of changed files: every check names the whole tree (the mutation run of a pull request is the one exception, and it is not in this script)';
+            $violations[] = 'a command of checks.sh takes a list of changed files or asks version control for a diff: every check names the whole tree (the mutation run of a pull request is the one exception, and it is not in this script). A drift check of a generated file generates it to a temporary path and compares by content: cmp -s <committed file> "$tmp"';
         }
 
         if (preg_match('/"Lint::([^"]*)"/', $text, $lint) === 1 && ! str_contains($lint[1], $this->zeroWarnings)) {
