@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Support\Architecture;
 
+use InvalidArgumentException;
+use Tests\Support\Globs;
+
 final readonly class TestHelperMirrorGuard
 {
     /**
-     * @param string $supportFolder the support folder, relative to the root
+     * @param string $supportFolder the support folder, relative to the root; a folder that does not exist is an error
      * @param string $testFolder the folder of the tests, whose subfolders the support subfolders mirror
      * @param string $namespace the namespace of the support folder
      */
@@ -27,16 +30,20 @@ final readonly class TestHelperMirrorGuard
     {
         $violations = [];
 
-        foreach (self::paths($this->root . '/' . $this->supportFolder . '/*', GLOB_ONLYDIR) as $tree) {
+        if (! is_dir($this->root . '/' . $this->supportFolder)) {
+            throw new InvalidArgumentException('The directory ' . $this->supportFolder . ' does not exist: a guard over a missing folder would pass without reading a file');
+        }
+
+        foreach (Globs::of($this->root . '/' . $this->supportFolder . '/*', GLOB_ONLYDIR) as $tree) {
             if (! is_dir($this->root . '/' . $this->testFolder . '/' . basename($tree))) {
                 continue;
             }
 
             foreach ($this->inspector->phpFiles($tree) as $file) {
-                $violation = $this->violationOf(substr($file, strlen($this->root . '/' . $this->supportFolder . '/')));
+                $violation = $this->violationOf(mb_substr($file, mb_strlen($this->root . '/' . $this->supportFolder . '/')));
 
                 if ($violation !== null) {
-                    $violations[] = $this->supportFolder . '/' . substr($file, strlen($this->root . '/' . $this->supportFolder . '/')) . ': ' . $violation;
+                    $violations[] = $this->supportFolder . '/' . mb_substr($file, mb_strlen($this->root . '/' . $this->supportFolder . '/')) . ': ' . $violation;
                 }
             }
         }
@@ -46,7 +53,7 @@ final readonly class TestHelperMirrorGuard
 
     private function violationOf(string $path): ?string
     {
-        $class = $this->namespace . '\\' . str_replace('/', '\\', substr($path, 0, -4));
+        $class = $this->namespace . '\\' . str_replace('/', '\\', mb_substr($path, 0, -4));
 
         if (preg_match('/^(.+)(Helpers|Scenario)\.php$/', $path, $parts) !== 1) {
             return null;
@@ -70,7 +77,7 @@ final readonly class TestHelperMirrorGuard
 
     private function returnedByNeighbor(string $path, string $class): bool
     {
-        foreach (self::paths($this->root . '/' . $this->supportFolder . '/' . dirname($path) . '/*Helpers.php') as $neighbor) {
+        foreach (Globs::of($this->root . '/' . $this->supportFolder . '/' . dirname($path) . '/*Helpers.php') as $neighbor) {
             $mirrored = $this->root . '/' . $this->testFolder . '/' . dirname($path) . '/' . basename($neighbor, 'Helpers.php') . 'Test.php';
 
             if (is_file($mirrored) && in_array($class, $this->inspector->referencedNames($neighbor), true)) {
@@ -79,15 +86,5 @@ final readonly class TestHelperMirrorGuard
         }
 
         return false;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private static function paths(string $pattern, int $flags = 0): array
-    {
-        $paths = glob($pattern, $flags);
-
-        return $paths === false ? [] : $paths;
     }
 }

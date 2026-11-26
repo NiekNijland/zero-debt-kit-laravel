@@ -77,6 +77,16 @@ it('names the helper relative to the root when the checkout sits under a dot dir
         ->and($violations[0])->toStartWith('tests/Support/Unit/OrphanHelpers.php: there is no tests/Unit/OrphanTest.php');
 });
 
+it('fails when the support folder is missing', function (): void {
+    $root = SourceSandbox::create(['tests/Unit/ArchTest.php' => "<?php\n"]);
+
+    try {
+        expect(fn (): array => new TestHelperMirrorGuard(new PhpFileInspector(), $root, 'tests/Support', 'tests', 'Tests\\Support')->violations())->toThrow(InvalidArgumentException::class, 'does not exist');
+    } finally {
+        SourceSandbox::remove($root);
+    }
+});
+
 it('gives every helper and scenario in the mirrored tree of tests/Support a test at the mirrored path', function (): void {
     expect(new TestHelperMirrorGuard(new PhpFileInspector(), dirname(__DIR__, 2), 'tests/Support', 'tests', 'Tests\\Support')->violations())->toBe([]);
 });

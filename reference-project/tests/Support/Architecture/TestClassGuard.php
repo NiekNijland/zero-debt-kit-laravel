@@ -4,46 +4,40 @@ declare(strict_types=1);
 
 namespace Tests\Support\Architecture;
 
-use Tests\Support\RecursiveFiles;
-
-final class TestClassGuard
+final readonly class TestClassGuard
 {
     private const string DECLARATION = '/^\h*(#\[[^\n]*\]\h*)*(\w+\h+)*(class|interface|trait|enum)\h+\w/mi';
 
     /**
-     * @param list<string> $suites the suite folders, relative to the root; a suite that does not exist is skipped
+     * @param list<string> $suites the suite folders, relative to the root; a suite that does not exist is an error, so a renamed folder cannot turn the check into an empty pass
      */
     public function __construct(
-        private readonly PhpFileInspector $inspector,
-        private readonly string $root,
-        private readonly array $suites,
+        private PhpFileInspector $inspector,
+        private string $root,
+        private array $suites,
     ) {
     }
 
     /**
-     * @return array<string, list<string>>
+     * @return array<string, list<string>> the types a test file declares besides its own test case, per file relative to the root
      */
     public function violations(): array
     {
         $violations = [];
 
         foreach ($this->suites as $suite) {
-            if (! is_dir($this->root . '/' . $suite)) {
-                continue;
-            }
-
-            foreach (RecursiveFiles::in($this->root . '/' . $suite) as $file) {
-                if (! str_ends_with($file->getFilename(), 'Test.php') || preg_match(self::DECLARATION, (string) file_get_contents($file->getPathname())) !== 1) {
+            foreach ($this->inspector->phpFiles($this->root . '/' . $suite) as $file) {
+                if (! str_ends_with($file, 'Test.php') || preg_match(self::DECLARATION, (string) file_get_contents($file)) !== 1) {
                     continue;
                 }
 
                 $foreign = array_values(array_filter(
-                    array_keys($this->inspector->declaredTypes($file->getPathname())),
-                    static fn (string $type): bool => class_basename($type) !== $file->getBasename('.php'),
+                    array_keys($this->inspector->declaredTypes($file)),
+                    static fn (string $type): bool => class_basename($type) !== basename($file, '.php'),
                 ));
 
                 if ($foreign !== []) {
-                    $violations[substr($file->getPathname(), strlen($this->root) + 1)] = $foreign;
+                    $violations[mb_substr($file, mb_strlen($this->root) + 1)] = $foreign;
                 }
             }
         }
