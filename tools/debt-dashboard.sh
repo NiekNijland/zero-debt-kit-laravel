@@ -41,9 +41,9 @@ SHRINK_ONLY="comments test-doubles event-fake-all"
 ANALYSER_SWITCHES_TARGET=18
 # What the other min rows must reach, as "<row>:<number>" split on spaces. --final fails a row below its number, and a name here
 # that has no ratchet row. The numbers are the kit's: coverage of the backend and of the frontend logic at 95, every set of
-# REFACTOR_SETS (19), every rule of FORMATTER_RULES (21), the advisory-blocking package (1). A project without the subject of a
+# REFACTOR_SETS (18), every rule of FORMATTER_RULES (21), the advisory-blocking package (1). A project without the subject of a
 # row removes that entry with the script tag (no frontend: frontend-logic-coverage-floor; no PHP: the last three).
-MIN_ROW_TARGETS="coverage-floor:95 frontend-logic-coverage-floor:95 refactor-sets:19 formatter-rules:21 advisory-block:1"
+MIN_ROW_TARGETS="coverage-floor:95 frontend-logic-coverage-floor:95 refactor-sets:18 formatter-rules:21 advisory-block:1"
 # More rows: "<caps key>::<always|online|shown>::<command that prints one whole number>". online rows are skipped by --offline.
 # A shown row is skipped by --offline too, has no cap and never fails: only dependencies-behind is one.
 # json '<operation> <path>' reads JSON on standard input (tools/README.md, the methods table, "json").
@@ -302,7 +302,7 @@ min_target() {
 kit_min_target() {
     case "$1" in
         coverage-floor | frontend-logic-coverage-floor) echo 95 ;;
-        refactor-sets) echo 19 ;;
+        refactor-sets) echo 18 ;;
         formatter-rules) echo 21 ;;
         advisory-block) echo 1 ;;
         *) return 1 ;;

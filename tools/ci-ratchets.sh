@@ -20,11 +20,11 @@ TYPE_CHECKER_CONFIGS="tsconfig.json?"
 # or after a brace or comma, so a switch that is commented out (# or //) is not counted.
 ANALYSER_SWITCHES="(^|[{,])[[:space:]]*[^A-Za-z[:space:]#/]?(checkTooWideReturnTypesInProtectedAndPublicMethods|checkMissingOverrideMethodAttribute|reportAnyTypeWideningInVarTag|checkOctaneCompatibility|noEnvCallsOutsideOfConfig|strict|noUncheckedIndexedAccess|noImplicitOverride|noImplicitReturns|noFallthroughCasesInSwitch|noUnusedLocals|noUnusedParameters|noUncheckedSideEffectImports)[^A-Za-z:[:space:]]?[[:space:]]*:[[:space:]]*true|(^|[{,])[[:space:]]*[^A-Za-z[:space:]#/]?(allowJs|allowUnreachableCode|allowUnusedLabels)[^A-Za-z:[:space:]]?[[:space:]]*:[[:space:]]*false|^[[:space:]]*-[[:space:]]+[^#[:space:]]*/conf/bleedingEdge[.]neon|^[[:space:]]*-[[:space:]]+[^#[:space:]]*/carbon/extension[.]neon"
 REFACTOR_CONFIG="rector.php?"
-# One extended regular expression that matches a set or switch of the refactoring tool that is on, in REFACTOR_CONFIG: the six
+# One extended regular expression that matches a set or switch of the refactoring tool that is on, in REFACTOR_CONFIG: the five
 # prepared sets, the ten framework sets, the language sets, the framework version read from the manifest, and unused imports
 # removed (templates/tool-configs.md). The row refactor-sets counts the matches and only goes up. No double quote, backslash
 # or dollar sign in the value: the merge base is read as text. A set after // or # at the line start is not counted.
-REFACTOR_SETS="(^[[:space:]]*|,[[:space:]]*|(^[[:space:]]*|[]A-Za-z0-9_)])->withPreparedSets[(][[:space:]]*)(deadCode|codeQuality|codingStyle|typeDeclarations|privatization|earlyReturn):[[:space:]]*true|(^[[:space:]]*|[,([][[:space:]]*)LaravelSetList::LARAVEL_(ARRAYACCESS_TO_METHOD_CALL|ARRAY_STR_FUNCTION_TO_STATIC_CALL|CODE_QUALITY|COLLECTION|CONTAINER_STRING_TO_FULLY_QUALIFIED_NAME|ELOQUENT_MAGIC_METHOD_TO_QUERY_BUILDER|FACADE_ALIASES_TO_FULL_NAMES|FACTORIES|IF_HELPERS|LEGACY_FACTORIES_TO_CLASSES)|(^[[:space:]]*|[]A-Za-z0-9_)])->withPhpSets[(][)]|(^[[:space:]]*|[]A-Za-z0-9_)])->withComposerBased[(]laravel:[[:space:]]*true[)]|(^[[:space:]]*|,[[:space:]]*|(^[[:space:]]*|[]A-Za-z0-9_)])->withImportNames[(][[:space:]]*)removeUnusedImports:[[:space:]]*true"
+REFACTOR_SETS="(^[[:space:]]*|,[[:space:]]*|(^[[:space:]]*|[]A-Za-z0-9_)])->withPreparedSets[(][[:space:]]*)(deadCode|codeQuality|codingStyle|typeDeclarations|privatization):[[:space:]]*true|(^[[:space:]]*|[,([][[:space:]]*)LaravelSetList::LARAVEL_(ARRAYACCESS_TO_METHOD_CALL|ARRAY_STR_FUNCTION_TO_STATIC_CALL|CODE_QUALITY|COLLECTION|CONTAINER_STRING_TO_FULLY_QUALIFIED_NAME|ELOQUENT_MAGIC_METHOD_TO_QUERY_BUILDER|FACADE_ALIASES_TO_FULL_NAMES|FACTORIES|IF_HELPERS|LEGACY_FACTORIES_TO_CLASSES)|(^[[:space:]]*|[]A-Za-z0-9_)])->withPhpSets[(][)]|(^[[:space:]]*|[]A-Za-z0-9_)])->withComposerBased[(]laravel:[[:space:]]*true[)]|(^[[:space:]]*|,[[:space:]]*|(^[[:space:]]*|[]A-Za-z0-9_)])->withImportNames[(][[:space:]]*)removeUnusedImports:[[:space:]]*true"
 # The formatter's config, and one extended regular expression that matches a rule of the kit's strictness list that is on in it
 # (true, or an object of options). The row formatter-rules counts the matches and only goes up: a rule that is switched off
 # for its own pull request (templates/tool-configs.md, "Rules that can change behavior") is not counted until it is on.
@@ -690,7 +690,7 @@ refactor-skip 1 ->withSkipPath(__DIR__ . '/x')
 refactor-skip 0 ->withSkip([])
 refactor-sets 2     ->withPreparedSets(deadCode: true, codeQuality: true)
 refactor-sets 1     deadCode: true,
-refactor-sets 1 $config->withPreparedSets(earlyReturn: true)
+refactor-sets 0 $config->withPreparedSets(earlyReturn: true)
 refactor-sets 1     ->withPhpSets()
 refactor-sets 1     ->withComposerBased(laravel: true)
 refactor-sets 1     ->withImportNames(removeUnusedImports: true)

@@ -12,6 +12,10 @@ MUTATION_SOURCE_FOLDERS="<source folders>"
 # of a test file is no score of the code), so the defaults keep source files of PHP and TypeScript/JavaScript and drop test files.
 MUTATION_FILE_PATTERN='\.(php|ts|tsx|js|jsx|mjs|cjs|mts|cts)$'
 MUTATION_EXCLUDE_PATTERN='(\.(test|spec)\.[a-z]+$|/__tests__/|Test\.php$)'
+# The worker count of Pest (--processes) and Infection (--threads): a whole number from 1. Pest's own default is one worker per
+# core, and on a machine with many cores the workers starve each other: the same code scored 75% (29 untested, 10 timeouts) with the
+# default and 94.59% with 4. The default is 4; raise it on a runner with the cores to spare, and keep the score at the floor.
+MUTATION_PROCESSES="4"
 # <<< config
 
 SHARED_CONFIG="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/kit-config.sh"
@@ -30,6 +34,10 @@ fail() {
 
 case "$MUTATION_TOOL$MUTATION_SOURCE_FOLDERS" in
     *"<"*">"*) fail "the config block of this script still holds a placeholder" ;;
+esac
+
+case "$MUTATION_PROCESSES" in
+    "" | *[!0-9]* | 0*) fail "MUTATION_PROCESSES is \"$MUTATION_PROCESSES\": a whole number from 1" ;;
 esac
 
 MODE="${1:-}"
@@ -90,10 +98,10 @@ run_stryker() {
     exit "$status"
 }
 case "$MUTATION_TOOL:$MODE" in
-    pest:) vendor/bin/pest --mutate --everything --parallel --min="$FLOOR" ;;
-    pest:--changed) vendor/bin/pest --mutate --parallel --path="$CHANGED" --min="$FLOOR" ;;
-    infection:) vendor/bin/infection --threads=max --min-msi="$FLOOR" ;;
-    infection:--changed) vendor/bin/infection --threads=max --min-msi="$FLOOR" --git-diff-filter=AMR --git-diff-base="$REMOTE/$BASE" ;;
+    pest:) vendor/bin/pest --mutate --everything --parallel --processes="$MUTATION_PROCESSES" --min="$FLOOR" ;;
+    pest:--changed) vendor/bin/pest --mutate --parallel --processes="$MUTATION_PROCESSES" --path="$CHANGED" --min="$FLOOR" ;;
+    infection:) vendor/bin/infection --threads="$MUTATION_PROCESSES" --min-msi="$FLOOR" ;;
+    infection:--changed) vendor/bin/infection --threads="$MUTATION_PROCESSES" --min-msi="$FLOOR" --git-diff-filter=AMR --git-diff-base="$REMOTE/$BASE" ;;
     stryker:) run_stryker ;;
     stryker:--changed) run_stryker --mutate "$(printf '%s' "$CHANGED" | sed 's/[][(){}*!]/?/g')" ;;
     *) fail "MUTATION_TOOL is \"$MUTATION_TOOL\": it is one of pest, infection, stryker" ;;

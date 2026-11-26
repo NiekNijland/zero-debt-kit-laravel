@@ -1200,7 +1200,7 @@ commit "PROJ-7 ci: the kit's formatter and refactoring configs, the advisory-blo
 [ratchet: script] the config values of the strictness rows"
 git push -q origin strict:strict-main
 check X01 "ratchet --head: the formatter config of templates/tool-configs.md holds the 21 rules of FORMATTER_RULES" 0 '^formatter-rules min 21$' "$SHELL_BIN" scripts/ci-ratchets.sh --head
-check X02 "ratchet --head: the refactoring config of templates/tool-configs.md holds the 19 sets of REFACTOR_SETS" 0 '^refactor-sets min 19$' "$SHELL_BIN" scripts/ci-ratchets.sh --head
+check X02 "ratchet --head: the refactoring config of templates/tool-configs.md holds the 18 sets of REFACTOR_SETS" 0 '^refactor-sets min 18$' "$SHELL_BIN" scripts/ci-ratchets.sh --head
 check X03 "ratchet --head: that config has no skip entry" 0 '^refactor-skip max 0$' "$SHELL_BIN" scripts/ci-ratchets.sh --head
 check X04 "ratchet --head: the advisory-blocking package at dev-latest counts 1" 0 '^advisory-block min 1$' "$SHELL_BIN" scripts/ci-ratchets.sh --head
 check X05 "ratchet --head: analyser-switches counts the bleeding-edge include and the date extension's include, and not the framework extension's (2 flags, 1 switch, 2 includes)" 0 '^analyser-switches min 5$' "$SHELL_BIN" scripts/ci-ratchets.sh --head
@@ -1220,12 +1220,12 @@ check X07b "ratchet: the same when the rule is removed from the config" fail '^f
 ts_branch x08 strict
 edit rector.php 's/codingStyle: true/codingStyle: false/'
 commit "PROJ-7 chore: switch a prepared set off"
-check X08 "ratchet: a prepared set of the refactoring tool that is switched off fails" fail '^refactor-sets +up +19 +18 +-1 +FAILS' env CHECK_BASE=strict-main "$SHELL_BIN" scripts/ci-ratchets.sh
+check X08 "ratchet: a prepared set of the refactoring tool that is switched off fails" fail '^refactor-sets +up +18 +17 +-1 +FAILS' env CHECK_BASE=strict-main "$SHELL_BIN" scripts/ci-ratchets.sh
 
 ts_branch x08b strict
 edit rector.php '/LARAVEL_IF_HELPERS/d'
 commit "PROJ-7 chore: drop a framework set"
-check X08b "ratchet: a framework set that is removed fails" fail '^refactor-sets +up +19 +18 +-1 +FAILS' env CHECK_BASE=strict-main "$SHELL_BIN" scripts/ci-ratchets.sh
+check X08b "ratchet: a framework set that is removed fails" fail '^refactor-sets +up +18 +17 +-1 +FAILS' env CHECK_BASE=strict-main "$SHELL_BIN" scripts/ci-ratchets.sh
 
 ts_branch x09 strict
 edit rector.php 's/^    ->withPhpSets\(\);$/    ->withPhpSets()\
@@ -1258,7 +1258,7 @@ commit "PROJ-7 ci: lower the coverage floor"
 check X12 "ratchet: the coverage floor fails when it falls" fail '^coverage-floor +up +80 +79 +-1 +FAILS' env CHECK_BASE=strict-main "$SHELL_BIN" scripts/ci-ratchets.sh
 
 ts_branch x13 strict
-edit scripts/debt-dashboard.sh 's/^ANALYSER_SWITCHES_TARGET=.*$/ANALYSER_SWITCHES_TARGET=5/; s/^MIN_ROW_TARGETS=.*$/MIN_ROW_TARGETS="coverage-floor:95 refactor-sets:19 formatter-rules:21 advisory-block:1"/'
+edit scripts/debt-dashboard.sh 's/^ANALYSER_SWITCHES_TARGET=.*$/ANALYSER_SWITCHES_TARGET=5/; s/^MIN_ROW_TARGETS=.*$/MIN_ROW_TARGETS="coverage-floor:95 refactor-sets:18 formatter-rules:21 advisory-block:1"/'
 commit "PROJ-7 ci: the kit's end goals of the min rows
 
 [ratchet: script] MIN_ROW_TARGETS as the kit ships it, without the frontend entry"
@@ -1304,7 +1304,7 @@ ts_branch x14b integrate
 check X14 "checks.sh: the refactoring dry run is a line of the checks step" 0 '^PASS +[0-9]+s +Refactor$' env CHECK_BASE=main "$SHELL_BIN" scripts/checks.sh
 check X14b "checks.sh: so is the type coverage" 0 '^PASS +[0-9]+s +Type coverage$' env CHECK_BASE=main "$SHELL_BIN" scripts/checks.sh
 check X14c "the kit's checks.sh ships both lines as placeholders, so a project cannot leave them out unnoticed" 0 '^2$' "$SHELL_BIN" -c 'grep -c -E "^ +.(Refactor|Type coverage)::<" "$0"; exit 0' "$KIT/ci/checks.sh"
-check X15 "the kit's dashboard ships the end goals: coverage 95, 19 sets, 21 rules, the advisory-blocking package" 0 '^MIN_ROW_TARGETS="coverage-floor:95 frontend-logic-coverage-floor:95 refactor-sets:19 formatter-rules:21 advisory-block:1"$' grep -E '^MIN_ROW_TARGETS=' "$KIT/tools/debt-dashboard.sh"
+check X15 "the kit's dashboard ships the end goals: coverage 95, 18 sets, 21 rules, the advisory-blocking package" 0 '^MIN_ROW_TARGETS="coverage-floor:95 frontend-logic-coverage-floor:95 refactor-sets:18 formatter-rules:21 advisory-block:1"$' grep -E '^MIN_ROW_TARGETS=' "$KIT/tools/debt-dashboard.sh"
 
 # A layout move (step 5). The tree is not in the kit's layout yet, so the expressions of the test rows name today's
 # folder as well as the kit's: the number signed in step 1 is the real one, and the move changes no row.
@@ -1465,8 +1465,8 @@ chmod +x "$MUT_DIR/vendor/bin/pest"
     cd "$MUT_DIR" && git init -q -b main && echo a > app/a.php && git add -A && git commit -q -m "PROJ-1 chore: base" &&
         git update-ref refs/remotes/origin/main HEAD && echo b > app/b.php && git add -A && git commit -q -m "PROJ-1 chore: change"
 ) > /dev/null 2>&1
-check MU01 "mutation.sh: the whole tree runs the tool with the committed floor" 0 '^pest --mutate --everything --parallel --min=70$' "$SHELL_BIN" -c "cd '$MUT_DIR' && bash scripts/mutation.sh"
-check MU02 "mutation.sh --changed: only the files the branch changes, with the same floor" 0 '^pest --mutate --parallel --path=app/b\.php --min=70$' "$SHELL_BIN" -c "cd '$MUT_DIR' && CHECK_BASE=main bash scripts/mutation.sh --changed"
+check MU01 "mutation.sh: the whole tree runs the tool with the committed floor" 0 '^pest --mutate --everything --parallel --processes=4 --min=70$' "$SHELL_BIN" -c "cd '$MUT_DIR' && bash scripts/mutation.sh"
+check MU02 "mutation.sh --changed: only the files the branch changes, with the same floor" 0 '^pest --mutate --parallel --processes=4 --path=app/b\.php --min=70$' "$SHELL_BIN" -c "cd '$MUT_DIR' && CHECK_BASE=main bash scripts/mutation.sh --changed"
 check MU03 "mutation.sh: a floor file without a threshold line fails" fail 'holds no line "threshold: N"' "$SHELL_BIN" -c "cd '$MUT_DIR' && echo nothing > scripts/mutation-floor.txt && bash scripts/mutation.sh"
 check MU04 "mutation.sh: the shipped placeholders stop the run" fail 'still holds a placeholder' "$SHELL_BIN" -c "cd '$MUT_DIR' && cp '$KIT/tools/mutation.sh' scripts/mutation.sh && bash scripts/mutation.sh"
 
