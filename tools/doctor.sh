@@ -32,6 +32,8 @@
 # put back, written only under scripts/ (a temporary file, then a rename). A changed script that GUARDED_FILES lists is a guarded file: the commit needs
 # [ratchet: script] <reason> and a code-owner review (UPGRADING.md); and each ratchet row it carried from the kit needs its own
 # [ratchet: <row>] <reason> line (the plan and --apply print one per row).
+# --apply also runs the project's dashboard offline before and after and lists the rows that moved up (a path list or a definition the
+# kit widened): the project fixes them in the same pull request. When the dashboard cannot run it says "not run" and why.
 #
 # Exit 0: nothing diverged. Exit 1: a body differs, a required script is missing, a project-only kit script exists or a config
 # key is missing or extra. Exit 64: a usage error. Writes nothing without --apply.
@@ -659,6 +661,34 @@ carried_tags() {
     done
 }
 
+# ---------------------------------------------------------------- the dashboard before and after --apply
+# A kit upgrade can widen a path list or a definition (the dashboard's SOURCE_FILES gained database/): a row then counts more files
+# than before and fails the project's gate in the same pull request. dash_run <outfile> runs the project's dashboard offline and
+# writes "<row> <now>" per row; it prints the reason and returns 1 when the dashboard cannot run.
+dash_run() {
+    local raw="$1.raw" dir="$PROJECT/$SCRIPTS_DIR" f
+    : > "$1"
+    for f in debt-dashboard.sh ci-ratchets.sh kit-config.sh; do
+        [ -f "$dir/$f" ] || { echo "$SCRIPTS_DIR/$f is missing"; return 1; }
+    done
+    command -v git > /dev/null 2>&1 || { echo "git is not installed"; return 1; }
+    git -C "$PROJECT" rev-parse --show-toplevel > /dev/null 2>&1 || { echo "the project is not a git repository"; return 1; }
+    (cd "$PROJECT" && bash "$SCRIPTS_DIR/debt-dashboard.sh" --offline --report > "$raw" 2> "$raw.err")
+    awk '$1 ~ /^(ratchet|size|classes|tests|docs|command|caps)$/ && NF >= 5 { print $2, $3 }' "$raw" > "$1"
+    if [ ! -s "$1" ]; then
+        echo "the dashboard printed no rows: $(head -n 1 "$raw.err" 2> /dev/null | cut -c1-160)"
+        return 1
+    fi
+    return 0
+}
+
+# dash_moved <before> <after>: the rows whose count rose ("<row> <before> -> <after>"), and the rows that are new above zero.
+dash_moved() {
+    awk 'FILENAME == ARGV[1] { b[$1] = $2; next }
+        $2 ~ /^[0-9]+$/ && $2 > 0 && !($1 in b) { printf "%s (new row) -> %s\n", $1, $2; next }
+        ($1 in b) && b[$1] ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ && $2 + 0 > b[$1] + 0 { printf "%s %s -> %s\n", $1, b[$1], $2 }' "$1" "$2"
+}
+
 # ---------------------------------------------------------------- the upgrade plan, and --apply
 if [ "$PLAN" -eq 1 ]; then
     {
@@ -684,10 +714,16 @@ if [ "$PLAN" -eq 1 ]; then
             carried_tags "$carried" >&2
         fi
         echo "  Then run: bash $SCRIPTS_DIR/ci-ratchets.sh --self-test and bash $SCRIPTS_DIR/checks.sh --part gate"
+        echo "  --apply runs the dashboard offline (--offline) before and after, and lists the rows that moved up because a path list or a definition widened:"
+        echo "  fix each one in the same pull request, or the gate fails it."
     } >&2
 fi
 
 if [ "$APPLY" -eq 1 ]; then
+    DASH_BEFORE_WHY=""
+    if [ -s "$TMP/apply_list" ]; then
+        DASH_BEFORE_WHY=$(dash_run "$TMP/dash.before") && DASH_BEFORE_WHY=""
+    fi
     CHANGED=""
     FAILED=0
     while read -r name; do
@@ -786,6 +822,26 @@ if [ "$APPLY" -eq 1 ]; then
             echo "Applied: nothing changed."
         fi
     } >&2
+    if [ -n "$CHANGED" ]; then
+        {
+            DASH_AFTER_WHY=$(dash_run "$TMP/dash.after") && DASH_AFTER_WHY=""
+            if [ -n "$DASH_AFTER_WHY" ]; then
+                echo "Dashboard after --apply: not run ($DASH_AFTER_WHY). Run: bash $SCRIPTS_DIR/debt-dashboard.sh --offline, and fix every row that moved in the same pull request."
+            elif [ -n "$DASH_BEFORE_WHY" ]; then
+                echo "Dashboard before --apply: not run ($DASH_BEFORE_WHY), so no row can be compared. The rows above zero after it:"
+                awk '$2 ~ /^[0-9]+$/ && $2 > 0 { print "    " $1 " " $2 }' "$TMP/dash.after"
+            else
+                moved=$(dash_moved "$TMP/dash.before" "$TMP/dash.after")
+                if [ -n "$moved" ]; then
+                    echo "Dashboard rows that moved up after --apply (a path list or a definition the kit widened counts more files: fix each in this pull request, or the gate fails it):"
+                    printf '%s\n' "$moved" | sed 's/^/    /'
+                    echo "  List the files of a row with: bash $SCRIPTS_DIR/debt-dashboard.sh --offline --details"
+                else
+                    echo "Dashboard run offline before and after --apply: no row moved up."
+                fi
+            fi
+        } >&2
+    fi
     [ "$FAILED" -eq 0 ] || exit 1
     exit 0
 fi

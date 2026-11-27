@@ -163,3 +163,47 @@ check DX38 "F51: --apply lists the replaced value as a conflict, with the projec
 check DX38b "F51: the conflict block shows the project's earlier value too" 0 'was: OVERRIDE_AT_ZERO="comments' cat "$DX/stale-apply.out"
 check DX38c "F51: the conflict block says how to keep the project's value" 0 'trailing comment with the reason' cat "$DX/stale-apply.out"
 check DX39 "F51: a value with a trailing comment is the project's decision, not a value the kit changed" 0 '^0$' "$SHELL_BIN" -c "'$SHELL_BIN' '$KIT/tools/doctor.sh' --kit '$DXK2' --project '$DX/p-keep' | grep -c 'config values the kit changed' || true"
+
+# F52: a kit upgrade widened a path list (the dashboard's SOURCE_FILES gained database/) and the open-classes row failed the project's
+# gate in the same pull request. --apply runs the dashboard offline before and after and lists the rows that moved up. The scratch kit
+# has v1 with a SOURCE_FILES that lacks database/, and v2 with the kit's own value.
+DXK3="$DX/kit3"
+mkdir -p "$DXK3/tools" "$DXK3/ci"
+(
+    cd "$DXK3" || exit 1
+    git init -q -b main
+    for f in ci-ratchets debt-dashboard ci-commit-messages ci-parallel kit-config; do cp "$KIT/tools/$f.sh" tools/; done
+    cp "$KIT/ci/checks.sh" ci/
+    sed -i.bak "s/^SOURCE_FILES='^(app|bootstrap|config|database|routes|lang)/SOURCE_FILES='^(app|bootstrap|config|routes|lang)/" tools/debt-dashboard.sh
+    rm -f tools/*.bak
+    echo "1.0.0" > VERSION
+    git add -A && git commit -q -m "kit v1" && git tag v1
+    cp "$KIT/tools/debt-dashboard.sh" tools/
+    echo "1.1.0" > VERSION
+    git add -A && git commit -q -m "kit v2"
+) > /dev/null 2>&1
+# dx_widen_project <folder> <database file: yes|no>: a git repository with the kit's v1 scripts and a class under app/ (and database/)
+dx_widen_project() {
+    mkdir -p "$1/scripts" "$1/app" "$1/database/seeders" "$1/bootstrap" "$1/config" "$1/routes" "$1/tests"
+    local f
+    for f in tools/ci-ratchets.sh tools/debt-dashboard.sh tools/ci-commit-messages.sh tools/ci-parallel.sh tools/kit-config.sh ci/checks.sh; do
+        git -C "$DXK3" show "v1:$f" > "$1/scripts/$(basename "$f")"
+    done
+    cp "$KIT/tools/debt-caps.json" "$1/scripts/debt-caps.json"
+    printf '<?php\nclass Alpha {}\n' > "$1/app/Alpha.php"
+    [ "$2" != yes ] || printf '<?php\nclass Seeder {}\n' > "$1/database/seeders/Seeder.php"
+    touch "$1/bootstrap/.gitkeep" "$1/config/.gitkeep" "$1/routes/.gitkeep" "$1/tests/.gitkeep" "$1/database/.gitkeep"
+    (cd "$1" && git init -q -b main && git add -A && git -c user.email=a@b.c -c user.name=proof commit -q -m init) > /dev/null 2>&1
+}
+dx_widen_project "$DX/p-widen" yes
+dx_widen_project "$DX/p-nowiden" no
+mkdir -p "$DX/p-nogit/scripts"
+for f in tools/ci-ratchets.sh tools/debt-dashboard.sh tools/kit-config.sh; do git -C "$DXK3" show "v1:$f" > "$DX/p-nogit/scripts/$(basename "$f")"; done
+"$SHELL_BIN" "$KIT/tools/doctor.sh" --kit "$DXK3" --project "$DX/p-widen" --apply > "$DX/widen-apply.out" 2>&1
+"$SHELL_BIN" "$KIT/tools/doctor.sh" --kit "$DXK3" --project "$DX/p-nowiden" --apply > "$DX/nowiden-apply.out" 2>&1
+"$SHELL_BIN" "$KIT/tools/doctor.sh" --kit "$DXK3" --project "$DX/p-nogit" --apply > "$DX/nogit-apply.out" 2>&1
+check DX40 "F52: --apply lists the dashboard row that moved up because the kit widened SOURCE_FILES" 0 'open-classes 1 -> 2' cat "$DX/widen-apply.out"
+check DX40b "F52: the list says to fix the rows in the same pull request" 0 'moved up after --apply.*fix each in this pull request' cat "$DX/widen-apply.out"
+check DX41 "F52: a project the widening does not touch reads 'no row moved up'" 0 'no row moved up' cat "$DX/nowiden-apply.out"
+check DX42 "F52: a project the dashboard cannot run in (no git repository) reads 'not run' with the reason" 0 'Dashboard after --apply: not run \(the project is not a git repository\)' cat "$DX/nogit-apply.out"
+check DX43 "F52: the plan says that --apply runs the dashboard offline before and after" 0 'runs the dashboard offline \(--offline\) before and after' "$SHELL_BIN" "$KIT/tools/doctor.sh" --kit "$DXK3" --project "$DX/p-widen" --upgrade-plan

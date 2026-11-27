@@ -44,6 +44,9 @@ A row is added to the table, or a config key is set, by a decision in a pull req
    kit's body, with the project's config values, table rows and task commands put back, is written under `scripts/` only (a
    temporary file, verified to equal the kit's body and to parse, then renamed). A script without config block markers is not
    touched: do it by hand. Run the doctor again: it must say `matches kit v<B>` and exit 0 (config values that differ are fine).
+   `--apply` also runs the project's dashboard offline (`--offline`) before and after, and lists the rows that moved up: a path list or a
+   definition the kit widened (the dashboard's `SOURCE_FILES` gained `database/`) counts more files, and the row fails the gate unless the
+   same pull request fixes it. When the dashboard cannot run (a script, git or the repository is missing) it says "not run" and why.
 4. Set the config keys that B added, then re-run: `bash scripts/ci-ratchets.sh --self-test`, `bash scripts/checks.sh --part gate`
    and the project's own checks.
 5. Commit and open the pull request.
