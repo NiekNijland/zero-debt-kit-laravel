@@ -110,3 +110,56 @@ check DX26b "G-09: a docs-only kit commit is not 'behind': the scripts equal the
 mkdir -p "$DX/my proj"
 dx_project "$DX/my proj" v1
 check DX27 "G-10: the plan quotes a project path that holds a space" fail 'my\\ proj --upgrade-plan --apply' dx_doctor --project "$DX/my proj" --upgrade-plan
+
+# F51: --apply carried neither a config key only the project has, nor the self-test cases of a row the project defined itself, and
+# replaced a value that equals an older kit default without showing both. A project at v1 with: a key its own row reads (PROJ_FLOOR_FILE),
+# its own row guide-future-tense (the kit has that row only in its EXTRA fixture) with its own cases.
+dx_project "$DX/p-carry" v1
+sed -i.bak 's/^SOURCE_PATHS=.*$/&\
+PROJ_FLOOR_FILE="scripts\/floor.txt"/; s/^todo  *max  grep .*$/&\
+proj-floor                             min  number @PROJ_FLOOR_FILE\
+guide-future-tense                     max  grep   @SOURCE_PATHS  SHALL_ZZ/; /^guide-future-tense [01] /d; s/^todo 1 \/\/ TODO later$/&\
+guide-future-tense 1 SHALL_ZZ is here\
+guide-future-tense 0 shall/' "$DX/p-carry/scripts/ci-ratchets.sh"
+rm -f "$DX"/p-carry/scripts/*.bak
+cp -R "$DX/p-carry" "$DX/p-carry-apply"
+dx_doctor --project "$DX/p-carry-apply" --apply > "$DX/carry-apply.out" 2>&1
+check DX30 "F51: the project's own row and its own cases pass the self-test before the upgrade (the setup is sound)" 0 'Self-test: [0-9]+ cases run, 0 wrong' "$SHELL_BIN" -c "cd '$DX/p-carry' && bash scripts/ci-ratchets.sh --self-test"
+check DX31 "F51: a key the project added and its own row reads is listed as the project's addition, not as a dropped one" fail 'config keys the project added .*: PROJ_FLOOR_FILE' dx_doctor --project "$DX/p-carry"
+check DX32 "F51: --apply keeps the key the project added in the config block" 0 '^PROJ_FLOOR_FILE="scripts/floor.txt"$' cat "$DX/p-carry-apply/scripts/ci-ratchets.sh"
+check DX33 "F51: --apply keeps the project's cases of its own row: the self-test of the upgraded script passes" 0 'Self-test: [0-9]+ cases run, 0 wrong' "$SHELL_BIN" -c "cd '$DX/p-carry-apply' && bash scripts/ci-ratchets.sh --self-test"
+check DX34 "F51: --apply says which keys it kept" 0 'config keys only the project has are kept.*PROJ_FLOOR_FILE' cat "$DX/carry-apply.out"
+check DX34b "F51: --apply names the rows whose EXTRA and CASES lines are the project's" 0 'rows the project defined itself are kept: .*guide-future-tense' cat "$DX/carry-apply.out"
+check DX35 "F51: after --apply the project is not diverged" 0 'Diverged: no' dx_doctor --project "$DX/p-carry-apply"
+check DX36 "F51: the kit's body is still there after --apply (the line the second version adds)" 0 'doctor-proof: a line the second version adds' cat "$DX/p-carry-apply/scripts/ci-ratchets.sh"
+cp -R "$DX/p-key" "$DX/p-key-apply"
+dx_doctor --project "$DX/p-key-apply" --apply > /dev/null 2>&1
+check DX37 "F51: a key only the project has, which nothing reads, is kept by --apply too (and stays reported)" 0 '^OLD_KEY=1$' cat "$DX/p-key-apply/scripts/debt-dashboard.sh"
+
+# A value that equals an older kit default is replaced, and the output shows both values and the way to keep one.
+DXK2="$DX/kit2"
+mkdir -p "$DXK2/tools" "$DXK2/ci"
+(
+    cd "$DXK2" || exit 1
+    git init -q -b main
+    for f in ci-ratchets debt-dashboard ci-commit-messages ci-parallel kit-config; do cp "$KIT/tools/$f.sh" tools/; done
+    cp "$KIT/ci/checks.sh" ci/
+    echo "1.0.0" > VERSION
+    git add -A && git commit -q -m "kit v1" && git tag v1
+    sed -i.bak 's/^OVERRIDE_AT_ZERO="\(.*\)"$/OVERRIDE_AT_ZERO="\1,dx-extra"/' tools/ci-ratchets.sh
+    rm -f tools/*.bak
+    echo "1.1.0" > VERSION
+    git add -A && git commit -q -m "kit v2"
+) > /dev/null 2>&1
+mkdir -p "$DX/p-stale/scripts"
+for f in tools/ci-ratchets.sh tools/debt-dashboard.sh tools/ci-commit-messages.sh tools/ci-parallel.sh tools/kit-config.sh ci/checks.sh; do
+    git -C "$DXK2" show "v1:$f" > "$DX/p-stale/scripts/$(basename "$f")"
+done
+cp -R "$DX/p-stale" "$DX/p-keep"
+sed -i.bak 's/^OVERRIDE_AT_ZERO="\(.*\)"$/OVERRIDE_AT_ZERO="\1" # kept on purpose: the owner pinned it/' "$DX/p-keep/scripts/ci-ratchets.sh"
+rm -f "$DX"/p-keep/scripts/*.bak
+"$SHELL_BIN" "$KIT/tools/doctor.sh" --kit "$DXK2" --project "$DX/p-stale" --apply > "$DX/stale-apply.out" 2>&1
+check DX38 "F51: --apply lists the replaced value as a conflict, with the project's value and the kit's" 0 'now: OVERRIDE_AT_ZERO=".*dx-extra' cat "$DX/stale-apply.out"
+check DX38b "F51: the conflict block shows the project's earlier value too" 0 'was: OVERRIDE_AT_ZERO="comments' cat "$DX/stale-apply.out"
+check DX38c "F51: the conflict block says how to keep the project's value" 0 'trailing comment with the reason' cat "$DX/stale-apply.out"
+check DX39 "F51: a value with a trailing comment is the project's decision, not a value the kit changed" 0 '^0$' "$SHELL_BIN" -c "'$SHELL_BIN' '$KIT/tools/doctor.sh' --kit '$DXK2' --project '$DX/p-keep' | grep -c 'config values the kit changed' || true"

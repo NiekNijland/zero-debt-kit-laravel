@@ -20,7 +20,10 @@
 # self-test cases in the body no longer fit it. --apply carries those rows and values (the kit's come back). A row or value that
 # equals no kit commit is the project's own and is kept. A row that differs from the kit's when the kit folder has no history to
 # tell the two apart is listed ("differs from the kit") and --apply keeps it: compare it with the kit's by hand and run the self-test.
-# A config block that has a key the other one lacks (a new key of the kit) counts as a divergence: the script needs a value.
+# A config block that has a key the kit's lacks counts as a divergence unless a row, a task or the body reads it (the project's own
+# addition, for example the file of its own min row): such a key is listed and kept. --apply never drops a key: the project's keys the
+# kit's block lacks stay at the end of its block. A key the kit has and the project lacks is a divergence: the script needs a value.
+# The self-test cases (the CASES and EXTRA fixtures) of a row the project defined itself are the project's: not compared, and kept.
 # With --kit pointing into a git repository, the newest kit commit whose script bodies equal the project's is named
 # ("matches kit v0.9.0 / commit abc1234"), or "diverged: body edited locally".
 #
@@ -95,16 +98,24 @@ mkdir -p "$TMP/kit" "$TMP/proj" "$TMP/out"
 
 # ---------------------------------------------------------------- what the project owns, and how to read it
 # normalize [<file of task keys>]: a script without the config block, the rows of the ratchet table and the commands of the task lines.
+# With OWNED_FILE (the names of the table rows the project defined itself) the lines of those rows in the two fixtures of the body
+# (the EXTRA rows and the self-test CASES) are left out too: a row of the project's own has its own cases, and they are its own.
 # With a file of task keys ("<name>#<n>" per line: the kit's tasks) a task line of another key is a task the project added: left out.
 normalize() {
-    awk -v known="${1:-}" '
-        BEGIN { if (known != "") while ((getline l < known) > 0) K[l] = 1 }
+    awk -v known="${1:-}" -v owned="${OWNED_FILE:-}" '
+        BEGIN {
+            if (known != "") while ((getline l < known) > 0) K[l] = 1
+            if (owned != "") while ((getline l < owned) > 0) O[l] = 1
+        }
         /^# >>> config/ { skip = 1; next }
         /^# <<< config/ { skip = 0; next }
         skip { next }
         /^    cat <<.TABLE.$/ { print; intable = 1; next }
         intable && /^TABLE$/ { intable = 0 }
         intable { next }
+        /^    cat <<.(EXTRA|CASES).$/ { print; region = 1; next }
+        region && /^(EXTRA|CASES)$/ { region = 0 }
+        region { r = $1; sub(/@.*/, "", r); if (r in O) next }
         /^[[:space:]]+"[^":]+::.*"$/ {
             name = $0; sub(/^[[:space:]]+"/, "", name); sub(/::.*/, "", name)
             tn[name]++
@@ -140,6 +151,7 @@ function has_code(s,   n, i, c, nx, q, prev) {
     return 0
 }
 function finish(   out) {
+    if (mode == "merge") SEEN[key] = 1
     if (mode == "extract") {
         out = raw
         if (flat) gsub(/\t/, " ", out)
@@ -168,16 +180,31 @@ function begin_entry(line,   v) {
 BEGIN {
     SEP = "\001"
     if (mode == "merge") {
-        while ((getline l < projfile) > 0) { i = index(l, "\t"); P[substr(l, 1, i - 1)] = substr(l, i + 1) }
+        while ((getline l < projfile) > 0) { i = index(l, "\t"); P[substr(l, 1, i - 1)] = substr(l, i + 1); PORD[++np] = substr(l, 1, i - 1) }
         if (taskfile != "") while ((getline l < taskfile) > 0) { i = index(l, "\t"); T[substr(l, 1, i - 1)] = substr(l, i + 1) }
         if (onlyfile != "") while ((getline l < onlyfile) > 0) { i = index(l, "\t"); a = substr(l, 1, i - 1); AFTER[a] = AFTER[a] substr(l, i + 1) "\n" }
+        if (ownedfile != "") while ((getline l < ownedfile) > 0) OWN[l] = 1
+        if (ownlinesfile != "") while ((getline l < ownlinesfile) > 0) {
+            i = index(l, "\t"); reg = substr(l, 1, i - 1); rest = substr(l, i + 1)
+            i = index(rest, "\t"); nown++
+            OREG[nown] = reg; OROW[nown] = substr(rest, 1, i - 1); OLINE[nown] = substr(rest, i + 1)
+        }
     }
 }
 /^# >>> config/ { inblock = 1; if (mode == "merge") print; next }
 /^# <<< config/ {
     if (cmode != "") finish()
     inblock = 0
-    if (mode == "merge") print
+    if (mode == "merge") {
+        # A key only the project has (its own rows read it, or the kit dropped it) is carried, never dropped.
+        for (j = 1; j <= np; j++) {
+            ck = PORD[j]
+            if (ck in SEEN || ck ~ /^#code:/) continue
+            if (!carried_note) { print "# Carried from the project by doctor.sh: keys the kit\047s script does not define."; carried_note = 1 }
+            out = P[ck]; gsub(SEP, "\n", out); print out
+        }
+        print
+    }
     next
 }
 inblock {
@@ -201,6 +228,20 @@ mode == "merge" && /^    cat <<.TABLE.$/ {
 }
 mode == "merge" && intable && /^TABLE$/ { intable = 0; skiptable = 0; print; next }
 mode == "merge" && intable && skiptable { next }
+mode == "merge" && /^    cat <<.(EXTRA|CASES).$/ { print; region = ($0 ~ /EXTRA/) ? "EXTRA" : "CASES"; next }
+mode == "merge" && region != "" && $0 == region {
+    for (j = 1; j <= nown; j++) if (OREG[j] == region && !DONE[j]) { print OLINE[j]; DONE[j] = 1 }
+    region = ""
+    print
+    next
+}
+mode == "merge" && region != "" {
+    r = $1; sub(/@.*/, "", r)
+    if (r in OWN) {
+        for (j = 1; j <= nown; j++) if (OREG[j] == region && OROW[j] == r && !DONE[j]) { print OLINE[j]; DONE[j] = 1 }
+        next
+    }
+}
 mode == "merge" && /^[[:space:]]+"[^":]+::.*"$/ {
     name = $0; sub(/^[[:space:]]+"/, "", name); sub(/::.*/, "", name)
     tcount[name]++
@@ -241,6 +282,54 @@ table_lines() { # table_lines <file>: the rows of the ratchet table, as written
 
 has_table() { grep -q "^    cat <<'TABLE'\$" "$1"; }
 has_block() { grep -q '^# >>> config' "$1" && grep -q '^# <<< config' "$1"; }
+
+extra_lines() { # extra_lines <file>: the rows of the EXTRA fixture of ci-ratchets.sh (the rows tools/README.md "Adding a row" names)
+    awk "/^    cat <<'EXTRA'\$/ { inside = 1; next } /^EXTRA\$/ { inside = 0 } inside && NF" "$1"
+}
+
+# owned_rows <kit file> <project file> <file of every row line the kit's copy ever had>: the names of the rows the project defined
+# itself: a row of the table the kit has in neither its table nor its EXTRA rows, or one that differs from the kit's line and is no
+# older kit line either (a row that equals an older kit line is the kit's change: --apply brings the kit's row and its cases).
+# The self-test cases of such a row are the project's too.
+owned_rows() {
+    { table_lines "$1"; echo "#extra"; extra_lines "$1"; } > "$TMP/o.kit"
+    table_lines "$2" > "$TMP/o.proj"
+    awk '
+        FILENAME == ARGV[1] { h[$0] = 1; next }
+        FILENAME == ARGV[2] { if ($0 == "#extra") { inx = 1; next } if (inx) E[$1] = $0; else T[$1] = $0; next }
+        NF {
+            n = $1
+            if (n in T) { if (T[n] == $0 || ($0 in h)) next; print n; next }
+            if (n in E) { if (E[n] == $0) next; print n; next }
+            print n
+        }' "$3" "$TMP/o.kit" "$TMP/o.proj"
+}
+
+# own_lines <file> <file of owned row names>: "<EXTRA|CASES><TAB><row><TAB><line>" for the lines of the two fixtures that belong to an owned row
+own_lines() {
+    awk '
+        NR == FNR { O[$0] = 1; next }
+        /^    cat <<.(EXTRA|CASES).$/ { reg = ($0 ~ /EXTRA/) ? "EXTRA" : "CASES"; region = 1; next }
+        region && /^(EXTRA|CASES)$/ { region = 0; next }
+        region { r = $1; sub(/@.*/, "", r); if (r in O) print reg "\t" r "\t" $0 }' "$2" "$1"
+}
+
+# kit_key_home <key> <script name>: the other kit script whose config block defines the key ("" when none)
+kit_key_home() {
+    local pair other
+    for pair in $NAMES; do
+        other="${pair%%:*}"
+        [ "$other" != "$2" ] || continue
+        [ -f "$KIT/$(kit_path "$other")" ] || continue
+        if entries "$KIT/$(kit_path "$other")" 1 | cut -f1 | grep -x "$1" > /dev/null; then echo "$other"; return 0; fi
+    done
+    return 0
+}
+
+# key_used <key> <file>: the key is read outside the config block (@KEY in a row, $KEY in a task or the body)
+key_used() {
+    awk '/^# >>> config/ { s = 1; next } /^# <<< config/ { s = 0; next } !s' "$2" | grep -E "(@|[$]\{?)$1([^A-Za-z0-9_]|\$)" > /dev/null
+}
 
 # build_hist <name>: every config entry and ratchet row the kit's copy of the script ever had ($TMP/h-<name>.cfg and .rows)
 build_hist() {
@@ -311,7 +400,7 @@ for pair in $NAMES; do
     out="$TMP/out/$name"
     : > "$out"
     status=""
-    added=0 removed=0 vkeys="" kkeys="" pkeys="" rows_new="" rows_own="" codelines="" stale_keys="" stale_rows="" diff_rows="" stale_tasks=""
+    added=0 removed=0 vkeys="" kkeys="" pkeys="" pkeys_used="" rows_new="" rows_own="" codelines="" stale_keys="" stale_rows="" diff_rows="" stale_tasks=""
 
     if [ ! -f "$pfile" ] && [ ! -f "$kfile" ]; then
         continue
@@ -333,6 +422,12 @@ for pair in $NAMES; do
         fi
     else
         INSTALLED="$INSTALLED $name"
+        OWNED_FILE=""
+        if [ "$name" = ci-ratchets.sh ] && has_table "$kfile" && has_table "$pfile"; then
+            build_hist "$name"
+            owned_rows "$kfile" "$pfile" "$TMP/h-$name.rows" > "$TMP/owned.$name"
+            [ ! -s "$TMP/owned.$name" ] || OWNED_FILE="$TMP/owned.$name"
+        fi
         normalize < "$kfile" > "$TMP/kit/$name"
         task_lines "$kfile" | cut -f1 > "$TMP/kit/$name.taskkeys"
         normalize "$TMP/kit/$name.taskkeys" < "$pfile" > "$TMP/proj/$name"
@@ -343,6 +438,16 @@ for pair in $NAMES; do
         vkeys=$(awk -F'\t' '$1 == "V" && $2 !~ /^#code:/ { printf "%s%s", sep, $2; sep = " " }' "$TMP/out/$name.cmp")
         kkeys=$(awk -F'\t' '$1 == "K" && $2 !~ /^#code:/ { printf "%s%s", sep, $2; sep = " " }' "$TMP/out/$name.cmp")
         pkeys=$(awk -F'\t' '$1 == "P" && $2 !~ /^#code:/ { printf "%s%s", sep, $2; sep = " " }' "$TMP/out/$name.cmp")
+        # A key only the project has: one that its own rows or tasks read is the project's addition (kept, no divergence); another is
+        # one the kit dropped or renamed (a divergence, and --apply keeps it too).
+        pkeys_used=""
+        if [ -n "$pkeys" ]; then
+            allp="$pkeys"
+            pkeys=""
+            for pk in $allp; do
+                if key_used "$pk" "$pfile"; then pkeys_used="${pkeys_used:+$pkeys_used }$pk"; else pkeys="${pkeys:+$pkeys }$pk"; fi
+            done
+        fi
         # Code in the config block: a line that is no assignment, comment or blank, or an assignment that runs something.
         codelines=$(awk -F'\t' '$1 == "P" && $2 ~ /^#code:/ { print $2 }' "$TMP/out/$name.cmp" | while read -r ck; do grep -F "$ck$(printf '\t')" "$TMP/proj/$name.cfg" | awk 'NR == 1' | cut -f2-; done)
         if [ -s "$TMP/kit/$name.taskkeys" ]; then
@@ -410,8 +515,18 @@ for pair in $NAMES; do
             grep -qx "$name" "$TMP/apply_list" || echo "$name" >> "$TMP/apply_list"
         fi
         if [ -n "$pkeys" ]; then
-            echo "config keys only in the project (the kit dropped or renamed them): $pkeys" >> "$out"
+            echo "config keys only in the project (the kit dropped or renamed them; --apply keeps them): $pkeys" >> "$out"
             DIVERGED=1
+        fi
+        if [ -n "$pkeys_used" ]; then
+            echo "config keys the project added (its own rows or tasks read them; kept, and --apply carries them): $pkeys_used" >> "$out"
+        fi
+        for pk in $pkeys $pkeys_used; do
+            home=$(kit_key_home "$pk" "$name")
+            [ -z "$home" ] || echo "  the kit defines $pk in $home now: set the value there, and remove it here when nothing in this script reads it" >> "$out"
+        done
+        if [ -s "${OWNED_FILE:-/dev/null}" ]; then
+            echo "ratchet rows the project defined itself: their lines in the EXTRA and CASES fixtures of the body are the project's, kept by --apply (the kit's cases of those rows are not used): $(tr '\n' ' ' < "$OWNED_FILE" | sed 's/ $//')" >> "$out"
         fi
         if [ -n "$stale_tasks" ]; then
             echo "task lines the kit changed since the project took them (the project's line is an older kit line; --apply brings the kit's; a line the project filled in is its own and is not listed): $stale_tasks" >> "$out"
@@ -443,7 +558,7 @@ for pair in $NAMES; do
     printf '%s\n' "$stale_tasks" > "$TMP/out/$name.staletasks"
     frag="{\"name\":\"$name\",\"status\":\"$status\",\"required\":$([ "$required" -eq 1 ] && echo true || echo false)"
     frag="$frag,\"body_lines_kit_only\":$added,\"body_lines_project_only\":$removed,\"config_holds_code\":$([ -n "$codelines" ] && echo true || echo false)"
-    frag="$frag,\"config_values_differ\":$(list_json "$vkeys"),\"config_keys_only_in_kit\":$(list_json "$kkeys"),\"config_keys_only_in_project\":$(list_json "$pkeys")"
+    frag="$frag,\"config_values_differ\":$(list_json "$vkeys"),\"config_keys_only_in_kit\":$(list_json "$kkeys"),\"config_keys_only_in_project\":$(list_json "$pkeys"),\"config_keys_project_added\":$(list_json "$pkeys_used")"
     frag="$frag,\"ratchet_rows_not_in_project\":$(list_json "$rows_new"),\"ratchet_rows_only_in_project\":$(list_json "$rows_own")"
     frag="$frag,\"ratchet_rows_kit_changed\":$(list_json "$stale_rows"),\"ratchet_rows_differ\":$(list_json "$diff_rows"),\"config_values_kit_changed\":$(list_json "$stale_keys"),\"task_lines_kit_changed\":$(list_json "$stale_tasks")}"
     JSON_FILES="${JSON_FILES:+$JSON_FILES,}$frag"
@@ -468,6 +583,8 @@ if [ -n "$INSTALLED" ]; then
             for name in $INSTALLED; do
                 hit=0
                 if git -C "$KIT" cat-file -e "$c:./$(kit_path "$name")" 2> /dev/null; then
+                    OWNED_FILE=""
+                    [ ! -s "$TMP/owned.$name" ] || OWNED_FILE="$TMP/owned.$name"
                     sum=$(git -C "$KIT" show "$c:./$(kit_path "$name")" 2> /dev/null | normalize | cksum)
                     [ "$sum" != "$(cat "$TMP/proj/$name.sum")" ] || hit=1
                 fi
@@ -597,6 +714,9 @@ if [ "$APPLY" -eq 1 ]; then
             if [ -n "$(cat "$TMP/out/$name.stalekeys" 2> /dev/null)" ]; then
                 awk -F'\t' -v keys="$(cat "$TMP/out/$name.stalekeys")" 'BEGIN { n = split(keys, a, " "); for (i = 1; i <= n; i++) drop[a[i]] = 1 } !($1 in drop)' "$TMP/proj/$name.raw" > "$TMP/proj/$name.raw2" && mv "$TMP/proj/$name.raw2" "$TMP/proj/$name.raw"
                 echo "Doctor: $SCRIPTS_DIR/$name: config values the kit changed are the kit's again: $(cat "$TMP/out/$name.stalekeys")" >&2
+                echo "Doctor: CONFLICTS to decide in $SCRIPTS_DIR/$name (the project's value equals an older kit default, so it counts as no decision; the kit's value replaced it):" >&2
+                awk -F'\t' -v keys="$(cat "$TMP/out/$name.stalekeys")" 'BEGIN { n = split(keys, a, " "); for (i = 1; i <= n; i++) st[a[i]] = 1 } $1 == "V" && ($2 in st) { gsub(/\001/, " ", $3); gsub(/\001/, " ", $4); print "    " $2 "\n      was: " $3 "\n      now: " $4 }' "$TMP/out/$name.cmp" >&2
+                echo "  A value that is counted (SOURCE_PATHS, REFACTOR_SETS, MIN_ROW_TARGETS, ...) can move a ratchet row: run the gate. To keep the project's value, put its line back and add a trailing comment with the reason (# why): a value with a comment is the project's decision and is not listed again." >&2
             fi
             tablefile=""
             if has_table "$kfile" && has_table "$pfile"; then
@@ -616,16 +736,32 @@ if [ "$APPLY" -eq 1 ]; then
                 awk -F'\t' -v keys="$(cat "$TMP/out/$name.staletasks")" 'BEGIN { n = split(keys, a, ","); for (i = 1; i <= n; i++) drop[a[i]] = 1 } !($1 in drop)' "$taskfile" > "$taskfile.2" && mv "$taskfile.2" "$taskfile"
                 echo "Doctor: $SCRIPTS_DIR/$name: task lines the kit changed are the kit's again: $(cat "$TMP/out/$name.staletasks")" >&2
             fi
+            ownlines=""
+            if [ -s "$TMP/owned.$name" ]; then
+                own_lines "$pfile" "$TMP/owned.$name" > "$TMP/proj/$name.ownlines"
+                ownlines="$TMP/proj/$name.ownlines"
+                echo "Doctor: $SCRIPTS_DIR/$name: the EXTRA and CASES lines of the rows the project defined itself are kept: $(tr '\n' ',' < "$TMP/owned.$name" | sed 's/,$//')" >&2
+            fi
+            carried_keys=$(awk -F'\t' '$1 == "P" && $2 !~ /^#code:/ { printf "%s%s", sep, $2; sep = " " }' "$TMP/out/$name.cmp")
+            [ -z "$carried_keys" ] || echo "Doctor: $SCRIPTS_DIR/$name: the config keys only the project has are kept at the end of its config block: $carried_keys" >&2
             onlyfile="$TMP/proj/$name.only"
             [ ! -s "$onlyfile" ] || echo "Doctor: $SCRIPTS_DIR/$name: the task lines the project added are kept: $(cut -f2 "$onlyfile" | sed -E 's/^[[:space:]]+"//; s/::.*//' | tr '\n' ',' | sed 's/,$//')" >&2
-            awk -v mode=merge -v projfile="$TMP/proj/$name.raw" -v tablefile="$tablefile" -v taskfile="$taskfile" -v onlyfile="$onlyfile" "$ENTRIES_AWK" "$kfile" > "$tmpf" || { rm -f "$tmpf"; FAILED=1; continue; }
+            awk -v mode=merge -v projfile="$TMP/proj/$name.raw" -v tablefile="$tablefile" -v taskfile="$taskfile" -v onlyfile="$onlyfile" -v ownedfile="${ownlines:+$TMP/owned.$name}" -v ownlinesfile="$ownlines" "$ENTRIES_AWK" "$kfile" > "$tmpf" || { rm -f "$tmpf"; FAILED=1; continue; }
             [ ! -x "$pfile" ] || chmod +x "$tmpf"
+            OWNED_FILE=""
+            [ ! -s "$TMP/owned.$name" ] || OWNED_FILE="$TMP/owned.$name"
             if ! normalize "$TMP/kit/$name.taskkeys" < "$tmpf" | cmp -s - "$TMP/kit/$name" || ! bash -n "$tmpf" 2> /dev/null; then
                 echo "Doctor: the merged $SCRIPTS_DIR/$name did not verify (body differs from the kit's or does not parse): left unchanged" >&2
                 rm -f "$tmpf"
                 FAILED=1
                 continue
             fi
+        fi
+        if [ "$name" = ci-ratchets.sh ] && [ -f "$pfile" ] && has_table "$pfile" && has_table "$tmpf"; then
+            # Every row whose line the new file changes, adds or removes is a change inside the table: it needs its own tag line.
+            table_lines "$pfile" > "$TMP/t.before"
+            table_lines "$tmpf" > "$TMP/t.after"
+            awk 'FILENAME == ARGV[1] { b[$1] = $0; next } { a[$1] = 1; if (!($1 in b) || b[$1] != $0) printf "%s ", $1 } END { for (k in b) if (!(k in a)) printf "%s ", k }' "$TMP/t.before" "$TMP/t.after" > "$TMP/out/ci-ratchets.sh.changedrows"
         fi
         mv "$tmpf" "$pfile" || { rm -f "$tmpf"; FAILED=1; continue; }
         CHANGED="$CHANGED $name"
@@ -635,6 +771,8 @@ if [ "$APPLY" -eq 1 ]; then
             echo "Applied: $SCRIPTS_DIR/ changed:$CHANGED"
             echo "Every changed guarded file needs the commit tag [ratchet: script] <reason> and a code-owner review."
             carried=$(cat "$TMP/out/ci-ratchets.sh.stalerows" 2> /dev/null | tr -s ' \n' ' ' | sed 's/^ //; s/ $//')
+            # The rows the new file really changed, read from the table before and after, are the tags to write.
+            [ ! -f "$TMP/out/ci-ratchets.sh.changedrows" ] || carried=$(tr -s ' \n' ' ' < "$TMP/out/ci-ratchets.sh.changedrows" | sed 's/^ //; s/ $//')
             case " $CHANGED " in
                 *" ci-ratchets.sh "*)
                     if [ -n "$carried" ]; then
