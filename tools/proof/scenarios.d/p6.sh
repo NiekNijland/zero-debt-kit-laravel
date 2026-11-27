@@ -80,3 +80,8 @@ check P7X03 "P7-1 files-to-copy.md states no switch count of its own" 0 '^0$' "$
 check P7X04 "P7-2 starter-variants.md does not list the GitHub reader family as removed" 0 '^0$' "$SHELL_BIN" -c "grep -c 'starter has its own GitHub reader' '$KIT/docs/starter-variants.md'; exit 0"
 check P7X05 "P7-3 04-guards.md says the secret reader finds the indexed forms" 0 'toJSON\(secrets\)' grep -o 'toJSON(secrets)' "$KIT/04-guards.md"
 check P7X06 "P7-4 starter-canary.yml has no step that puts task lines back" 0 '^0$' "$SHELL_BIN" -c "grep -c 'task lines of checks.sh back' '$KIT/.github/workflows/starter-canary.yml'; exit 0"
+
+# P8: the database health command waits for the real server (finding P8-1), the template note (P8-2).
+check P8X01 "P8-1 no skeleton health command uses the socket form of pg_isready" 0 '^0$' "$SHELL_BIN" -c "cd '$KIT' && cat ci/github-actions.yml ci/github-actions-runner.yml .github/workflows/starter-canary.yml | grep -c 'pg_isready -U'; exit 0"
+check P8X02 "P8-1 the skeletons use the TCP form" 0 '127\.0\.0\.1 -U postgres' grep -o -m1 'pg_isready -h 127.0.0.1 -U postgres' "$KIT/ci/github-actions.yml"
+check P8X03 "P8-2 reference-project/README.md says to drop the export-ignore line" 0 'export-ignore' grep -o -m1 'export-ignore' "$KIT/reference-project/README.md"

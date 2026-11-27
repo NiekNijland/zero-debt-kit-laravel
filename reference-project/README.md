@@ -28,3 +28,6 @@ The CI skeletons of the kit (`ci/`) are proved against example files that live w
 ## Running the starter against the kit
 
 `.github/workflows/starter-canary.yml` (a proposal: see its header) checks out the starter, puts the kit's current scripts into it and runs its checks. A kit change that breaks the starter is found there, not by the next project.
+
+
+A Laravel skeleton's `.gitattributes` marks `/.github export-ignore`. A zip, `git archive` or `composer create-project` copy then lacks the workflows and `CODEOWNERS`; a project that uses its repository as a template drops that line (the starter did).

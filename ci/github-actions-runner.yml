@@ -22,7 +22,7 @@
 #
 # The service blocks of the engines (keep the pair of the engine, delete the others, in every services block of this file; the
 # contract test reads the engine from DATABASE_IMAGE and names an auxiliary image beside it):
-#   postgres  image postgres:17   env POSTGRES_PASSWORD: ci        ports - '5432:5432'   health pg_isready -U postgres
+#   postgres  image postgres:17   env POSTGRES_PASSWORD: ci        ports - '5432:5432'   health pg_isready -h 127.0.0.1 -U postgres
 #   mysql     image mysql:8.4     env MYSQL_ROOT_PASSWORD: ci      ports - '3306:3306'   health mysqladmin ping -h 127.0.0.1 -uroot -pci
 #   mariadb   image mariadb:11.4  env MARIADB_ROOT_PASSWORD: ci    ports - '3306:3306'   health healthcheck.sh --connect --innodb_initialized
 #   mongo     image mongo:8       no variable                      ports - '27017:27017' health mongosh --quiet --eval "db.runCommand({ping:1})"
@@ -152,7 +152,7 @@ jobs:
         ports:
           - '5432:5432'
         options: >-
-          --health-cmd "pg_isready -U postgres"
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres"
           --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
       - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v7.0.1>
@@ -197,7 +197,7 @@ jobs:
         ports:
           - '5432:5432'
         options: >-
-          --health-cmd "pg_isready -U postgres"
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres"
           --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
       - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v7.0.1>
@@ -236,7 +236,7 @@ jobs:
         ports:
           - '5432:5432'
         options: >-
-          --health-cmd "pg_isready -U postgres"
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres"
           --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
       - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v7.0.1>

@@ -126,7 +126,7 @@ final class CiRunnerExamples
                     ports:
                       - '5432:5432'
                     options: >-
-                      --health-cmd "pg_isready -U postgres"
+                      --health-cmd "pg_isready -h 127.0.0.1 -U postgres"
                       --health-interval 5s --health-timeout 5s --health-retries 12
                 steps:
                   - uses: actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # v7.0.1
@@ -170,7 +170,7 @@ final class CiRunnerExamples
                     ports:
                       - '5432:5432'
                     options: >-
-                      --health-cmd "pg_isready -U postgres"
+                      --health-cmd "pg_isready -h 127.0.0.1 -U postgres"
                       --health-interval 5s --health-timeout 5s --health-retries 12
                 steps:
                   - uses: actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # v7.0.1
@@ -208,7 +208,7 @@ final class CiRunnerExamples
                     ports:
                       - '5432:5432'
                     options: >-
-                      --health-cmd "pg_isready -U postgres"
+                      --health-cmd "pg_isready -h 127.0.0.1 -U postgres"
                       --health-interval 5s --health-timeout 5s --health-retries 12
                 steps:
                   - uses: actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # v7.0.1

@@ -203,7 +203,7 @@ jobs:
         # engine from DATABASE_IMAGE). The official images exit at start without their password variable, and GitHub then fails
         # the job at "Initialize containers", before a step runs. Keep the pair of the engine, delete the others (the same in
         # every services block of this file); a container job reaches the service by name on its default port, no ports: needed.
-        #   postgres  POSTGRES_PASSWORD: ci          health  pg_isready -U postgres      (user postgres)
+        #   postgres  POSTGRES_PASSWORD: ci          health  pg_isready -h 127.0.0.1 -U postgres      (user postgres)
         #   mysql     MYSQL_ROOT_PASSWORD: ci        health  mysqladmin ping -h 127.0.0.1 -uroot -pci      (user root)
         #   mariadb   MARIADB_ROOT_PASSWORD: ci      health  healthcheck.sh --connect --innodb_initialized (user root)
         #   mongo     no variable needed             health  mongosh --quiet --eval "db.runCommand({ping:1})"      (mongo:8 holds mongosh)
@@ -217,7 +217,7 @@ jobs:
         env:
           POSTGRES_PASSWORD: ci
         options: >-
-          --health-cmd "pg_isready -U postgres"
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres"
           --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
       - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v7.0.1>
@@ -255,7 +255,7 @@ jobs:
         env:
           POSTGRES_PASSWORD: ci
         options: >-
-          --health-cmd "pg_isready -U postgres"
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres"
           --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
       - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v7.0.1>
@@ -288,7 +288,7 @@ jobs:
         env:
           POSTGRES_PASSWORD: ci
         options: >-
-          --health-cmd "pg_isready -U postgres"
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres"
           --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
       - uses: actions/checkout@<40-character commit sha of the release the project pins> # <release, for example v7.0.1>
