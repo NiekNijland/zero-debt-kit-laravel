@@ -8,6 +8,8 @@ No version is tagged yet; v0.12.0 will be the first tag. The versions before 0.9
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-27
+
 ### Added
 - `09-reviewer-brief.md`, "Default questions of the auditor method" (finding a): the twelve kinds of debt a rule-based dashboard misses (type predicates that check less than they promise, exports used only by tests, allowed-place lists without a row, analyser rules off, limits no test pins, real-time waits, queue timing without a test, untested `down()`, unseeded random for unique columns, clones, load-all and N+1, count-then-insert quotas), each a question with how to count it. `05-program.md` step 10 points at it.
 - `doctor.sh --apply` runs the project's dashboard offline before and after, and lists the rows that moved up because a path list or a definition widened (finding 52: `SOURCE_FILES` gained `database/` and `open-classes` failed the gate in the same pull request); "not run" and why when the dashboard cannot run. Proof scenarios `DX40` to `DX43`. Changed script: `doctor.sh`.
