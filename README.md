@@ -151,7 +151,7 @@ A ratchet row is a name, a direction and a method that counts something in the t
 | `event-fake-all` | max | event fakes with no list of events | It silences every listener. Shrink-only. |
 | `lint-disable` | max | lint disable comments | A disabled rule is a hole in the whole-tree check. |
 | `lint-config-off` | max | rules at `off` or `warn` in the lint config | A rule that is not `error` does not block. One category may stay (a core rule off because its typed replacement is on). |
-| `lint-config-ignores` | max | entries of `ignores` lists in the lint config | An ignore is an exception. One category may stay (generated output, a rule scoped to one kind of file). |
+| `lint-config-ignores` | max | entries of `ignores` lists in the lint config | An ignore is an exception. A category may stay (generated output, a rule scoped to one kind of file, prototypes the owner keeps on purpose: `01-principles.md`, "Kept prototypes"). |
 | `lint-baseline` | max | the linter's bulk suppressions | Counted per entry, so it shrinks. |
 | `type-baseline` | max | lines of every keyed baseline (type-checker flags, unused-code tool) | One line is one finding; a file that grows fails. |
 | `ts-suppressions` | max | `@ts-expect-error`, `@ts-ignore`, `@ts-nocheck` | Type escapes. |

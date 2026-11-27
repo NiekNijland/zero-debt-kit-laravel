@@ -16,7 +16,7 @@ Not measured, and why:
 | --- | ---: | ---: | --- | --- |
 | | | 0 | | ratchet row |
 
-Shrink-only rows (kit `01-principles.md`, "Shrink-only rows"): the three fixed ones, and by decision row: <row or `cap-<key>`, decision id, the evidence why zero is impossible, or the owner's pin of a major version>.
+Shrink-only rows (kit `01-principles.md`, "Shrink-only rows"): the three fixed ones, and by decision row: <row or `cap-<key>`, decision id, the evidence why zero is impossible, or the owner's pin of a major version, or the folder of prototypes the owner keeps on purpose (`01-principles.md`, "Kept prototypes")>.
 
 ### 1b. Other debt
 
