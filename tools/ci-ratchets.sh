@@ -1039,6 +1039,17 @@ selftest_fail() {
     SELFTEST_FAILED=$((SELFTEST_FAILED + 1))
 }
 
+# config_value_has_reason <NAME>: true when the config block of this script sets NAME="..." and a trailing comment follows the
+# closing quote (REFACTOR_SETS="..." # kept: our code uses the earlyReturn set). Such a value is the project's recorded decision.
+config_value_has_reason() {
+    local line rest
+    line=$(grep -a "^$1=\"" "$SELFTEST_SCRIPT" | awk 'NR == 1')
+    [ -n "$line" ] || return 1
+    rest="${line#*\"}"
+    rest="${rest#*\"}"
+    [[ "$rest" =~ ^[[:space:]]*#[[:space:]]*[^[:space:]] ]]
+}
+
 # alt_mutants <extended regular expression>: one line per alternative of an alternation (a member of every group (a|b|c) at any
 # depth, and of the top level), "<the alternative><TAB><the expression without it>". Bracket expressions and escapes are skipped
 # over, so a | or a parenthesis inside [...] or after a backslash is no alternation. Used by the self-test: an alternative whose
@@ -1092,9 +1103,10 @@ selftest() {
     local name method spec got status dir path covered="" witness member mutated base alt_missing=0 alt_total=0 done_rows=""
     local -a rows=() wants=() paths=() texts=() methods=() specs=() states=() extras=() placed=() case_filters=() case_items=()
     local placed_flag case_paths case_item
-    local from_extra=0 tool_skipped=0
+    local from_extra=0 tool_skipped=0 raw_spec kept_cases=0 kept_names=""
     NL=$'\n'
     SELFTEST_FAILED=0
+    SELFTEST_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
     cases="$(selftest_cases)"
     if [ -n "$extra" ]; then
         [ -r "$extra" ] || {
@@ -1179,6 +1191,7 @@ selftest() {
             continue
         fi
         read -r name _ method case_paths spec <<< "$line"
+        raw_spec="$spec"
         spec=$(resolve_spec "$spec" -) || {
             selftest_fail "$row: its expression cannot be resolved"
             index=$((index + 1))
@@ -1220,7 +1233,16 @@ selftest() {
             selftest_fail "$row cannot be counted (exit $status): ${texts[$index]}"
         else
             ran=$((ran + 1))
-            [ "$got" = "${wants[$index]}" ] || selftest_fail "$row counts $got, not ${wants[$index]}: ${texts[$index]}"
+            if [ "$got" != "${wants[$index]}" ]; then
+                # The kit's case describes the kit's value of a config expression (@NAME). A value the project kept with a reason
+                # comment is its own decision (UPGRADING.md): a kit case that counts differently under it is reported, not failed.
+                if [ "${extras[$index]}" = "0" ] && [[ "$raw_spec" =~ ^@[A-Z_]+$ ]] && config_value_has_reason "${raw_spec#@}"; then
+                    kept_cases=$((kept_cases + 1))
+                    case "$kept_names" in *" ${raw_spec#@} "*) ;; *) kept_names="$kept_names ${raw_spec#@} " ;; esac
+                else
+                    selftest_fail "$row counts $got, not ${wants[$index]}: ${texts[$index]}"
+                fi
+            fi
         fi
         index=$((index + 1))
     done
@@ -1332,6 +1354,9 @@ selftest() {
     # In CI a case that needs php or node and was skipped for want of it is a check that did not run.
     if [ "$tool_skipped" -gt 0 ] && [ -n "${CI:-}" ]; then
         selftest_fail "$tool_skipped case(s) were skipped because a counter tool (php or node) is missing on this runner: install it, or the rows they test are not tested"
+    fi
+    if [ "$kept_cases" -gt 0 ]; then
+        echo "Self-test: $kept_cases kit case(s) count differently under the config value(s) the project kept with a reason comment ($(echo $kept_names)): the kept value is the project's decision, so they are not failures."
     fi
     echo "Self-test: $ran cases run, $SELFTEST_FAILED wrong, $skipped skipped (no such row, or a counter tool is missing); $alt_total alternatives of the regex rows, $alt_missing without a case."
     [ -z "$uncovered" ] || echo "Self-test: no fixture for:$uncovered"

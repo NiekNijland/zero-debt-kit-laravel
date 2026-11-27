@@ -207,3 +207,35 @@ check DX40b "F52: the list says to fix the rows in the same pull request" 0 'mov
 check DX41 "F52: a project the widening does not touch reads 'no row moved up'" 0 'no row moved up' cat "$DX/nowiden-apply.out"
 check DX42 "F52: a project the dashboard cannot run in (no git repository) reads 'not run' with the reason" 0 'Dashboard after --apply: not run \(the project is not a git repository\)' cat "$DX/nogit-apply.out"
 check DX43 "F52: the plan says that --apply runs the dashboard offline before and after" 0 'runs the dashboard offline \(--offline\) before and after' "$SHELL_BIN" "$KIT/tools/doctor.sh" --kit "$DXK3" --project "$DX/p-widen" --upgrade-plan
+
+# F53: a value of a counted config expression (REFACTOR_SETS, FORMATTER_RULES, ANALYSER_SWITCHES) that the project kept with a trailing
+# reason comment is its own decision; the kit's self-test cases of that row describe the kit's value, so a case that counts
+# differently under the kept value is reported, not failed. A value without the comment still has to fit the cases.
+# dx_sets_project <folder> <comment: yes|no>: a project of kit v1 whose three expressions differ from the kit's (the prepared set
+# earlyReturn added, rule strict_comparison and switch checkOctaneCompatibility removed).
+dx_sets_project() {
+    dx_project "$1" v1
+    local tail=""
+    [ "$2" != yes ] || tail=' # kept: our code uses the earlyReturn set, and we have no octane or strict comparison'
+    sed -i.bak \
+        -e "/^REFACTOR_SETS=/ { s/(deadCode|/(earlyReturn|deadCode|/; s/\"\$/\"$tail/; }" \
+        -e "/^FORMATTER_RULES=/ { s/(strict_comparison|/(/; s/\"\$/\"$tail/; }" \
+        -e "/^ANALYSER_SWITCHES=/ { s/checkOctaneCompatibility|//; s/\"\$/\"$tail/; }" \
+        "$1/scripts/ci-ratchets.sh"
+    rm -f "$1"/scripts/*.bak
+}
+dx_sets_project "$DX/p-sets-kept" yes
+dx_sets_project "$DX/p-sets-bare" no
+cp -R "$DX/p-sets-kept" "$DX/p-sets-kept-apply"
+"$SHELL_BIN" "$KIT/tools/doctor.sh" --kit "$DXK" --project "$DX/p-sets-kept-apply" --apply > "$DX/sets-apply.out" 2>&1
+check DX44 "F53: the setup changed the values (the self-test of the variant without a comment fails on refactor-sets)" fail 'refactor-sets counts 1, not 0: .*earlyReturn' "$SHELL_BIN" -c "cd '$DX/p-sets-bare' && bash scripts/ci-ratchets.sh --self-test"
+check DX44b "F53: a value without a reason comment still has to fit the kit's cases (formatter-rules)" fail 'formatter-rules counts 0, not 1' "$SHELL_BIN" -c "cd '$DX/p-sets-bare' && bash scripts/ci-ratchets.sh --self-test"
+check DX44c "F53: a value without a reason comment still has to fit the kit's cases (analyser-switches)" fail 'analyser-switches counts 0, not 1' "$SHELL_BIN" -c "cd '$DX/p-sets-bare' && bash scripts/ci-ratchets.sh --self-test"
+check DX45 "F53: with the reason comment the self-test passes for all three counted values" 0 'Self-test: [0-9]+ cases run, 0 wrong' "$SHELL_BIN" -c "cd '$DX/p-sets-kept' && bash scripts/ci-ratchets.sh --self-test"
+check DX45b "F53: the self-test names the values whose cases it did not fail" 0 'case\(s\) count differently under the config value\(s\) the project kept with a reason comment \(ANALYSER_SWITCHES REFACTOR_SETS FORMATTER_RULES\)' "$SHELL_BIN" -c "cd '$DX/p-sets-kept' && bash scripts/ci-ratchets.sh --self-test"
+check DX46 "F53: after the doctor's --apply the kept values are still there" 0 'REFACTOR_SETS=".*earlyReturn.*" # kept' cat "$DX/p-sets-kept-apply/scripts/ci-ratchets.sh"
+check DX46b "F53: after the doctor's --apply the self-test passes with no hand edit of the cases" 0 'Self-test: [0-9]+ cases run, 0 wrong' "$SHELL_BIN" -c "cd '$DX/p-sets-kept-apply' && bash scripts/ci-ratchets.sh --self-test"
+check DX46c "F53: the upgraded script is the kit's second version, so the cases are the kit's" 0 'doctor-proof: a line the second version adds' cat "$DX/p-sets-kept-apply/scripts/ci-ratchets.sh"
+# A project's own cases file stays strict: it describes the project's value, so a wrong count in it fails even with the comment.
+printf 'refactor-sets 0     ->withPreparedSets(earlyReturn: true)\n' > "$DX/sets-own-cases.txt"
+check DX47 "F53: a case of the project's own cases file that counts differently still fails" fail 'refactor-sets counts 1, not 0' "$SHELL_BIN" -c "cd '$DX/p-sets-kept' && bash scripts/ci-ratchets.sh --self-test '$DX/sets-own-cases.txt'"

@@ -8,6 +8,9 @@ No version is tagged yet; v0.12.0 will be the first tag. The versions before 0.9
 
 ## [Unreleased]
 
+### Fixed
+- `ci-ratchets.sh --self-test` (finding 53): a kit case of a row whose expression is a config value (`REFACTOR_SETS`, `FORMATTER_RULES`, `ANALYSER_SWITCHES`, or a project's own `@NAME` row) that counts differently under a value the project kept with a trailing reason comment is reported and no longer fails, so the self-test stays green after `doctor.sh --apply` with a kept value. A value without the comment, and the project's own cases file, stay strict. `UPGRADING.md` and `tools/README.md` say so. Proof scenarios `DX44` to `DX47`. Script changed: `ci-ratchets.sh`.
+
 ## [0.13.0] - 2026-11-27
 
 ### Added
