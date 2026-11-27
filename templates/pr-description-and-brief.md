@@ -60,6 +60,7 @@ You work from that copy of the builder rules and this brief; every kit section t
 ## Scope
 - Files: <explicit list. A selector only when it gives the same files for every builder at every moment; never "the files in the diff">
 - Scratch folder: <a folder of your own, outside the repository; no other builder writes there>
+- Commit trailer (only where this brief gives you the branch): <the exact co-author line, copied from the session of the lead>
 - Infrastructure names: <your container names, network aliases, volumes, ports and database name, each carrying the theme; no other builder uses one, and you touch no name you did not create>
 - Backlog items: <ids>
 - Out of scope: <what you must not touch, and who does>
