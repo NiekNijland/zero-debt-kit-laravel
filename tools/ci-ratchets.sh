@@ -1684,5 +1684,16 @@ if [ "$FAILED" -ne 0 ]; then
     echo "A ratchet moved the wrong way, or a row was redefined or removed. A row that is at 0 takes no override unless it is in OVERRIDE_AT_ZERO: fix the entries. Other rows can be explained in a commit that touches that row's files, or this script for a redefined or removed row:"
     echo "  [ratchet: <name>] <reason>"
 fi
+if [ "$FAILED" -ne 0 ] || [ "$CHECKS_FAILED" -ne 0 ]; then
+    echo "A tag counts only at the START OF A LINE of a commit message: the subject line counts, the middle of a line does not. A squash keeps only the tags written in the squash message: list every [ratchet: ...] line again."
+    # A tag inside a line is the usual reason an override does not apply: name the commits that hold one.
+    MISPLACED=$(for commit in $(git log --no-merges --format=%h "$BASE..$HEAD_SHA"); do
+        git log -1 --format=%B "$commit" | { grep -E '\[ratchet: [^]]+\]' || [ $? -eq 1 ]; } | { grep -v -E '^\[ratchet: ' || [ $? -eq 1 ]; } | awk -v c="$commit" 'NR == 1 { print "  " c ": " substr($0, 1, 100) }'
+    done | awk 'NR <= 5')
+    if [ -n "$MISPLACED" ]; then
+        echo "These commits hold a [ratchet: ...] tag inside a line, which is no override (move it to the start of its own line):"
+        printf '%s\n' "$MISPLACED"
+    fi
+fi
 
 [ "$FAILED" -eq 0 ] && [ "$CHECKS_FAILED" -eq 0 ]

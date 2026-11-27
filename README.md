@@ -31,6 +31,7 @@ analyser-ignore                        down       0       1      +1  FAILS
 
 A ratchet moved the wrong way, or a row was redefined or removed. A row that is at 0 takes no override, except the rows of OVERRIDE_AT_ZERO: fix the entries. Other rows can be explained in a commit that touches that row's files, or this script for a redefined or removed row:
   [ratchet: <name>] <reason>
+A tag counts only at the START OF A LINE of a commit message: the subject line counts, the middle of a line does not. A squash keeps only the tags written in the squash message: list every [ratchet: ...] line again.
 ```
 
 The first output is the message of a guard of the starter (`reference-project/README.md`); the second is what `tools/ci-ratchets.sh` prints when a suppression is added (the numbers are illustrative).

@@ -88,6 +88,16 @@ commit "PROJ-5 feat: one more todo
 
 Do not forget the [ratchet: todo] tag, said the reviewer."
 check_php RX19 "A-17: a tag in the middle of a line is no override" fail '^todo +down +1 +2 +\+1 +FAILS' ratchets
+check_php RX19b "F49: the failure says a tag counts only at the start of a line, and a squash keeps only the tags it lists" fail 'START OF A LINE of a commit message.*squash' ratchets
+check_php RX19c "F49: the failure names the commit that holds a tag inside a line" fail 'hold a \[ratchet: \.\.\.\] tag inside a line' ratchets
+branch x11b
+printf '<?php\n$note = "TODO another";\n' > app/Services/Other.php
+commit "PROJ-5 feat: one more todo [ratchet: todo] in the subject, mid-line"
+check_php RX19d "F49: a tag in the middle of the subject is no override either" fail '^todo +down +1 +2 +\+1 +FAILS' ratchets
+branch x11c
+printf '<?php\n$note = "TODO another";\n' > app/Services/Other.php
+commit "[ratchet: todo] one more todo, the tag opens the subject"
+check_php RX19e "F49: a tag that opens the subject line counts" 0 '^todo +down +1 +2 +\+1 +allowed' ratchets
 
 # ---------------------------------------------------------------- E-002: a max row at 0 takes an override when it is on the list
 git checkout -q -f main
