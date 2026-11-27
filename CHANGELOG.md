@@ -8,6 +8,11 @@ No version is tagged yet; v0.12.0 will be the first tag. The versions before 0.9
 
 ## [Unreleased]
 
+### Fixed
+- `reference-project/files-to-copy.md` and `docs/starter-variants.md` name what the starter has: the ten classes of the GitHub guard, the `tests/Support/Ci/` folder, no switch count of its own (P7-1, P7-2).
+- `04-guards.md` C4: the reader of secret names must also find `secrets['NAME']`, `secrets[format(...)]` and `toJSON(secrets)` (P7-3).
+- `starter-canary.yml` lost the step that put task lines back; the doctor keeps them (P7-4).
+
 ## [0.12.0] - 2026-11-26
 
 The scope is narrowed to what has been run: a Laravel (PHP) backend with a React frontend. A Laravel project without a frontend

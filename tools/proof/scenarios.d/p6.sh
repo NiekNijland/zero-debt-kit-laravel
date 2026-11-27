@@ -72,3 +72,11 @@ if [ -f "$P6RULE" ]; then
     check P6X13 "P6-4 the rule class and its test hold no spaced loose comparison and stay under 400 lines" 0 '^0$' "$SHELL_BIN" -c "cat '$P6RULE' '$KIT/reference-project/examples/php/tests/Unit/AuxiliarySecretRuleTest.php' | grep -c -E '(^|[^=!<>])(==|!=|<>)([^=]|\$)'; exit 0"
     check P6X14 "P6-4 04-guards.md C4 names the declaration of an auxiliary secret and the rule" 0 'AuxiliarySecretRule' grep -o 'AuxiliarySecretRule' "$KIT/04-guards.md"
 fi
+
+# P7: the pointer files name what the starter has (findings P7-1 to P7-4).
+check P7X01 "P7-1 files-to-copy.md names no class the starter lacks (GithubTriggerRules) and the CiExamples folder" 0 '^0$' "$SHELL_BIN" -c "grep -c 'GithubTriggerRules' '$KIT/reference-project/files-to-copy.md'; exit 0"
+check P7X02 "P7-1 files-to-copy.md names the classes the GitHub guard needs" 0 'AuxiliarySecretRule' grep -o 'AuxiliarySecretRule' "$KIT/reference-project/files-to-copy.md"
+check P7X03 "P7-1 files-to-copy.md states no switch count of its own" 0 '^0$' "$SHELL_BIN" -c "grep -c 'the 18 switches' '$KIT/reference-project/files-to-copy.md'; exit 0"
+check P7X04 "P7-2 starter-variants.md does not list the GitHub reader family as removed" 0 '^0$' "$SHELL_BIN" -c "grep -c 'starter has its own GitHub reader' '$KIT/docs/starter-variants.md'; exit 0"
+check P7X05 "P7-3 04-guards.md says the secret reader finds the indexed forms" 0 'toJSON\(secrets\)' grep -o 'toJSON(secrets)' "$KIT/04-guards.md"
+check P7X06 "P7-4 starter-canary.yml has no step that puts task lines back" 0 '^0$' "$SHELL_BIN" -c "grep -c 'task lines of checks.sh back' '$KIT/.github/workflows/starter-canary.yml'; exit 0"

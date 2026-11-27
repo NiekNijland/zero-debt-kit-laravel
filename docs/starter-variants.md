@@ -30,8 +30,8 @@ A variant is built the same way as the starter: the guard comes with its applica
 
 | Guard | What it checked |
 | --- | --- |
-| `CiContractGuard` (Bitbucket form, with `ChecksParts`), `GitlabPipelineGuard`, `GithubWorkflowReader`, `GithubWorkflowRules`, `GithubRunnerRules`, `GithubChecksRules`, `DatabaseEngine` | the contract test of `04-guards.md` C4 for the Bitbucket and GitLab forms and for the runner form of GitHub; the starter has its own GitHub reader for the one workflow it uses |
-| `tests/Support/Ci/CiExamples.php`, `CiHostExamples.php`, `CiHostVariants.php` | the filled skeletons the failing cases change one line of. `CiHostExamples.php` is kept as a proof fixture (`tools/proof/fixtures/ci/`): the proof scenarios `CX27`, `PF03` and `RG06` compare it with `ci/github-actions.yml` and `ci/github-actions-runner.yml` |
+| `CiContractGuard` (Bitbucket form), `GitlabPipelineGuard` | the contract test of `04-guards.md` C4 for the Bitbucket and GitLab forms. The GitHub reader family (`GithubWorkflowReader`, `GithubWorkflowRules`, `GithubRunnerRules`, `GithubChecksRules`, `ChecksParts`, `DatabaseEngine`) is in the starter, with the runner form, the container form, the owner exceptions and the auxiliary workflows |
+| `tests/Support/Ci/CiExamples.php`, `CiHostExamples.php`, `CiHostVariants.php`, `CiRunnerExamples.php` | the filled skeletons the failing cases change one line of. `CiHostExamples.php` is kept as a proof fixture (`tools/proof/fixtures/ci/`): the proof scenarios `CX27`, `PF03` and `RG06` compare it with `ci/github-actions.yml` and `ci/github-actions-runner.yml` |
 
 The `ci/` skeletons for Bitbucket and GitLab are proved by text checks only (`tools/proof/`); their readers have no running code in the starter.
 

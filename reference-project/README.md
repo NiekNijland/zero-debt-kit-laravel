@@ -17,7 +17,7 @@ Only what the starter does not cover and a reader can follow without an applicat
 | `examples/php/tests/Support/Architecture/StoredNameRegisterGuard.php`, `examples/php/tests/Unit/StoredNameRegisterArchitectureTest.php`, `examples/php/database/stored-names/` | stored class names as register files compared with the code in both directions | the starter has no queue, event or notification classes that are stored by name |
 | `examples/frontend/` | `eslint.config.js`, `knip.json`, `tsconfig.json` and the `AGENTS.md` of the frontend folders (React with Inertia) | the starter has no frontend; `catalog/frontend-react.md` points here |
 
-The PHP examples need the shared reader of the starter (`PhpSource`, `PhpFileInspector`, `ClassGraph`, `PhpCallReader`) and its `SourceSandbox`; copy those from the starter first. They were written for an earlier revision of the guard folder, were never run as a whole, and the prose in them is for the reader of the kit (a project deletes it: the ratchet row `comments` counts it).
+The PHP examples need the shared reader of the starter (`PhpSource`, `PhpFileInspector`, `ClassGraph`, `PhpCallReader`) and its `SourceSandbox`; copy those from the starter first (`AuxiliarySecretRule` needs none of them). They were written for an earlier revision of the guard folder, were never run as a whole, and the prose in them is for the reader of the kit (a project deletes it: the ratchet row `comments` counts it).
 
 ## What is not here
 

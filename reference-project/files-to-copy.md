@@ -1,13 +1,13 @@
 # Files to copy from the starter
 
-Paths are in <https://github.com/NiekNijland/zero-debt-laravel>, read at commit `a6a54d6` (pinned to kit commit `119d889`). Order of use: the shared reader first (`04-guards.md` C1), then the documents, then the rest as the program reaches it. A path that a later starter commit moved is the starter's to fix; open the file in the starter and compare with the kit before copying (the kit wins).
+Paths are in <https://github.com/NiekNijland/zero-debt-laravel>, read at commit `5310ea7` (pinned to kit commit `e48979c`). Order of use: the shared reader first (`04-guards.md` C1), then the documents, then the rest as the program reaches it. A path that a later starter commit moved is the starter's to fix; open the file in the starter and compare with the kit before copying (the kit wins).
 
 ## The shared reader and the test support
 
 | Path | For |
 | --- | --- |
 | `tests/Support/Architecture/PhpSource.php`, `PhpFileInspector.php`, `PhpCallReader.php`, `ClassGraph.php`, `TypedReceivers.php`, `FolderScan.php`, `TemporarySource.php`, `YamlNode.php` | the one parser and the folder, call and declaration readers every guard depends on |
-| `tests/Support/SourceSandbox.php`, `Globs.php`, `RecursiveFiles.php`, `ClassNames.php`, `Narrow.php`, `Users.php`, `ApplicationRoutes.php`, `CiExamples.php` | sandbox trees for guard examples, glob and path helpers, the checked narrowing of `mixed` |
+| `tests/Support/SourceSandbox.php`, `Globs.php`, `RecursiveFiles.php`, `ClassNames.php`, `Narrow.php`, `Users.php`, `ApplicationRoutes.php` | sandbox trees for guard examples, glob and path helpers, the checked narrowing of `mixed` |
 | `tests/Support/PHPStan/` | analyser extensions for Pest (`$this` in closures, `arch()`, higher-order calls) and the dead-code provider for by-name framework calls |
 | `tests/Pest.php`, `tests/TestCase.php`, `phpunit.xml`, `tests/Feature/HermeticBaseTest.php` | the hermetic base test, the groups, the database pinned to a host and a port |
 
@@ -22,7 +22,7 @@ Paths are in <https://github.com/NiekNijland/zero-debt-laravel>, read at commit 
 | Queues, schedule, registration | `UniqueJobGuard`, `QueueNameGuard`, `QueuedClassLimitsGuard`, `RateLimiterGuard`, `ScheduledTaskGuard`, `ScheduledOneServerGuard`, `BootstrapRegistrationGuard` |
 | Migrations | `MigrationShapeGuard`, `MigrationClassGuard`, `ConcurrentIndexGuard` |
 | Tests | `TestClassGuard`, `TestTierGuard`, `TestLocationGuard`, `TestHelperFunctionGuard`, `TestHelperMirrorGuard`, `TestAssertionGuard`, `TestCaseFixtureGuard`, `BannedTestCallGuard`, `ReflectionInTestsGuard` |
-| CI and repository files | `CiSafetyGuard`, `GithubWorkflowGuard` with `GithubJobRules` and `GithubTriggerRules`, `CodeOwnersGuard`, `AnalyserPathsGuard`, `ComposerScriptsGuard`, `BlameRevisionsGuard`, with `docs/guards/ci-contract.md` and `tests/Unit/CiContractArchitectureTest.php` |
+| CI and repository files | `CiSafetyGuard`, `GithubWorkflowGuard` with the ten classes it needs in `tests/Support/Architecture/` (`GithubWorkflowReader`, `GithubWorkflowRules`, `GithubJobRules`, `GithubRunnerRules`, `GithubChecksRules`, `ChecksParts`, `DatabaseEngine`, `AuxiliarySecretRule`, `YamlNode`, `PhpSource`; the starter's README names them and a test holds that they read no other class of the test support) and the filled skeletons in `tests/Support/Ci/` (`CiExamples.php`, `CiHostExamples.php`, `CiHostVariants.php`, `CiRunnerExamples.php`), `CodeOwnersGuard`, `AnalyserPathsGuard`, `ComposerScriptsGuard`, `BlameRevisionsGuard`, with `docs/guards/ci-contract.md` and `tests/Unit/CiContractArchitectureTest.php` |
 
 The Pest `arch()` rules are `tests/Unit/Arch*Test.php`, `ActionNamingArchitectureTest.php` and `FinalReadonlyArchitectureTest.php`. Coverage tests that ask the booted application: `tests/Feature/Http/RoutePermissionCoverageTest.php`, `RouteRateLimitCoverageTest.php`, `ObjectLevelAccessTest.php`, `tests/Feature/Database/ColumnTypeTest.php`, `ForeignKeyIndexTest.php`, `MigrationShapeTest.php`, `tests/Feature/Lang/TranslationKeysTest.php`, `tests/Feature/Providers/` (strictness and rate limits).
 
@@ -30,7 +30,7 @@ The Pest `arch()` rules are `tests/Unit/Arch*Test.php`, `ActionNamingArchitectur
 
 | Path | For |
 | --- | --- |
-| `phpstan.neon`, `phpstan-tests.neon` | the analyser at level 10 with the 18 switches and the banned-call rules; the test config with the stub folders |
+| `phpstan.neon`, `phpstan-tests.neon` | the analyser at level 10 with the switches it keeps (the ratchet row `analyser-switches` counts them; the starter has no `tsconfig.json`, so the compiler options of the kit's count are absent) and the banned-call rules; the test config with the stub folders |
 | `rector.php`, `pint.json` | the refactoring sets and the strictness rules of the formatter |
 | `composer.json` | the six composer scripts, the advisory block, the manifest floor |
 | `scripts/checks.sh`, `kit-config.sh`, `ci-ratchets.sh`, `debt-dashboard.sh`, `debt-caps.json`, `keyed-baseline.sh`, `audit-gate.sh`, `audit-exceptions.json`, `ci-commit-messages.sh`, `ci-parallel.sh`, `prepush.sh`, `init.sh`, `coverage-floor.txt`, `mutation.sh`, `mutation-floor.txt` | the kit's scripts with the project's config block; never copy them from here when `tools/` has the newer body: run `tools/doctor.sh` |

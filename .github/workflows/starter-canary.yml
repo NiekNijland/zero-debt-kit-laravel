@@ -85,18 +85,6 @@ jobs:
         timeout-minutes: 5
         working-directory: starter
         run: bash ../kit-main/tools/doctor.sh --project "$PWD" --upgrade-plan --apply
-      - name: Put the starter's own task lines of checks.sh back
-        timeout-minutes: 2
-        working-directory: starter
-        run: |
-          # The doctor drops the task lines a project added while PARTS still names them (starter finding P3-11).
-          git show HEAD:scripts/checks.sh | grep -E '^    "[A-Za-z][A-Za-z ]*::' | while IFS= read -r line; do
-            name="${line#    \"}"
-            name="${name%%::*}"
-            if grep -qF "\"$name::" scripts/checks.sh; then continue; fi
-            awk -v add="$line" '/^    "Guard tests::/ && done != 1 { print add; done = 1 } { print }' scripts/checks.sh > checks.tmp
-            mv checks.tmp scripts/checks.sh
-          done
       - name: Move the kit checkout out of the workspace, the starter's formatter reads every file below it
         timeout-minutes: 2
         run: mv kit-main "$RUNNER_TEMP/kit-main"
