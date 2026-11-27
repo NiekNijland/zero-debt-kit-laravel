@@ -104,7 +104,7 @@ Every task has one way to do it, written down here: copy this file, not the neig
 - **Helpers, fixtures, fakes** <the rule and the support folder>.
 - **Config, clock, container** <the one spelling each>.
 - **Spelling** <the project's test framework and its column of "One spelling in a test">.
-- **Coverage** the floor is `<number>` in `<committed file>`, on its way to the kit's goal of 95 or at it; the `min` ratchet row `coverage-floor` holds it. The mutation score is `<number>` in `scripts/mutation-floor.txt`; the row `mutation-floor` holds it.
+- **Coverage** the floor is the number in `<committed file>`, on its way to the kit's goal of 95 or at it; the `min` ratchet row `coverage-floor` holds it. The mutation score is the number in `scripts/mutation-floor.txt`; the row `mutation-floor` holds it. No number is written in this file: it would be stale at the next raise.
 ```
 
 ---
