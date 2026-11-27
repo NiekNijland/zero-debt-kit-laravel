@@ -267,7 +267,7 @@ More: `docs/adoption-guide.md` (who it is for, what to prepare, what the three g
 
 ## What is proven and what is not
 
-- **The scripts are proven by a proof suite.** `tools/proof/proof.sh` builds scratch repositories and runs more than 600 scenarios against the scripts in `tools/` and `ci/` (it counts scenarios, not features), and `ci-ratchets.sh --self-test` runs 224 regex cases. The proof runs no real analyser, formatter, refactoring tool, coverage tool, unused-code tool or CI host; it replaces the secret scan by `true`.
+- **The scripts are proven by a proof suite.** `tools/proof/proof.sh` builds scratch repositories and runs more than 600 scenarios against the scripts in `tools/` and `ci/` (it counts scenarios, not features), and `ci-ratchets.sh --self-test` runs 382 regex cases. The proof runs no real analyser, formatter, refactoring tool, coverage tool, unused-code tool or CI host; it replaces the secret scan by `true`.
 - **The program has been run on three Laravel applications, all hosted on Bitbucket.** The Bitbucket skeleton ran in real pipelines there, and the lessons of each run are written back into the kit. Only a few measured figures appear in the method files, each marked as one run; the rest of what the runs measured is not published here.
 - **GitHub Actions has run once.** The GitHub skeleton ran on one real repository (a private repository of a free plan, runner form). What was seen and what was not is in `04-guards.md` C4, "What has run". Treat the rest of the GitHub skeleton (the container form, the schedule, a stacked pull request, a required check) as unverified (`docs/adoption-guide.md`, "GitHub first-run notes").
 - **GitLab is untested.** The skeleton exists and is checked against examples only.

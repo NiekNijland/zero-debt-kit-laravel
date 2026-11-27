@@ -44,3 +44,6 @@ check_php NMD09 "dashboard: a sum over two package managers is not measured when
 git checkout -q -- scripts/debt-dashboard.sh
 
 cd "$NM_CWD" || exit 1
+
+# The README states the number of self-test cases the script prints.
+check DOCX08 "docs: the README names the number of self-test cases that the script prints" 0 'same' "$SHELL_BIN" -c "n=\$(bash '$KIT/tools/ci-ratchets.sh' --self-test 2>&1 | grep -o '[0-9]* cases run' | grep -o '^[0-9]*'); grep -q \"runs \$n regex cases\" '$KIT/README.md' && echo same || echo \"README differs from \$n\""
