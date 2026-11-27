@@ -8,11 +8,21 @@ No version is tagged yet; v0.12.0 will be the first tag. The versions before 0.9
 
 ## [Unreleased]
 
-### Fixed
-- The skeleton database health command is the TCP form `pg_isready -h 127.0.0.1 -U <user>` (P8-1): the socket form answers during the image's first-run init server and the first job connection fails.
-- Docs say to drop `/.github export-ignore` from a Laravel `.gitattributes` when the repository is used as a template (P8-2).
+### Added
+- `tools/ci-ratchets.sh --self-test` tests the exclude pathspecs of a row: a built-in case in a file the glob names, and the case syntax `<row>@/<path> <count> <text>` for a project's own excluded folder (finding 30). Changed scripts: `ci-ratchets.sh`.
+- Proof scenarios `NX01` to `NX16` (`tools/proof/scenarios.d/round2.sh`).
+- `10-hazards.md`, "Before a repository can be public": the question in step 1.1, the scan of all refs and of personal data, and that a history rewrite on an existing GitHub repository leaves the old commits reachable through the pull-request refs and by SHA (findings 48, G-30).
+- `08-builder-rules.md`: a per-builder `TEST_TOKEN`, named containers removed with `docker rm -f`, one `node_modules` per environment, the co-author line from the brief, undo of a break from a copy, enum-case clashes in a codemod, and "One machine" (at most three agents in total, one or two full suites, a commit after every file) (findings 28, 31, 33, 35, 38, 41, 44, 46).
+- `07-process.md` section 11: every job failing in one or two seconds with no log is a quota or billing stop, read the check-run annotations; `04-guards.md` "GitHub Actions cost": the minutes of one pull-request run in the profile, the levers that remain, and why the skeletons do not skip jobs by changed path (findings 47, G-29).
+- `catalog/frontend-react.md`: one definition of a swallowed catch (finding 37). `catalog/backend-laravel.md`: `mixed` only at named entry points (finding 27). `tools/README.md`: a sampled mutation run for a test-only branch, the guard-folder exclusion of the three PHP rows, the heredoc heading and the `8bit` spelling (findings 34, 42, 43).
 
 ### Fixed
+- `lint-config-off` reads the severity position only: the `'warn'` inside an `allow` option of a rule is no longer counted (finding 36). Changed scripts: `ci-ratchets.sh`.
+- `CHECK_BASE=origin/main` is read as `main` (finding 39). Changed scripts: `kit-config.sh`, `checks.sh`, `prepush.sh`, `mutation.sh`.
+- One form for dispatching an event, `Event::dispatch(new <X>Event(...))` with no `Dispatchable` trait, because the Laravel code-quality set rewrites `<X>Event::dispatch()` into the `event()` helper the analyser bans (findings 26, 32). The shared Inertia fake is no hit of the per-file mock count (40); the docs name the coverage file and the row, not the number (45).
+- The self-test case count in the README and `04-guards.md` matches what the script prints.
+- The skeleton database health command is the TCP form `pg_isready -h 127.0.0.1 -U <user>` (P8-1): the socket form answers during the image's first-run init server and the first job connection fails.
+- Docs say to drop `/.github export-ignore` from a Laravel `.gitattributes` when the repository is used as a template (P8-2).
 - `reference-project/files-to-copy.md` and `docs/starter-variants.md` name what the starter has: the ten classes of the GitHub guard, the `tests/Support/Ci/` folder, no switch count of its own (P7-1, P7-2).
 - `04-guards.md` C4: the reader of secret names must also find `secrets['NAME']`, `secrets[format(...)]` and `toJSON(secrets)` (P7-3).
 - `starter-canary.yml` lost the step that put task lines back; the doctor keeps them (P7-4).
